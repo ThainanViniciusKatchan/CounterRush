@@ -1,0 +1,14 @@
+[package]
+name    = "core"
+version.workspace      = true
+edition.workspace      = true
+rust-version.workspace = true
+authors.workspace      = true
+license.workspace      = true
+
+[dependencies]
+windows_api = { path = "../windows_api" }
+config      = { path = "../config" }
+tweaks      = { path = "../tweaks" }
+thiserror.workspace = true
+serde.workspace     = true

@@ -1,0 +1,12 @@
+[package]
+name    = "tweaks"
+version.workspace      = true
+edition.workspace      = true
+rust-version.workspace = true
+authors.workspace      = true
+license.workspace      = true
+
+[dependencies]
+windows_api = { path = "../windows_api" }
+thiserror.workspace = true
+serde.workspace     = true

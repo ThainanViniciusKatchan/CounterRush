@@ -1,0 +1,15 @@
+[package]
+name    = "windows_api"
+version.workspace      = true
+edition.workspace      = true
+rust-version.workspace = true
+authors.workspace      = true
+license.workspace      = true
+
+[dependencies]
+thiserror.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+# Bindings oficiais da Microsoft. Adicionar features conforme forem usadas.
+# Exemplo (NÃO ativar agora, só quando um tweak precisar):
+# windows = { version = "0.58", features = ["Win32_System_Power"] }

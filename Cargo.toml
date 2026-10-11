@@ -1,0 +1,31 @@
+[workspace]
+resolver = "2"
+members = [
+    "core",
+    "windows_api",
+    "tweaks",
+    "config",
+]
+
+# A UI (Slint) será adicionada como membro apenas quando iniciarmos essa etapa:
+# "ui",
+
+[workspace.package]
+version      = "0.1.0"
+edition      = "2021"
+rust-version = "1.75"
+authors      = ["Thainan Vinicis Katchan"]
+license      = "GPL-3.0"
+
+[workspace.dependencies]
+# Dependências compartilhadas entre os crates.
+# Adicionar apenas quando um módulo realmente precisar.
+thiserror = "1.0"
+serde     = { version = "1.0", features = ["derive"] }
+toml      = "0.8"
+
+[profile.release]
+opt-level = "z"
+lto       = true
+strip     = true
+panic     = "abort"
