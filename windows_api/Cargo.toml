@@ -8,6 +8,8 @@ license.workspace      = true
 
 [dependencies]
 thiserror.workspace = true
+serde.workspace     = true
+sysinfo.workspace   = true
 
 [target.'cfg(windows)'.dependencies]
 # Bindings oficiais da Microsoft. Adicionar features conforme forem usadas.

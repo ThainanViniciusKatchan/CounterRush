@@ -7,9 +7,12 @@ pub enum CoreError {
     Tweak(#[from] TweakError),
     #[error("Tweak com ID '{0}' não foi encontrado")]
     NotFound(String),
-    #[error("Falha ao iniciar o CS2: {0}")]
-    LaunchFailed(#[from] windows_api::WindowsApiError),
+    #[error("Erro na API do Windows: {0}")]
+    WindowsApi(#[from] windows_api::WindowsApiError),
 }
+
+pub mod classifier;
+pub use classifier::{classify_pc, PcCategory};
 
 pub struct OptimizerCore {
     tweaks: Vec<Box<dyn Tweak>>,
@@ -52,6 +55,12 @@ impl OptimizerCore {
         windows_api::wait_for_process("cs2", timeout)?;
         self.apply_tweaks()?;
         Ok(())
+    }
+
+    pub fn get_hardware_profile(&self) -> Result<(windows_api::HardwareInfo, PcCategory), CoreError> {
+        let info = windows_api::detect_hardware()?;
+        let category = classify_pc(&info);
+        Ok((info, category))
     }
 }
 

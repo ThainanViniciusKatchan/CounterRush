@@ -20,3 +20,6 @@ pub use powershell::run_powershell;
 
 pub mod process;
 pub use process::{is_process_running, wait_for_process};
+
+pub mod hardware;
+pub use hardware::{detect_hardware, CpuInfo, GpuInfo, HardwareInfo, RamInfo};
