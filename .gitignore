@@ -2,3 +2,5 @@ cargo.lock
 .cargo
 target
 steamcmd
+Parameters.md
+/Desativar_Aceleração_GPU

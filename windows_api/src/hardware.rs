@@ -41,6 +41,12 @@ pub fn detect_hardware() -> Result<HardwareInfo, WindowsApiError> {
     Ok(HardwareInfo { cpu, gpu, ram })
 }
 
+pub fn get_cpu_physical_cores() -> usize {
+    let mut sys = System::new();
+    sys.refresh_all();
+    sys.physical_core_count().unwrap_or_else(|| sys.cpus().len())
+}
+
 fn detect_cpu(sys: &System) -> Result<CpuInfo, WindowsApiError> {
     let cpus = sys.cpus();
     if cpus.is_empty() {

@@ -13,7 +13,10 @@ pub enum WindowsApiError {
 }
 
 pub mod launcher;
-pub use launcher::launch_cs2;
+pub use launcher::{
+    launch_cs2, launch_cs2_economico, launch_cs2_intermediario, launch_cs2_potente,
+    launch_cs2_with_args,
+};
 
 pub mod powershell;
 pub use powershell::run_powershell;
@@ -22,4 +25,4 @@ pub mod process;
 pub use process::{is_process_running, wait_for_process};
 
 pub mod hardware;
-pub use hardware::{detect_hardware, CpuInfo, GpuInfo, HardwareInfo, RamInfo};
+pub use hardware::{detect_hardware, get_cpu_physical_cores, CpuInfo, GpuInfo, HardwareInfo, RamInfo};

@@ -26,6 +26,11 @@ impl Tweak for Cs2AffinityTweak {
     }
 
     fn apply(&self) -> Result<(), TweakError> {
+        let physical_cores = windows_api::get_cpu_physical_cores();
+        if physical_cores <= 4 {
+            return Ok(());
+        }
+
         windows_api::wait_for_process("cs2", std::time::Duration::from_secs(60))?;
         let script = "Get-Process -Name 'cs2' | ForEach-Object { $_.ProcessorAffinity = [IntPtr]($_.ProcessorAffinity.ToInt64() -band -2) }";
         run_powershell(script).map_err(|err| match err {

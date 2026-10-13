@@ -62,6 +62,42 @@ impl OptimizerCore {
         let category = classify_pc(&info);
         Ok((info, category))
     }
+
+    pub fn launch_economico(&self) -> Result<(), CoreError> {
+        windows_api::launch_cs2_economico()?;
+        Ok(())
+    }
+
+    pub fn launch_intermediario(&self) -> Result<(), CoreError> {
+        windows_api::launch_cs2_intermediario()?;
+        Ok(())
+    }
+
+    pub fn launch_potente(&self) -> Result<(), CoreError> {
+        windows_api::launch_cs2_potente()?;
+        Ok(())
+    }
+
+    pub fn launch_by_category(&self, category: PcCategory) -> Result<(), CoreError> {
+        match category {
+            PcCategory::Economico => self.launch_economico(),
+            PcCategory::Intermediario => self.launch_intermediario(),
+            PcCategory::Potente => self.launch_potente(),
+        }
+    }
+
+    pub fn launch_auto(&self) -> Result<PcCategory, CoreError> {
+        let (_, category) = self.get_hardware_profile()?;
+        self.launch_by_category(category)?;
+        Ok(category)
+    }
+
+    pub fn launch_and_optimize_auto(&self, timeout: std::time::Duration) -> Result<PcCategory, CoreError> {
+        let category = self.launch_auto()?;
+        windows_api::wait_for_process("cs2", timeout)?;
+        self.apply_tweaks()?;
+        Ok(category)
+    }
 }
 
 impl Default for OptimizerCore {
