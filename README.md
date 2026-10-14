@@ -13,10 +13,10 @@
 
 #### O que já foi feito:
 
-- [x] ~~Iniciar o jogo por meio da Steam diretamente no software.~~
-- [x] ~~Iniciar o game com parâmetros atualizados para o CS2 e adequados para o seu hardware.~~
-- [x] ~~Desativar o núcleo 0 do processador, já que ele é utilizado por programas em segundo plano, gerando disputa entre o jogo e os serviços abertos no computador.~~
-- [x] ~~Aumentar a prioridade do processo do jogo, mantendo-o em primeiro plano para o processador.~~
+- [x] Iniciar o jogo por meio da Steam diretamente no software.
+- [x] Iniciar o game com parâmetros atualizados para o CS2 e adequados para o seu hardware.
+- [x] Desativar o núcleo 0 do processador, já que ele é utilizado por programas em segundo plano, gerando disputa entre o jogo e os serviços abertos no computador.
+- [x] Aumentar a prioridade do processo do jogo, mantendo-o em primeiro plano para o processador.
 
 ### O que está sendo feito:
 
