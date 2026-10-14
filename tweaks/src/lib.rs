@@ -35,3 +35,12 @@ pub use priority::Cs2PriorityTweak;
 
 pub mod affinity;
 pub use affinity::Cs2AffinityTweak;
+
+pub mod gpu_acceleration;
+pub use gpu_acceleration::{
+    disable_all_gpu_accel, disable_chromium_gpu_accel, disable_discord_gpu_accel,
+    disable_firefox_gpu_accel, disable_steam_gpu_accel, enable_all_gpu_accel,
+    enable_chromium_gpu_accel, enable_discord_gpu_accel, enable_firefox_gpu_accel,
+    enable_steam_gpu_accel, ChromiumGpuAccelTweak, DiscordGpuAccelTweak, FirefoxGpuAccelTweak,
+    SteamGpuAccelTweak,
+};

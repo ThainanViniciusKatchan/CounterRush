@@ -28,6 +28,10 @@ impl OptimizerCore {
     pub fn register_default_tweaks(&mut self) {
         self.register(tweaks::Cs2PriorityTweak);
         self.register(tweaks::Cs2AffinityTweak);
+        self.register(tweaks::DiscordGpuAccelTweak);
+        self.register(tweaks::SteamGpuAccelTweak);
+        self.register(tweaks::ChromiumGpuAccelTweak);
+        self.register(tweaks::FirefoxGpuAccelTweak);
     }
 
     pub fn register<T: Tweak + 'static>(&mut self, tweak: T) {
@@ -97,6 +101,16 @@ impl OptimizerCore {
         windows_api::wait_for_process("cs2", timeout)?;
         self.apply_tweaks()?;
         Ok(category)
+    }
+
+    pub fn disable_all_gpu_acceleration(&self) -> Result<(), CoreError> {
+        tweaks::disable_all_gpu_accel()?;
+        Ok(())
+    }
+
+    pub fn rollback_all_gpu_acceleration(&self) -> Result<(), CoreError> {
+        tweaks::enable_all_gpu_accel()?;
+        Ok(())
     }
 }
 
