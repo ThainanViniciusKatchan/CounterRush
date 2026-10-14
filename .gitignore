@@ -1,6 +1,10 @@
+# Cargo Files
 cargo.lock
 .cargo
 target
+
+# Project Guide File
 steamcmd
 Parameters.md
-/Desativar_Aceleração_GPU
+Desativar_Aceleração_GPU
+Empty_Standby_List_Clean
