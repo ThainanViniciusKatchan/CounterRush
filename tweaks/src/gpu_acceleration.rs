@@ -114,6 +114,11 @@ impl Tweak for SteamGpuAccelTweak {
 }
 
 pub fn disable_steam_gpu_accel() -> Result<(), TweakError> {
+    if windows_api::is_process_running("cs2").unwrap_or(false) {
+        return Err(TweakError::ValidationFailed(
+            "O CS2 está em execução. Feche o jogo antes de alterar a aceleração de GPU da Steam.".to_string(),
+        ));
+    }
     let script = r#"
         Get-Process -Name "steam", "steamwebhelper" -ErrorAction SilentlyContinue | Stop-Process -Force
         Start-Sleep -Seconds 1
@@ -144,6 +149,11 @@ pub fn disable_steam_gpu_accel() -> Result<(), TweakError> {
 }
 
 pub fn enable_steam_gpu_accel() -> Result<(), TweakError> {
+    if windows_api::is_process_running("cs2").unwrap_or(false) {
+        return Err(TweakError::ValidationFailed(
+            "O CS2 está em execução. Feche o jogo antes de alterar a aceleração de GPU da Steam.".to_string(),
+        ));
+    }
     let script = r#"
         Get-Process -Name "steam", "steamwebhelper" -ErrorAction SilentlyContinue | Stop-Process -Force
         Start-Sleep -Seconds 1

@@ -28,10 +28,6 @@ impl OptimizerCore {
     pub fn register_default_tweaks(&mut self) {
         self.register(tweaks::Cs2PriorityTweak);
         self.register(tweaks::Cs2AffinityTweak);
-        self.register(tweaks::DiscordGpuAccelTweak);
-        self.register(tweaks::SteamGpuAccelTweak);
-        self.register(tweaks::ChromiumGpuAccelTweak);
-        self.register(tweaks::FirefoxGpuAccelTweak);
     }
 
     pub fn register<T: Tweak + 'static>(&mut self, tweak: T) {
@@ -40,6 +36,11 @@ impl OptimizerCore {
 
     pub fn tweaks(&self) -> &[Box<dyn Tweak>] {
         &self.tweaks
+    }
+
+    pub fn empty_standby_list(&self) -> Result<(), CoreError> {
+        tweaks::empty_standby_list()?;
+        Ok(())
     }
 
     pub fn launch_game(&self) -> Result<(), CoreError> {
@@ -55,6 +56,7 @@ impl OptimizerCore {
     }
 
     pub fn launch_and_optimize(&self, timeout: std::time::Duration) -> Result<(), CoreError> {
+        let _ = self.empty_standby_list();
         self.launch_game()?;
         windows_api::wait_for_process("cs2", timeout)?;
         self.apply_tweaks()?;
@@ -97,6 +99,7 @@ impl OptimizerCore {
     }
 
     pub fn launch_and_optimize_auto(&self, timeout: std::time::Duration) -> Result<PcCategory, CoreError> {
+        let _ = self.empty_standby_list();
         let category = self.launch_auto()?;
         windows_api::wait_for_process("cs2", timeout)?;
         self.apply_tweaks()?;

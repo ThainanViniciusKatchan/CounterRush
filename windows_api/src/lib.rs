@@ -26,3 +26,6 @@ pub use process::{is_process_running, wait_for_process};
 
 pub mod hardware;
 pub use hardware::{detect_hardware, get_cpu_physical_cores, CpuInfo, GpuInfo, HardwareInfo, RamInfo};
+
+pub mod memory;
+pub use memory::empty_standby_list;

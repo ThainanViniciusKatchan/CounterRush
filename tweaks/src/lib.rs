@@ -44,3 +44,6 @@ pub use gpu_acceleration::{
     enable_steam_gpu_accel, ChromiumGpuAccelTweak, DiscordGpuAccelTweak, FirefoxGpuAccelTweak,
     SteamGpuAccelTweak,
 };
+
+pub mod memory;
+pub use memory::{empty_standby_list, EmptyStandbyListTweak};
