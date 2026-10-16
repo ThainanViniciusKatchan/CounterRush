@@ -20,14 +20,20 @@
 - [x] Desativar a utilização da GPU por outros programas (Discord, Steam e navegadores), liberando VRAM e recursos com rollback opcional.
 - [x] Limpar a memória RAM livre eliminando páginas em standby (clone nativo do Empty Standby List do RAMMap).
 - [x] Otimização de DPI e desativação de otimizações de janela do DirectX (DPI_Otimização).
+- [x] Otimização na leitura dos dados da RAM desativando a compactação de memória
 
 ### O que está sendo feito:
 
-- [ ] Interface gráfica moderna (Slint) com switches e controles modulares.
+- [ ] Diminui o Temporizador de eventos de alta precisão
+
+- [ ] Definir a resolução de temporizador do sistema para 0.5ms
+
+- [ ] desativar o modo jogo do windows
 
 ### O que ainda vai ser feito:
 
 - Função para criar binds (atalhos dentro do game) para todos os comandos permitidos em servidores oficiais e comandos de treino.
+- Interface gráfica moderna (Slint) com switches e controles modulares.
 - Função para configurar o próprio `autoexec.cfg` ou baixar a configuração de algum profissional.
 - Possibilidade de abrir e, talvez, baixar mapas da Oficina diretamente pelo software.
 
