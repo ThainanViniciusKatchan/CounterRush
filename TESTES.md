@@ -50,10 +50,18 @@ cargo run -p windows_api --example test_launcher
 
 ## 5. Tweaks de Processo (Prioridade e Afinidade)
 
-Verifica a contagem de núcleos físicos da CPU, consulta o status atual e aplica prioridade `RealTime` e isolamento do Core 0 (`-band -2`) no processo `cs2.exe` (a afinidade só é aplicada em processadores com mais de 4 núcleos).
+Inicia o Counter-Strike 2 via Steam automaticamente (caso ainda não esteja em execução), aguarda a detecção do processo `cs2.exe` e aplica os ajustes de processo diretamente, podendo executar cada um separadamente ou ambos juntos:
 
 ```powershell
-cargo run -p tweaks --example test_process_tweaks
+# 5.1. Abrir jogo (se fechado) e aplicar apenas a Prioridade RealTime
+cargo run -p tweaks --example test_process_tweaks -- --priority
+
+# 5.2. Abrir jogo (se fechado) e aplicar apenas a Afinidade de CPU (sem Core 0 em CPUs > 4 núcleos)
+cargo run -p tweaks --example test_process_tweaks -- --affinity
+
+# 5.3. Abrir jogo (se fechado) e aplicar ambos os tweaks em conjunto
+cargo run -p tweaks --example test_process_tweaks -- --all
+# (ou simplesmente: cargo run -p tweaks --example test_process_tweaks)
 ```
 
 ---
@@ -142,4 +150,21 @@ Esvazia a lista de memória em standby do Windows através da Native API (`NtSet
 
 ```powershell
 cargo run -p tweaks --example test_empty_standby
+```
+
+---
+
+## 9. Otimização de DPI e Modo Janela do CS2
+
+Configura flags de compatibilidade do Windows (`~ DISABLEDXMAXIMIZEDWINDOWEDMODE PERPROCESSSYSTEMDPIFORCEOFF HIGHDPIAWARE`) na chave de registro do CS2 para mitigar latência de entrada (input lag), desativar otimizações de janela do DirectX e desligar o escalonamento incorreto de DPI.
+
+```powershell
+# 9.1. Aplicar a otimização de DPI no Registro e disparar o CS2 via Steam
+cargo run -p tweaks --example test_dpi_optimization -- --apply
+
+# 9.2. Executar o Fallback (Rollback) para remover a chave do Registro e restaurar o padrão
+cargo run -p tweaks --example test_dpi_optimization -- --rollback
+
+# 9.3. Consultar o status atual da chave no Registro
+cargo run -p tweaks --example test_dpi_optimization -- --status
 ```

@@ -115,6 +115,21 @@ impl OptimizerCore {
         tweaks::enable_all_gpu_accel()?;
         Ok(())
     }
+
+    pub fn apply_dpi_optimization(&self) -> Result<(), CoreError> {
+        tweaks::apply_cs2_dpi_tweak()?;
+        Ok(())
+    }
+
+    pub fn rollback_dpi_optimization(&self) -> Result<(), CoreError> {
+        tweaks::rollback_cs2_dpi_tweak()?;
+        Ok(())
+    }
+
+    pub fn launch_with_dpi_optimization(&self) -> Result<(), CoreError> {
+        tweaks::launch_cs2_with_dpi_tweak()?;
+        Ok(())
+    }
 }
 
 impl Default for OptimizerCore {

@@ -47,3 +47,9 @@ pub use gpu_acceleration::{
 
 pub mod memory;
 pub use memory::{empty_standby_list, EmptyStandbyListTweak};
+
+pub mod dpi;
+pub use dpi::{
+    apply_cs2_dpi_tweak, launch_cs2_with_dpi_tweak, rollback_cs2_dpi_tweak,
+    Cs2DpiOptimizationTweak, CS2_DPI_APPLY_CMD, CS2_DPI_QUERY_CMD, CS2_DPI_ROLLBACK_CMD,
+};
