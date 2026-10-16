@@ -1,3 +1,5 @@
+[🇺🇸 Read in English](RDM_EN-US.md)
+
 | **COUNTER RUSH**                                                                        |
 | --------------------------------------------------------------------------------------- |
 | Jogue CS com mais desempenho, aumente seu FPS, elimine travamentos e quedas de quadros. |
@@ -28,7 +30,7 @@
 
 - [ ] Definir a resolução de temporizador do sistema para 0.5ms
 
-- [ ] desativar o modo jogo do windows
+- [ ] desativar o modo jogo do windows e outros recursos do Windows GameBar
 
 ### O que ainda vai ser feito:
 
