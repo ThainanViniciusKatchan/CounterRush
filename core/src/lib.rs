@@ -38,6 +38,11 @@ impl OptimizerCore {
         &self.tweaks
     }
 
+    pub fn empty_standby_list(&self) -> Result<(), CoreError> {
+        tweaks::empty_standby_list()?;
+        Ok(())
+    }
+
     pub fn launch_game(&self) -> Result<(), CoreError> {
         windows_api::launch_cs2()?;
         Ok(())
@@ -51,6 +56,7 @@ impl OptimizerCore {
     }
 
     pub fn launch_and_optimize(&self, timeout: std::time::Duration) -> Result<(), CoreError> {
+        let _ = self.empty_standby_list();
         self.launch_game()?;
         windows_api::wait_for_process("cs2", timeout)?;
         self.apply_tweaks()?;
@@ -93,10 +99,36 @@ impl OptimizerCore {
     }
 
     pub fn launch_and_optimize_auto(&self, timeout: std::time::Duration) -> Result<PcCategory, CoreError> {
+        let _ = self.empty_standby_list();
         let category = self.launch_auto()?;
         windows_api::wait_for_process("cs2", timeout)?;
         self.apply_tweaks()?;
         Ok(category)
+    }
+
+    pub fn disable_all_gpu_acceleration(&self) -> Result<(), CoreError> {
+        tweaks::disable_all_gpu_accel()?;
+        Ok(())
+    }
+
+    pub fn rollback_all_gpu_acceleration(&self) -> Result<(), CoreError> {
+        tweaks::enable_all_gpu_accel()?;
+        Ok(())
+    }
+
+    pub fn apply_dpi_optimization(&self) -> Result<(), CoreError> {
+        tweaks::apply_cs2_dpi_tweak()?;
+        Ok(())
+    }
+
+    pub fn rollback_dpi_optimization(&self) -> Result<(), CoreError> {
+        tweaks::rollback_cs2_dpi_tweak()?;
+        Ok(())
+    }
+
+    pub fn launch_with_dpi_optimization(&self) -> Result<(), CoreError> {
+        tweaks::launch_cs2_with_dpi_tweak()?;
+        Ok(())
     }
 }
 

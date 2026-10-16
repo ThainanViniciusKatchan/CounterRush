@@ -17,11 +17,13 @@
 - [x] Iniciar o game com parâmetros atualizados para o CS2 e adequados para o seu hardware.
 - [x] Desativar o núcleo 0 do processador, já que ele é utilizado por programas em segundo plano, gerando disputa entre o jogo e os serviços abertos no computador.
 - [x] Aumentar a prioridade do processo do jogo, mantendo-o em primeiro plano para o processador.
+- [x] Desativar a utilização da GPU por outros programas (Discord, Steam e navegadores), liberando VRAM e recursos com rollback opcional.
+- [x] Limpar a memória RAM livre eliminando páginas em standby (clone nativo do Empty Standby List do RAMMap).
+- [x] Otimização de DPI e desativação de otimizações de janela do DirectX (DPI_Otimização).
 
 ### O que está sendo feito:
 
-- [ ] Desativar a utilização da GPU (placa de vídeo) por outros programas, como Discord, Steam e navegadores, pois a concorrência por recursos pode diminuir o FPS ou causar travamentos.
-- [ ] Limpar a memória RAM livre eliminando arquivos em standby (processos não utilizados no momento que ficam salvos na memória), liberando mais recursos para o jogo.
+- [ ] Interface gráfica moderna (Slint) com switches e controles modulares.
 
 ### O que ainda vai ser feito:
 
