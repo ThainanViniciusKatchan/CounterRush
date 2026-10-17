@@ -24,6 +24,7 @@
 - [x] Otimização de DPI e desativação de otimizações de janela do DirectX (DPI_Otimização).
 - [x] Otimização na leitura dos dados da RAM desativando a compactação de memória
 - [x] Definir a resolução de temporizador do sistema para 0.5ms
+- [x] Otimização do agendador multimídia (MMCSS) adaptado por perfil de hardware, priorizando rede, CPU, GPU e I/O de disco para jogos.
 
 ### O que está sendo feito:
 

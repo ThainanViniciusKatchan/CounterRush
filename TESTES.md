@@ -218,3 +218,30 @@ cargo run -p tweaks --example test_timer_resolution -- --rollback-reg
 cargo run -p tweaks --example test_timer_resolution -- --status
 ```
 
+---
+
+## 12. Otimização MMCSS (Multimedia Class Scheduler Service)
+
+Gerencia a prioridade de rede, CPU, GPU e I/O de disco do Windows no `SystemProfile` e no perfil `Tasks\Games`, adaptando os valores automaticamente ao hardware da máquina (PC Forte vs PC Fraco / Quad-Core).
+
+> [!IMPORTANT]
+> A gravação de chaves sob `HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile` exige privilégios de Administrador. Execute o terminal PowerShell como Administrador.
+
+```powershell
+# 12.1. Aplicar automaticamente conforme o hardware detectado (PC Forte vs PC Fraco)
+cargo run -p tweaks --example test_mmcss -- --apply
+
+# 12.2. Forçar perfil PC Forte (6+ núcleos / 16GB+ RAM)
+cargo run -p tweaks --example test_mmcss -- --apply-forte
+
+# 12.3. Forçar perfil PC Fraco / Quad-Core / 8GB RAM
+cargo run -p tweaks --example test_mmcss -- --apply-fraco
+
+# 12.4. Rollback (restaurar todos os valores para o padrão de fábrica do Windows)
+cargo run -p tweaks --example test_mmcss -- --rollback
+
+# 12.5. Consultar status atual de cada chave no Registro
+cargo run -p tweaks --example test_mmcss -- --status
+```
+
+

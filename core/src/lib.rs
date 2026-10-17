@@ -175,7 +175,33 @@ impl OptimizerCore {
         let applied = tweaks::is_timer_registry_applied()?;
         Ok(applied)
     }
+
+    pub fn apply_all_mmcss(&self) -> Result<tweaks::MmcssHardwareTier, CoreError> {
+        let tier = tweaks::apply_all_mmcss()?;
+        Ok(tier)
+    }
+
+    pub fn apply_mmcss_with_tier(&self, tier: tweaks::MmcssHardwareTier) -> Result<(), CoreError> {
+        tweaks::apply_mmcss_with_tier(tier)?;
+        Ok(())
+    }
+
+    pub fn rollback_all_mmcss(&self) -> Result<(), CoreError> {
+        tweaks::rollback_all_mmcss()?;
+        Ok(())
+    }
+
+    pub fn get_mmcss_status(&self) -> Result<tweaks::MmcssStatus, CoreError> {
+        let status = tweaks::get_mmcss_status()?;
+        Ok(status)
+    }
+
+    pub fn is_mmcss_applied_for_current_hardware(&self) -> Result<bool, CoreError> {
+        let applied = tweaks::is_mmcss_applied_for_current_hardware()?;
+        Ok(applied)
+    }
 }
+
 
 
 impl Default for OptimizerCore {
