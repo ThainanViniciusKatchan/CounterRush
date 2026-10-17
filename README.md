@@ -28,9 +28,15 @@
 
 ### O que está sendo feito:
 
-- [ ] Diminui o Temporizador de eventos de alta precisão
+- [ ] Diminui o Temporizador de eventos de alta precisão.
 
-- [ ] desativar o modo jogo do windows e outros recursos do Windows GameBar
+- [ ] desativar o modo jogo do windows e outros recursos do Windows GameBar.
+
+- [ ] Ativar o Modo MSI (Message Signaled-Based Interrupts).
+
+- [ ] Desativar Economia de Energia PCIe e USB.
+
+- [ ] Fila de Quadros Renderizados (Render Queue / Flip Queue).
 
 ### O que ainda vai ser feito:
 
@@ -38,6 +44,7 @@
 - Interface gráfica moderna (Slint) com switches e controles modulares.
 - Função para configurar o próprio `autoexec.cfg` ou baixar a configuração de algum profissional.
 - Possibilidade de abrir e, talvez, baixar mapas da Oficina diretamente pelo software.
+- Vizualização do Ranking valve diretamente na interface do software.
 
 <p align="center">
   <a href="https://feitonobrasil.dev.br"><img src="https://selo.feitonobrasil.dev.br/en/branco-colorido/1x.svg" alt="Made in Brazil" height="56"></a>
