@@ -23,12 +23,11 @@
 - [x] Purge free RAM by clearing standby pages (native clone of RAMMap's Empty Standby List).
 - [x] DPI optimization and disabling DirectX fullscreen windowed optimizations (DPI Optimization).
 - [x] Optimize RAM data reads by disabling memory compression.
+- [x] Set system timer resolution to 0.5ms.
 
 ### What is currently in progress:
 
 - [ ] Decrease High Precision Event Timer (HPET).
-
-- [ ] Set system timer resolution to 0.5ms.
 
 - [ ] Disable Windows Game Mode and other Windows GameBar features.
 

@@ -59,3 +59,12 @@ pub use memory_compression::{
     disable_memory_compression, enable_memory_compression, get_memory_compression_status,
     MemoryCompressionTweak,
 };
+
+pub mod timer_resolution;
+pub use timer_resolution::{
+    apply_timer_registry, apply_timer_resolution, is_precision_reduced,
+    is_timer_registry_applied, rollback_timer_all, rollback_timer_registry,
+    rollback_timer_resolution, test_timer_precision, TimerApplyResult, TimerResolutionTweak,
+    REG_KERNEL_KEY, REG_TIMER_VALUE,
+};
+

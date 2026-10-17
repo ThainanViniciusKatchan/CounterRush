@@ -188,3 +188,33 @@ cargo run -p tweaks --example test_memory_compression -- --enable
 # 10.3. Consultar status atual no MMAgent e RAM detectada
 cargo run -p tweaks --example test_memory_compression -- --status
 ```
+
+---
+
+## 11. Resolução de Temporizador do Sistema (0.5ms)
+
+Gerencia a resolução do temporizador do Windows cravando-a em 0.5 ms através de chamadas nativas `NtSetTimerResolution`, habilitando a diretiva global `GlobalTimerResolutionRequests` no Registro e medindo a precisão das pausas com `NtDelayExecution`.
+
+> [!IMPORTANT]
+> A configuração do Registro e os ajustes de timer exigem privilégios de Administrador. Execute o terminal PowerShell como Administrador.
+
+```powershell
+# 11.1. Aplicar timer de 0.5ms (testa comando 1 Timer05; se não reduzir, usa fallback KernelTimer) e testa 10 pausas
+cargo run -p tweaks --example test_timer_resolution -- --apply
+
+# 11.2. Apenas testar precisão do timer atual (10 pausas de 0.5ms com NtDelayExecution)
+cargo run -p tweaks --example test_timer_resolution -- --test
+
+# 11.3. Rollback completo (restaura timer com NtSetTimerResolution Set=false e remove chave do Registro)
+cargo run -p tweaks --example test_timer_resolution -- --rollback
+
+# 11.4. Rollback apenas do timer
+cargo run -p tweaks --example test_timer_resolution -- --rollback-timer
+
+# 11.5. Rollback apenas do registro
+cargo run -p tweaks --example test_timer_resolution -- --rollback-reg
+
+# 11.6. Consultar status do registro e informações do tweak
+cargo run -p tweaks --example test_timer_resolution -- --status
+```
+

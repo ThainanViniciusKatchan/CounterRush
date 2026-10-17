@@ -23,12 +23,11 @@
 - [x] Limpar a memória RAM livre eliminando páginas em standby (clone nativo do Empty Standby List do RAMMap).
 - [x] Otimização de DPI e desativação de otimizações de janela do DirectX (DPI_Otimização).
 - [x] Otimização na leitura dos dados da RAM desativando a compactação de memória
+- [x] Definir a resolução de temporizador do sistema para 0.5ms
 
 ### O que está sendo feito:
 
 - [ ] Diminui o Temporizador de eventos de alta precisão
-
-- [ ] Definir a resolução de temporizador do sistema para 0.5ms
 
 - [ ] desativar o modo jogo do windows e outros recursos do Windows GameBar
 

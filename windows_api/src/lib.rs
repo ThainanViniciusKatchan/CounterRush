@@ -19,7 +19,7 @@ pub use launcher::{
 };
 
 pub mod powershell;
-pub use powershell::run_powershell;
+pub use powershell::{run_powershell, run_powershell_script};
 
 pub mod process;
 pub use process::{is_process_running, wait_for_process};

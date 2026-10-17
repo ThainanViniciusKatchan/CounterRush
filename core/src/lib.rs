@@ -145,7 +145,38 @@ impl OptimizerCore {
         let status = tweaks::get_memory_compression_status()?;
         Ok(status)
     }
+
+    pub fn apply_timer_resolution(&self) -> Result<tweaks::TimerApplyResult, CoreError> {
+        let result = tweaks::apply_timer_resolution()?;
+        Ok(result)
+    }
+
+    pub fn test_timer_precision(&self) -> Result<Vec<f64>, CoreError> {
+        let pauses = tweaks::test_timer_precision()?;
+        Ok(pauses)
+    }
+
+    pub fn rollback_timer_resolution(&self) -> Result<f64, CoreError> {
+        let restored = tweaks::rollback_timer_resolution()?;
+        Ok(restored)
+    }
+
+    pub fn rollback_timer_registry(&self) -> Result<(), CoreError> {
+        tweaks::rollback_timer_registry()?;
+        Ok(())
+    }
+
+    pub fn rollback_timer_all(&self) -> Result<(), CoreError> {
+        tweaks::rollback_timer_all()?;
+        Ok(())
+    }
+
+    pub fn is_timer_registry_applied(&self) -> Result<bool, CoreError> {
+        let applied = tweaks::is_timer_registry_applied()?;
+        Ok(applied)
+    }
 }
+
 
 impl Default for OptimizerCore {
     fn default() -> Self {
