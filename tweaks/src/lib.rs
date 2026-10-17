@@ -53,3 +53,9 @@ pub use dpi::{
     apply_cs2_dpi_tweak, launch_cs2_with_dpi_tweak, rollback_cs2_dpi_tweak,
     Cs2DpiOptimizationTweak, CS2_DPI_APPLY_CMD, CS2_DPI_QUERY_CMD, CS2_DPI_ROLLBACK_CMD,
 };
+
+pub mod memory_compression;
+pub use memory_compression::{
+    disable_memory_compression, enable_memory_compression, get_memory_compression_status,
+    MemoryCompressionTweak,
+};

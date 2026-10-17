@@ -168,3 +168,23 @@ cargo run -p tweaks --example test_dpi_optimization -- --rollback
 # 9.3. Consultar o status atual da chave no Registro
 cargo run -p tweaks --example test_dpi_optimization -- --status
 ```
+
+---
+
+## 10. Desativação de Compactação de Memória (MMAgent)
+
+Controla o recurso de compactação de páginas de memória do Windows (`Disable-MMAgent -mc` e `Enable-MMAgent -mc`), reduzindo latência de CPU e micro-travamentos em computadores com mais de 16 GB de RAM (> 16 GB).
+
+> [!IMPORTANT]
+> A desativação só é permitida se o computador possuir mais de 16 GB de RAM. Os comandos `MMAgent` exigem privilégios de Administrador. Execute o terminal PowerShell como Administrador.
+
+```powershell
+# 10.1. Desativar compactação de memória (com verificação prévia de status e trava > 16GB)
+cargo run -p tweaks --example test_memory_compression -- --disable
+
+# 10.2. Reativar compactação de memória (Rollback com Enable-MMAgent -mc)
+cargo run -p tweaks --example test_memory_compression -- --enable
+
+# 10.3. Consultar status atual no MMAgent e RAM detectada
+cargo run -p tweaks --example test_memory_compression -- --status
+```

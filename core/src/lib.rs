@@ -130,6 +130,21 @@ impl OptimizerCore {
         tweaks::launch_cs2_with_dpi_tweak()?;
         Ok(())
     }
+
+    pub fn disable_memory_compression(&self) -> Result<(), CoreError> {
+        tweaks::disable_memory_compression()?;
+        Ok(())
+    }
+
+    pub fn rollback_memory_compression(&self) -> Result<(), CoreError> {
+        tweaks::enable_memory_compression()?;
+        Ok(())
+    }
+
+    pub fn get_memory_compression_status(&self) -> Result<bool, CoreError> {
+        let status = tweaks::get_memory_compression_status()?;
+        Ok(status)
+    }
 }
 
 impl Default for OptimizerCore {
