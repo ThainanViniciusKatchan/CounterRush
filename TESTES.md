@@ -244,4 +244,25 @@ cargo run -p tweaks --example test_mmcss -- --rollback
 cargo run -p tweaks --example test_mmcss -- --status
 ```
 
+---
+
+## 13. Desativação do Temporizador de Alta Precisão (HPET)
+
+Controla o parâmetro `useplatformclock` do BCD (*Boot Configuration Data*). Desativar o HPET força o Windows a usar os contadores de tempo rápidos da própria CPU (TSC), diminuindo o *input lag* e os micro-stutters no CS2.
+
+> [!IMPORTANT]
+> A execução de comandos `bcdedit` exige privilégios de Administrador. Execute o terminal PowerShell como Administrador.
+
+```powershell
+# 13.1. Desativar HPET (bcdedit /set useplatformclock false)
+cargo run -p tweaks --example test_hpet -- --disable
+
+# 13.2. Rollback do HPET (bcdedit /deletevalue useplatformclock)
+cargo run -p tweaks --example test_hpet -- --rollback
+
+# 13.3. Consultar status atual do useplatformclock no BCD
+cargo run -p tweaks --example test_hpet -- --status
+```
+
+
 

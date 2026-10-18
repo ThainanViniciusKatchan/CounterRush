@@ -25,10 +25,9 @@
 - [x] Optimize RAM data reads by disabling memory compression.
 - [x] Set system timer resolution to 0.5ms.
 - [x] Optimize Multimedia Class Scheduler Service (MMCSS) tailored to hardware profiles, prioritizing network, CPU, GPU, and disk I/O for gaming.
+- [x] Disable High Precision Event Timer (HPET) via BCD.
 
 ### What is currently in progress:
-
-- [ ] Decrease High Precision Event Timer (HPET).
 
 - [ ] Disable Windows Game Mode and other Windows GameBar features.
 

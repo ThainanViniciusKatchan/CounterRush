@@ -200,7 +200,23 @@ impl OptimizerCore {
         let applied = tweaks::is_mmcss_applied_for_current_hardware()?;
         Ok(applied)
     }
+
+    pub fn disable_hpet(&self) -> Result<(), CoreError> {
+        tweaks::disable_hpet()?;
+        Ok(())
+    }
+
+    pub fn rollback_hpet(&self) -> Result<(), CoreError> {
+        tweaks::rollback_hpet()?;
+        Ok(())
+    }
+
+    pub fn get_hpet_status(&self) -> Result<tweaks::HpetStatus, CoreError> {
+        let status = tweaks::get_hpet_status()?;
+        Ok(status)
+    }
 }
+
 
 
 

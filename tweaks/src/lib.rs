@@ -75,4 +75,8 @@ pub use mmcss::{
     MmcssHardwareTier, MmcssStatus, MmcssTweak, REG_GAMES_PROFILE_KEY, REG_SYSTEM_PROFILE_KEY,
 };
 
+pub mod hpet;
+pub use hpet::{disable_hpet, get_hpet_status, rollback_hpet, HpetStatus, HpetTweak};
+
+
 
