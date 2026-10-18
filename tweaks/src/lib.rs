@@ -78,5 +78,15 @@ pub use mmcss::{
 pub mod hpet;
 pub use hpet::{disable_hpet, get_hpet_status, rollback_hpet, HpetStatus, HpetTweak};
 
+pub mod game_bar;
+pub use game_bar::{
+    disable_all_game_bar_features, disable_gamedvr_captures, disable_game_bar_shortcuts,
+    disable_game_mode, disable_xbox_mode, enable_gamedvr_captures, enable_game_bar_shortcuts,
+    enable_game_mode, enable_xbox_mode, get_game_bar_status, rollback_all_game_bar_features,
+    GameBarStatus, GameBarTweak, DEFAULT_XBOX_APP_PACKAGE, REG_APP_CAPTURE_KEY, REG_GAME_BAR_KEY,
+    REG_GAME_CONFIG_STORE_KEY, REG_GAMING_CONFIG_KEY, REG_POLICIES_GAMEDVR_KEY,
+};
+
+
 
 

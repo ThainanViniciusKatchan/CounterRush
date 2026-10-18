@@ -264,5 +264,38 @@ cargo run -p tweaks --example test_hpet -- --rollback
 cargo run -p tweaks --example test_hpet -- --status
 ```
 
+---
+
+## 14. Desativação do Xbox Game Bar, Modo de Jogo e Capturas (GameDVR)
+
+Desativa as sobreposições em segundo plano do ecossistema Xbox (Modo de Jogo, atalhos da Game Bar, Modo Xbox e gravação em segundo plano GameDVR) para eliminar micro-stutters, liberar VRAM e evitar sobreposições no CS2.
+
+> [!IMPORTANT]
+> A remoção e gravação da política `AllowGameDVR` sob `HKLM` exige privilégios de Administrador. Execute o terminal PowerShell como Administrador.
+
+```powershell
+# 14.1. Desativar todos os recursos (Modo de Jogo + Game Bar + Modo Xbox + Capturas GameDVR)
+cargo run -p tweaks --example test_game_bar -- --disable
+
+# 14.2. Desativar apenas o Modo de Jogo (AutoGameModeEnabled = 0)
+cargo run -p tweaks --example test_game_bar -- --disable-game-mode
+
+# 14.3. Desativar apenas os atalhos do Xbox Game Bar (UseNexusForGameBarEnabled = 0)
+cargo run -p tweaks --example test_game_bar -- --disable-game-bar
+
+# 14.4. Desativar apenas o Modo Xbox (GamingHomeApp = "")
+cargo run -p tweaks --example test_game_bar -- --disable-xbox-mode
+
+# 14.5. Desativar apenas as Capturas e GameDVR (GameDVR_Enabled = 0, AppCaptureEnabled = 0, AllowGameDVR = 0)
+cargo run -p tweaks --example test_game_bar -- --disable-captures
+
+# 14.6. Rollback completo (restaurar todos os valores para o padrão de fábrica do Windows)
+cargo run -p tweaks --example test_game_bar -- --rollback
+
+# 14.7. Consultar status atual de cada chave no Registro
+cargo run -p tweaks --example test_game_bar -- --status
+```
+
+
 
 

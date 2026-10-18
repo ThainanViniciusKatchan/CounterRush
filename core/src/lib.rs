@@ -215,7 +215,23 @@ impl OptimizerCore {
         let status = tweaks::get_hpet_status()?;
         Ok(status)
     }
+
+    pub fn disable_all_game_bar_features(&self) -> Result<(), CoreError> {
+        tweaks::disable_all_game_bar_features()?;
+        Ok(())
+    }
+
+    pub fn rollback_all_game_bar_features(&self) -> Result<(), CoreError> {
+        tweaks::rollback_all_game_bar_features()?;
+        Ok(())
+    }
+
+    pub fn get_game_bar_status(&self) -> Result<tweaks::GameBarStatus, CoreError> {
+        let status = tweaks::get_game_bar_status()?;
+        Ok(status)
+    }
 }
+
 
 
 

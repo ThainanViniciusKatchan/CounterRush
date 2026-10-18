@@ -26,10 +26,9 @@
 - [x] Definir a resolução de temporizador do sistema para 0.5ms
 - [x] Otimização do agendador multimídia (MMCSS) adaptado por perfil de hardware, priorizando rede, CPU, GPU e I/O de disco para jogos.
 - [x] Desativação do Temporizador de eventos de alta precisão (HPET) via BCD.
+- [x] Desativação do Modo de Jogo (Game Mode), atalhos do Xbox Game Bar, Modo Xbox e Capturas em segundo plano (GameDVR).
 
 ### O que está sendo feito:
-
-- [ ] desativar o modo jogo do windows e outros recursos do Windows GameBar.
 
 - [ ] Ativar o Modo MSI (Message Signaled-Based Interrupts).
 

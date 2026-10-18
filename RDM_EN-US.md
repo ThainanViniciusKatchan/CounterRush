@@ -26,10 +26,11 @@
 - [x] Set system timer resolution to 0.5ms.
 - [x] Optimize Multimedia Class Scheduler Service (MMCSS) tailored to hardware profiles, prioritizing network, CPU, GPU, and disk I/O for gaming.
 - [x] Disable High Precision Event Timer (HPET) via BCD.
+- [x] Disable Windows Game Mode, Xbox Game Bar shortcuts, Xbox Mode, and background captures (GameDVR).
 
 ### What is currently in progress:
 
-- [ ] Disable Windows Game Mode and other Windows GameBar features.
+- [ ] Enable MSI Mode (Message Signaled-Based Interrupts).
 
 ### What is planned:
 
