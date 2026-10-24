@@ -391,3 +391,19 @@ pub fn enable_all_gpu_accel() -> Result<(), TweakError> {
     enable_firefox_gpu_accel()?;
     Ok(())
 }
+
+pub fn is_all_gpu_accel_disabled() -> Result<bool, TweakError> {
+    if DiscordGpuAccelTweak.status()? == TweakStatus::Default {
+        return Ok(false);
+    }
+    if SteamGpuAccelTweak.status()? == TweakStatus::Default {
+        return Ok(false);
+    }
+    if ChromiumGpuAccelTweak.status()? == TweakStatus::Default {
+        return Ok(false);
+    }
+    if FirefoxGpuAccelTweak.status()? == TweakStatus::Default {
+        return Ok(false);
+    }
+    Ok(true)
+}

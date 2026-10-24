@@ -1,4 +1,4 @@
-# Comandos de Teste do CounterRush
+﻿# Comandos de Teste do CounterRush
 
 Guia rápido com todos os comandos de teste manual executáveis via terminal PowerShell.
 
@@ -80,6 +80,16 @@ Executa o fluxo completo do otimizador de ponta a ponta com feedback detalhado e
 ```powershell
 cargo run -p core --example test_launch_and_optimize
 ```
+
+---
+
+## 6.1. Inicialização com Otimizações Personalizadas (JSON)
+
+Inicia o CS2 com parâmetros da Steam e otimizações de sistema customizados a partir de um arquivo config/custom_optimization.json. Caso o arquivo não exista, ele é criado automaticamente com base no perfil de hardware detectado (Econômico, Intermediário ou Potente).
+
+`powershell
+cargo run -p core --example test_custom_launch
+`
 
 ---
 

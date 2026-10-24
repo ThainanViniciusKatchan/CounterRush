@@ -30,6 +30,7 @@
 - [x] Enable MSI Mode (Message Signaled-Based Interrupts) with High Priority for GPU, Network Adapters, and USB Host Controllers.
 - [x] Disable PCIe (Link State Power Management) and USB Power Saving (Selective Suspend and Hubs).
 - [x] Render Queue / Flip Queue Configuration for AMD and NVIDIA GPUs.
+- [x] Launch the game with custom optimizations read from a JSON configuration.
 
 ### What is currently in progress:
 

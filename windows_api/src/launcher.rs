@@ -13,10 +13,14 @@ pub fn launch_cs2() -> Result<(), WindowsApiError> {
 }
 
 pub fn launch_cs2_with_args(extra_args: &[&str]) -> Result<(), WindowsApiError> {
+    launch_cs2_with_args_slice(extra_args)
+}
+
+pub fn launch_cs2_with_args_slice<T: AsRef<str>>(extra_args: &[T]) -> Result<(), WindowsApiError> {
     let mut cmd = Command::new(r"C:\Program Files (x86)\Steam\steam.exe");
     cmd.arg("-applaunch").arg("730");
     for arg in extra_args {
-        cmd.arg(arg);
+        cmd.arg(arg.as_ref());
     }
 
     match cmd.status() {
@@ -29,7 +33,7 @@ pub fn launch_cs2_with_args(extra_args: &[&str]) -> Result<(), WindowsApiError> 
             let mut full_cmd = format!(r#"start "" "C:\Program Files (x86)\Steam\steam.exe" -applaunch 730"#);
             for arg in extra_args {
                 full_cmd.push(' ');
-                full_cmd.push_str(arg);
+                full_cmd.push_str(arg.as_ref());
             }
             let fallback_status = Command::new("cmd").args(["/c", &full_cmd]).status();
             match fallback_status {
