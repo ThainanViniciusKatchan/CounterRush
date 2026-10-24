@@ -245,6 +245,21 @@ impl OptimizerCore {
         let status = tweaks::get_msi_status()?;
         Ok(status)
     }
+
+    pub fn disable_all_power_saving(&self) -> Result<(), CoreError> {
+        tweaks::disable_all_power_saving()?;
+        Ok(())
+    }
+
+    pub fn rollback_all_power_saving(&self) -> Result<(), CoreError> {
+        tweaks::rollback_all_power_saving()?;
+        Ok(())
+    }
+
+    pub fn get_power_saving_status(&self) -> Result<tweaks::PowerSavingStatus, CoreError> {
+        let status = tweaks::get_power_saving_status()?;
+        Ok(status)
+    }
 }
 
 impl Default for OptimizerCore {

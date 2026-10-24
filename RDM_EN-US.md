@@ -28,10 +28,10 @@
 - [x] Disable High Precision Event Timer (HPET) via BCD.
 - [x] Disable Windows Game Mode, Xbox Game Bar shortcuts, Xbox Mode, and background captures (GameDVR).
 - [x] Enable MSI Mode (Message Signaled-Based Interrupts) with High Priority for GPU, Network Adapters, and USB Host Controllers.
+- [x] Disable PCIe (Link State Power Management) and USB Power Saving (Selective Suspend and Hubs).
 
 ### What is currently in progress:
 
-- [ ] Disable PCIe and USB Power Saving.
 - [ ] Render Queue / Flip Queue Configuration.
 
 ### What is planned:

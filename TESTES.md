@@ -339,3 +339,41 @@ cargo run -p tweaks --example test_msi -- --rollback-usb
 # 15.9. Consultar status detalhado de todos os dispositivos PCI encontrados
 cargo run -p tweaks --example test_msi -- --status
 ```
+
+---
+
+## 16. Desativação da Economia de Energia PCIe e USB
+
+Desativa o gerenciamento de economia de energia no barramento PCI Express (**Link State Power Management - ASPM**), a **Suspensão Seletiva USB** no plano de energia e a permissão do Windows para desligar **Hubs USB** no Gerenciador de Dispositivos (WMI). Isso evita que o hardware entre em estados de baixo consumo (L0s/L1 e suspensão de portas), eliminando *micro-stutters*, picos de *frametime* e latência de entrada (*input lag*) em mouses e teclados no CS2.
+
+> [!IMPORTANT]
+> A alteração do plano de energia e a manipulação das instâncias CIM no namespace `root\wmi` exigem permissões de Administrador. Execute o terminal PowerShell como Administrador.
+
+```powershell
+# 16.1. Desativar todas as economias de energia (PCIe ASPM + Suspensão Seletiva USB + Hubs USB)
+cargo run -p tweaks --example test_power_saving -- --disable
+
+# 16.2. Desativar apenas a economia PCIe (Link State Power Management - ASPM)
+cargo run -p tweaks --example test_power_saving -- --disable-pcie
+
+# 16.3. Desativar apenas a Suspensão Seletiva USB no plano de energia
+cargo run -p tweaks --example test_power_saving -- --disable-usb-suspend
+
+# 16.4. Desativar apenas a economia de energia em Hubs USB (Gerenciador de Dispositivos)
+cargo run -p tweaks --example test_power_saving -- --disable-usb-hubs
+
+# 16.5. Rollback completo (restaura todas as configurações para o padrão de fábrica do Windows)
+cargo run -p tweaks --example test_power_saving -- --rollback
+
+# 16.6. Rollback apenas no PCIe (restaura para Economia Moderada de Energia - padrão Windows)
+cargo run -p tweaks --example test_power_saving -- --rollback-pcie
+
+# 16.7. Rollback apenas na Suspensão Seletiva USB (restaura para Habilitado)
+cargo run -p tweaks --example test_power_saving -- --rollback-usb-suspend
+
+# 16.8. Rollback apenas nos Hubs USB (devolve permissão de economia de energia ao Windows)
+cargo run -p tweaks --example test_power_saving -- --rollback-usb-hubs
+
+# 16.9. Consultar status atual detalhado de todas as configurações de energia
+cargo run -p tweaks --example test_power_saving -- --status
+```

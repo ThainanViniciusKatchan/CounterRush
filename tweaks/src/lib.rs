@@ -93,3 +93,12 @@ pub use msi::{
     is_all_msi_enabled, rollback_all_msi, rollback_gpu_msi, rollback_network_msi,
     rollback_usb_msi, MsiDeviceStatus, MsiModeTweak,
 };
+
+pub mod power_saving;
+pub use power_saving::{
+    disable_all_power_saving, disable_pcie_power_saving, disable_usb_hubs_power_saving,
+    disable_usb_selective_suspend, get_power_saving_status, rollback_all_power_saving,
+    rollback_pcie_power_saving, rollback_usb_hubs_power_saving, rollback_usb_selective_suspend,
+    PcieUsbPowerSavingTweak, PowerSavingStatus, UsbDevicePowerStatus, PCI_ASPM_ALIAS,
+    PCI_ASPM_GUID, SUB_PCIEXPRESS, SUB_USB_GUID, USB_SELECTIVE_SUSPEND_GUID,
+};
