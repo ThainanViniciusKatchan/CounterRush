@@ -377,3 +377,37 @@ cargo run -p tweaks --example test_power_saving -- --rollback-usb-hubs
 # 16.9. Consultar status atual detalhado de todas as configurações de energia
 cargo run -p tweaks --example test_power_saving -- --status
 ```
+
+---
+
+## 17. Otimizações na Render Queue / Flip Queue Configuration (AMD & NVIDIA)
+
+Configura a fila de renderização de quadros (*pre-rendered frames*) para reduzir a latência de clique e resposta de mira (*input-to-display latency*) no Counter-Strike 2:
+- **AMD:** Define `FlipQueueSize = 1` (em formato binário `[0x31, 0x00]`) sob `HKLM:\SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}\000*`, limitando o driver a apenas 1 quadro pré-renderizado.
+- **NVIDIA:** Executa `nvidia-smi -pm 1` (Modo de Persistência), mantendo o driver da GPU ativo no kernel para eliminar latências de transição de estado de energia.
+
+> [!IMPORTANT]
+> A gravação na chave da classe de vídeo no Registro e a execução de comandos `nvidia-smi` exigem permissões de Administrador. Execute o terminal PowerShell como Administrador.
+
+```powershell
+# 17.1. Aplicar otimização em todas as placas de vídeo detectadas (AMD e/ou NVIDIA)
+cargo run -p tweaks --example test_render_queue -- --apply
+
+# 17.2. Aplicar FlipQueueSize = 1 apenas para placas AMD
+cargo run -p tweaks --example test_render_queue -- --apply-amd
+
+# 17.3. Aplicar Modo de Persistência apenas para placas NVIDIA (nvidia-smi -pm 1)
+cargo run -p tweaks --example test_render_queue -- --apply-nvidia
+
+# 17.4. Rollback completo (restaura o padrão do fabricante em todas as GPUs)
+cargo run -p tweaks --example test_render_queue -- --rollback
+
+# 17.5. Rollback apenas para placas AMD (remove FlipQueueSize do Registro)
+cargo run -p tweaks --example test_render_queue -- --rollback-amd
+
+# 17.6. Rollback apenas para placas NVIDIA (nvidia-smi -pm 0)
+cargo run -p tweaks --example test_render_queue -- --rollback-nvidia
+
+# 17.7. Consultar status atual da fila de renderização em todas as placas
+cargo run -p tweaks --example test_render_queue -- --status
+```

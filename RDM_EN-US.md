@@ -29,10 +29,11 @@
 - [x] Disable Windows Game Mode, Xbox Game Bar shortcuts, Xbox Mode, and background captures (GameDVR).
 - [x] Enable MSI Mode (Message Signaled-Based Interrupts) with High Priority for GPU, Network Adapters, and USB Host Controllers.
 - [x] Disable PCIe (Link State Power Management) and USB Power Saving (Selective Suspend and Hubs).
+- [x] Render Queue / Flip Queue Configuration for AMD and NVIDIA GPUs.
 
 ### What is currently in progress:
 
-- [ ] Render Queue / Flip Queue Configuration.
+- [ ] Modern graphical interface (Slint) with modular switches and controls.
 
 ### What is planned:
 

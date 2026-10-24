@@ -260,6 +260,21 @@ impl OptimizerCore {
         let status = tweaks::get_power_saving_status()?;
         Ok(status)
     }
+
+    pub fn apply_render_queue(&self) -> Result<(), CoreError> {
+        tweaks::apply_render_queue()?;
+        Ok(())
+    }
+
+    pub fn rollback_render_queue(&self) -> Result<(), CoreError> {
+        tweaks::rollback_render_queue()?;
+        Ok(())
+    }
+
+    pub fn get_render_queue_status(&self) -> Result<tweaks::RenderQueueStatus, CoreError> {
+        let status = tweaks::get_render_queue_status()?;
+        Ok(status)
+    }
 }
 
 impl Default for OptimizerCore {

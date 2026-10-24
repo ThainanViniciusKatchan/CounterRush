@@ -29,10 +29,12 @@
 - [x] Desativação do Modo de Jogo (Game Mode), atalhos do Xbox Game Bar, Modo Xbox e Capturas em segundo plano (GameDVR).
 - [x] Ativar o Modo MSI (Message Signaled-Based Interrupts) com Prioridade Alta na GPU, Placa de Rede e Controladoras USB.
 - [x] Desativar Economia de Energia PCIe (Link State Power Management) e USB (Suspensão Seletiva e Hubs).
+- [x] Otimização da Fila de Quadros Renderizados (Render Queue / Flip Queue) para placas AMD e NVIDIA.
 
 ### O que está sendo feito:
 
-- [ ] Fila de Quadros Renderizados (Render Queue / Flip Queue).
+- [ ] Função para lançamento do CS com otimizações personalizadas
+- [ ] Interface gráfica moderna (Slint) com switches e controles modulares.
 
 ### O que ainda vai ser feito:
 

@@ -102,3 +102,12 @@ pub use power_saving::{
     PcieUsbPowerSavingTweak, PowerSavingStatus, UsbDevicePowerStatus, PCI_ASPM_ALIAS,
     PCI_ASPM_GUID, SUB_PCIEXPRESS, SUB_USB_GUID, USB_SELECTIVE_SUSPEND_GUID,
 };
+
+pub mod render_queue;
+pub use render_queue::{
+    apply_amd_flip_queue, apply_nvidia_persistence_mode, apply_render_queue,
+    get_amd_flip_queue_status, get_nvidia_persistence_mode_status, get_render_queue_status,
+    is_nvidia_smi_available, rollback_amd_flip_queue, rollback_nvidia_persistence_mode,
+    rollback_render_queue, AmdGpuFlipQueueStatus, NvidiaGpuPersistenceStatus,
+    RenderQueueStatus, RenderQueueTweak, DISPLAY_CLASS_GUID,
+};
