@@ -27,10 +27,9 @@
 - [x] Otimização do agendador multimídia (MMCSS) adaptado por perfil de hardware, priorizando rede, CPU, GPU e I/O de disco para jogos.
 - [x] Desativação do Temporizador de eventos de alta precisão (HPET) via BCD.
 - [x] Desativação do Modo de Jogo (Game Mode), atalhos do Xbox Game Bar, Modo Xbox e Capturas em segundo plano (GameDVR).
+- [x] Ativar o Modo MSI (Message Signaled-Based Interrupts) com Prioridade Alta na GPU, Placa de Rede e Controladoras USB.
 
 ### O que está sendo feito:
-
-- [ ] Ativar o Modo MSI (Message Signaled-Based Interrupts).
 
 - [ ] Desativar Economia de Energia PCIe e USB.
 

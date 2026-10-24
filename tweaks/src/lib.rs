@@ -87,6 +87,9 @@ pub use game_bar::{
     REG_GAME_CONFIG_STORE_KEY, REG_GAMING_CONFIG_KEY, REG_POLICIES_GAMEDVR_KEY,
 };
 
-
-
-
+pub mod msi;
+pub use msi::{
+    enable_all_msi, enable_gpu_msi, enable_network_msi, enable_usb_msi, get_msi_status,
+    is_all_msi_enabled, rollback_all_msi, rollback_gpu_msi, rollback_network_msi,
+    rollback_usb_msi, MsiDeviceStatus, MsiModeTweak,
+};

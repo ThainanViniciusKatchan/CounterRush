@@ -3,6 +3,9 @@ cargo.lock
 .cargo
 target
 
+#folders
+ui
+
 # Project Guide File
 steamcmd
 Parameters.md

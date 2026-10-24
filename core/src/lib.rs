@@ -230,11 +230,22 @@ impl OptimizerCore {
         let status = tweaks::get_game_bar_status()?;
         Ok(status)
     }
+
+    pub fn enable_all_msi(&self) -> Result<(), CoreError> {
+        tweaks::enable_all_msi()?;
+        Ok(())
+    }
+
+    pub fn rollback_all_msi(&self) -> Result<(), CoreError> {
+        tweaks::rollback_all_msi()?;
+        Ok(())
+    }
+
+    pub fn get_msi_status(&self) -> Result<Vec<tweaks::MsiDeviceStatus>, CoreError> {
+        let status = tweaks::get_msi_status()?;
+        Ok(status)
+    }
 }
-
-
-
-
 
 impl Default for OptimizerCore {
     fn default() -> Self {

@@ -27,10 +27,12 @@
 - [x] Optimize Multimedia Class Scheduler Service (MMCSS) tailored to hardware profiles, prioritizing network, CPU, GPU, and disk I/O for gaming.
 - [x] Disable High Precision Event Timer (HPET) via BCD.
 - [x] Disable Windows Game Mode, Xbox Game Bar shortcuts, Xbox Mode, and background captures (GameDVR).
+- [x] Enable MSI Mode (Message Signaled-Based Interrupts) with High Priority for GPU, Network Adapters, and USB Host Controllers.
 
 ### What is currently in progress:
 
-- [ ] Enable MSI Mode (Message Signaled-Based Interrupts).
+- [ ] Disable PCIe and USB Power Saving.
+- [ ] Render Queue / Flip Queue Configuration.
 
 ### What is planned:
 

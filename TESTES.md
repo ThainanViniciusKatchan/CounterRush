@@ -299,3 +299,43 @@ cargo run -p tweaks --example test_game_bar -- --status
 
 
 
+---
+
+## 15. Ativação do Modo MSI (Message Signaled-Based Interrupts)
+
+Ativa o modo de interrupção baseado em mensagens (MSI) diretamente pelo barramento PCIe, eliminando o compartilhamento de linhas IRQ (INTx) e reduzindo a latência DPC/ISR do sistema:
+- **Placa de Vídeo (Display):** Ativa o MSI (`MSISupported = 1`) com Prioridade Alta (`DevicePriority = 3`) para que o agendador de interrupções priorize a renderização de frames do CS2.
+- **Placas de Rede (Ethernet / Wi-Fi):** Ativa o MSI (`MSISupported = 1`) para mitigar atrasos de buffer de rede e micro-congelamentos (*packet jitter*).
+- **Controladoras Host USB (PCI):** Ativa o MSI (`MSISupported = 1`) para periféricos de alto polling rate (mouses de 1000Hz a 8000Hz e teclados mecânicos).
+
+> [!IMPORTANT]
+> A manipulação das chaves em `HKLM:\SYSTEM\CurrentControlSet\Enum\PCI\...\Device Parameters` exige privilégios de Administrador. Execute o terminal PowerShell como Administrador.
+
+```powershell
+# 15.1. Ativar Modo MSI em todos os dispositivos elegíveis (GPU com Prioridade Alta + Rede + USB)
+cargo run -p tweaks --example test_msi -- --enable
+
+# 15.2. Ativar Modo MSI apenas na GPU (com Prioridade Alta: DevicePriority = 3)
+cargo run -p tweaks --example test_msi -- --enable-gpu
+
+# 15.3. Ativar Modo MSI apenas na Placa de Rede
+cargo run -p tweaks --example test_msi -- --enable-network
+
+# 15.4. Ativar Modo MSI apenas nas Controladoras Host USB
+cargo run -p tweaks --example test_msi -- --enable-usb
+
+# 15.5. Rollback completo (remove MessageSignaledInterruptProperties e Affinity Policy de todos os dispositivos)
+cargo run -p tweaks --example test_msi -- --rollback
+
+# 15.6. Rollback apenas na GPU
+cargo run -p tweaks --example test_msi -- --rollback-gpu
+
+# 15.7. Rollback apenas na Placa de Rede
+cargo run -p tweaks --example test_msi -- --rollback-network
+
+# 15.8. Rollback apenas nas Controladoras Host USB
+cargo run -p tweaks --example test_msi -- --rollback-usb
+
+# 15.9. Consultar status detalhado de todos os dispositivos PCI encontrados
+cargo run -p tweaks --example test_msi -- --status
+```
