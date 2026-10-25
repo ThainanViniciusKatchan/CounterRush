@@ -347,12 +347,8 @@ impl OptimizerCore {
         }
 
         if cfg.apply_timer_resolution {
-            if self.is_timer_registry_applied()? {
-                report.skipped_tweaks.push("Resolução do Temporizador do Sistema (0.5ms)");
-            } else {
-                self.apply_timer_resolution()?;
-                report.applied_tweaks.push("Resolução do Temporizador do Sistema (0.5ms)");
-            }
+            self.apply_timer_resolution()?;
+            report.applied_tweaks.push("Resolução do Temporizador do Sistema (0.5ms)");
         }
 
         if cfg.apply_mmcss {
