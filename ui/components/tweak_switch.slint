@@ -1,0 +1,82 @@
+import { CS2Theme } from "../theme.slint";
+
+export component TweakSwitch inherits Rectangle {
+    in property <string> label: "Otimização";
+    in property <string> info: "CPU Affinity";
+    in property <color> accent-color: CS2Theme.accent-orange;
+    in property <color> hover-color: #ff771a;
+    in-out property <bool> checked: false;
+    callback toggled(bool);
+
+    height: 50px;
+    horizontal-stretch: 1;
+    background: root.checked 
+        ? (touch.has-hover ? root.hover-color : root.accent-color) 
+        : (touch.has-hover ? CS2Theme.bg-card-hover : CS2Theme.bg-card);
+    border-radius: CS2Theme.radius-sm;
+    animate background { duration: 120ms; }
+
+    HorizontalLayout {
+        padding-left: 14px;
+        padding-right: 14px;
+        spacing: 10px;
+        alignment: space-between;
+
+        VerticalLayout {
+            alignment: center;
+            spacing: 2px;
+
+            Text {
+                text: root.label;
+                font-size: 11px;
+                font-weight: 800;
+                color: root.checked ? #ffffff : CS2Theme.text-muted;
+            }
+
+            Text {
+                text: root.info;
+                font-size: 9px;
+                color: root.checked ? rgba(255, 255, 255, 0.85) : CS2Theme.text-dim;
+            }
+        }
+
+        // Pílula Indicadora de Estado
+        Rectangle {
+            width: 46px;
+            height: 22px;
+            background: root.checked ? #ffffff : CS2Theme.bg-surface;
+            border-radius: CS2Theme.radius-xs;
+            y: (parent.height - self.height) / 2;
+            animate background { duration: 120ms; }
+
+            HorizontalLayout {
+                spacing: 5px;
+                alignment: center;
+
+                Rectangle {
+                    width: 5px;
+                    height: 5px;
+                    border-radius: 2.5px;
+                    background: root.checked ? root.accent-color : CS2Theme.text-dim;
+                    y: (parent.height - self.height) / 2;
+                }
+
+                Text {
+                    text: root.checked ? "ON" : "OFF";
+                    font-size: 8px;
+                    font-weight: 900;
+                    letter-spacing: 0.5px;
+                    color: root.checked ? #0b0f17 : CS2Theme.text-dim;
+                    vertical-alignment: center;
+                }
+            }
+        }
+    }
+
+    touch := TouchArea {
+        clicked => {
+            root.checked = !root.checked;
+            root.toggled(root.checked);
+        }
+    }
+}

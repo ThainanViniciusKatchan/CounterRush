@@ -1,0 +1,167 @@
+import { CS2Theme } from "../theme.slint";
+
+export component NavButton inherits Rectangle {
+    in property <string> text;
+    in property <image> icon-src;
+    in property <bool> active: false;
+    callback clicked();
+
+    height: 44px;
+    background: root.active 
+        ? CS2Theme.accent-orange 
+        : (touch.has-hover ? CS2Theme.bg-card-hover : transparent);
+    border-radius: CS2Theme.radius-sm;
+    animate background { duration: 100ms; }
+
+    HorizontalLayout {
+        padding-left: 14px;
+        padding-right: 12px;
+        spacing: 12px;
+        alignment: start;
+
+        Image {
+            source: root.icon-src;
+            width: 18px;
+            height: 18px;
+            colorize: root.active ? #ffffff : (touch.has-hover ? CS2Theme.text-primary : CS2Theme.text-muted);
+            y: (parent.height - self.height) / 2;
+        }
+
+        Text {
+            text: root.text;
+            color: root.active ? #ffffff : (touch.has-hover ? CS2Theme.text-primary : CS2Theme.text-muted);
+            font-size: 12px;
+            font-weight: root.active ? 800 : 500;
+            vertical-alignment: center;
+        }
+    }
+
+    touch := TouchArea {
+        clicked => { root.clicked(); }
+    }
+}
+
+export component Sidebar inherits Rectangle {
+    in-out property <int> active-tab: 0;
+    callback tab-selected(int);
+
+    width: 148px;
+    background: CS2Theme.bg-surface;
+
+    VerticalLayout {
+        padding-top: 18px;
+        padding-bottom: 16px;
+        padding-left: 10px;
+        padding-right: 10px;
+        spacing: 6px;
+
+        // Cabeçalho da Marca
+        VerticalLayout {
+            spacing: 3px;
+            padding-bottom: 14px;
+
+            HorizontalLayout {
+                spacing: 4px;
+                alignment: start;
+                Text {
+                    text: "COUNTER";
+                    font-size: 14px;
+                    font-weight: 900;
+                    letter-spacing: 0.6px;
+                    color: CS2Theme.text-primary;
+                }
+                Text {
+                    text: "RUSH";
+                    font-size: 14px;
+                    font-weight: 900;
+                    letter-spacing: 0.6px;
+                    color: CS2Theme.accent-orange;
+                }
+            }
+
+            Text {
+                text: "CS2 PERFORMANCE";
+                font-size: 8px;
+                font-weight: 800;
+                color: CS2Theme.accent-ct-cyan;
+                letter-spacing: 0.8px;
+            }
+        }
+
+        // Navegação
+        NavButton {
+            text: "Painel";
+            icon-src: @image-url("../assets/icons/home.svg");
+            active: root.active-tab == 0;
+            clicked => { root.active-tab = 0; root.tab-selected(0); }
+        }
+
+        NavButton {
+            text: "Otimizações";
+            icon-src: @image-url("../assets/icons/rocket.svg");
+            active: root.active-tab == 1;
+            clicked => { root.active-tab = 1; root.tab-selected(1); }
+        }
+
+        NavButton {
+            text: "Configurações";
+            icon-src: @image-url("../assets/icons/settings.svg");
+            active: root.active-tab == 2;
+            clicked => { root.active-tab = 2; root.tab-selected(2); }
+        }
+
+        NavButton {
+            text: "Ranking CS";
+            icon-src: @image-url("../assets/icons/crown.svg");
+            active: root.active-tab == 3;
+            clicked => { root.active-tab = 3; root.tab-selected(3); }
+        }
+
+        // Espaço flexível
+        Rectangle {}
+
+        // Card de Telemetria Inferior Sólido
+        Rectangle {
+            height: 50px;
+            background: CS2Theme.bg-card;
+            border-radius: CS2Theme.radius-sm;
+
+            VerticalLayout {
+                padding-top: 6px;
+                padding-bottom: 6px;
+                padding-left: 10px;
+                padding-right: 10px;
+                spacing: 3px;
+                alignment: center;
+
+                HorizontalLayout {
+                    spacing: 6px;
+                    alignment: start;
+
+                    Rectangle {
+                        width: 6px;
+                        height: 6px;
+                        border-radius: 3px;
+                        background: CS2Theme.status-success;
+                        y: (parent.height - self.height) / 2;
+                    }
+
+                    Text {
+                        text: "0.5ms ATIVO";
+                        font-size: 10px;
+                        font-weight: 800;
+                        color: CS2Theme.status-success-bright;
+                        letter-spacing: 0.4px;
+                        vertical-alignment: center;
+                    }
+                }
+
+                Text {
+                    text: "CounterRush v0.8.0";
+                    font-size: 8px;
+                    color: CS2Theme.text-dim;
+                }
+            }
+        }
+    }
+}

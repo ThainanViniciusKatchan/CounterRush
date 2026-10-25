@@ -1,0 +1,127 @@
+import { CS2Theme } from "../theme.slint";
+
+export component ActionCard inherits Rectangle {
+    in property <string> title: "Título do Card";
+    in property <string> description: "Descrição do recurso";
+    in property <string> badge: "RECURSO";
+    in property <image> icon-src;
+    in property <color> accent-color: CS2Theme.accent-orange;
+    callback clicked();
+
+    background: touch.has-hover ? CS2Theme.bg-card-hover : CS2Theme.bg-card;
+    border-color: touch.has-hover ? root.accent-color : CS2Theme.border;
+    border-width: 1px;
+    border-radius: CS2Theme.radius-sm;
+    animate background { duration: 120ms; }
+    animate border-color { duration: 120ms; }
+
+    // Linha de acento decorativa superior no hover
+    if touch.has-hover : Rectangle {
+        x: 0px;
+        y: 0px;
+        width: parent.width;
+        height: 2px;
+        background: root.accent-color;
+        border-radius: CS2Theme.radius-xs;
+    }
+
+    VerticalLayout {
+        padding: 12px;
+        spacing: 6px;
+        alignment: space-between;
+
+        // Cabeçalho do Card (Ícone + Tag/Badge)
+        HorizontalLayout {
+            alignment: space-between;
+
+            Rectangle {
+                width: 32px;
+                height: 32px;
+                background: touch.has-hover ? CS2Theme.accent-orange-soft : CS2Theme.bg-surface;
+                border-color: touch.has-hover ? root.accent-color : CS2Theme.border;
+                border-width: 1px;
+                border-radius: CS2Theme.radius-xs;
+                animate background { duration: 120ms; }
+
+                Image {
+                    source: root.icon-src;
+                    width: 16px;
+                    height: 16px;
+                    colorize: touch.has-hover ? root.accent-color : CS2Theme.text-muted;
+                    x: (parent.width - self.width) / 2;
+                    y: (parent.height - self.height) / 2;
+                }
+            }
+
+            // Tag Tática
+            Rectangle {
+                height: 18px;
+                background: CS2Theme.bg-surface;
+                border-color: CS2Theme.border;
+                border-width: 1px;
+                border-radius: CS2Theme.radius-xs;
+
+                HorizontalLayout {
+                    padding-left: 6px;
+                    padding-right: 6px;
+                    alignment: center;
+
+                    Text {
+                        text: root.badge;
+                        font-size: 8px;
+                        font-weight: 700;
+                        letter-spacing: 0.5px;
+                        color: touch.has-hover ? root.accent-color : CS2Theme.text-dim;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+        }
+
+        // Título e Descrição
+        VerticalLayout {
+            spacing: 3px;
+
+            Text {
+                text: root.title;
+                font-size: 13px;
+                font-weight: 700;
+                color: CS2Theme.text-primary;
+                overflow: elide;
+            }
+
+            Text {
+                text: root.description;
+                font-size: 11px;
+                color: CS2Theme.text-muted;
+                wrap: word-wrap;
+            }
+        }
+
+        // Rodapé do card (Ação tática)
+        HorizontalLayout {
+            alignment: end;
+            spacing: 4px;
+
+            Text {
+                text: touch.has-hover ? "ACESSAR" : "DETALHES";
+                font-size: 9px;
+                font-weight: 700;
+                letter-spacing: 0.4px;
+                color: touch.has-hover ? root.accent-color : CS2Theme.text-dim;
+                vertical-alignment: center;
+            }
+
+            Text {
+                text: "→";
+                font-size: 10px;
+                color: touch.has-hover ? root.accent-color : CS2Theme.text-dim;
+                vertical-alignment: center;
+            }
+        }
+    }
+
+    touch := TouchArea {
+        clicked => { root.clicked(); }
+    }
+}

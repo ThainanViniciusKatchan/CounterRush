@@ -1,0 +1,340 @@
+import { CS2Theme } from "theme.slint";
+import { Sidebar } from "components/sidebar.slint";
+import { TweakSwitch } from "components/tweak_switch.slint";
+import { TacticalButton } from "components/tactical_button.slint";
+
+export component MainWindow inherits Window {
+    title: "CounterRush - CS2 Performance";
+    min-width: 980px;
+    max-width: 980px;
+    min-height: 620px;
+    max-height: 620px;
+    preferred-width: 980px;
+    preferred-height: 620px;
+    background: CS2Theme.bg-main;
+
+    // Propriedades e estados reativos
+    in-out property <int> active-tab: 0;
+    in-out property <string> status-message: "Pronto para iniciar o CS2 com taxa de polling de 0.5ms e afinidade de CPU otimizada.";
+    in-out property <bool> cpu-tweak-active: true;
+    in-out property <bool> timer-tweak-active: true;
+    in-out property <bool> priority-tweak-active: true;
+    in-out property <bool> ram-tweak-active: true;
+
+    // Callbacks do backend Rust
+    callback launch-cs2-clicked();
+    callback card-action-clicked(string);
+    callback tweak-toggled(string, bool);
+
+    HorizontalLayout {
+        // 1. Barra Lateral Tática Sólida (Sem Bordas)
+        Sidebar {
+            active-tab <=> root.active-tab;
+            tab-selected(idx) => {
+                if idx == 0 {
+                    root.status-message = "Visualizando Painel Geral";
+                } else if idx == 1 {
+                    root.status-message = "Ajustes Avançados de Hardware";
+                } else if idx == 2 {
+                    root.status-message = "Configurações Gerais";
+                } else {
+                    root.status-message = "Tabela de Classificação Valve";
+                }
+            }
+        }
+
+        // 2. Área Central com Distribuição Limpa e Sem Fundos Pesados
+        VerticalLayout {
+            padding-left: 24px;
+            padding-right: 24px;
+            padding-top: 18px;
+            padding-bottom: 16px;
+            spacing: 16px;
+            alignment: space-between;
+
+            // Cabeçalho Minimalista Direto
+            Text {
+                text: "PAINEL DE CONTROLE";
+                font-size: 16px;
+                font-weight: 900;
+                letter-spacing: 0.6px;
+                color: CS2Theme.text-primary;
+            }
+
+            // Seção Superior: Ajustes de Hardware (Sem fundo envelopando, botões diretos no canvas com cor sólida)
+            VerticalLayout {
+                spacing: 8px;
+
+                HorizontalLayout {
+                    alignment: space-between;
+                    Text {
+                        text: "AJUSTES DE HARDWARE & LATÊNCIA";
+                        font-size: 11px;
+                        font-weight: 800;
+                        letter-spacing: 0.5px;
+                        color: CS2Theme.text-muted;
+                    }
+                    Text {
+                        text: "4 Módulos Ativos";
+                        font-size: 10px;
+                        font-weight: 800;
+                        color: CS2Theme.status-success-bright;
+                    }
+                }
+
+                HorizontalLayout {
+                    spacing: 10px;
+
+                    TweakSwitch {
+                        label: "Núcleo 0 Off";
+                        info: "Afinidade de CPU";
+                        accent-color: CS2Theme.accent-orange;
+                        hover-color: #ff771a;
+                        checked <=> root.cpu-tweak-active;
+                        toggled(val) => {
+                            root.status-message = val ? "Afinidade: Núcleo 0 desativado para o CS2." : "Afinidade: Restaurada ao padrão.";
+                            root.tweak-toggled("cpu_core_0", val);
+                        }
+                    }
+
+                    TweakSwitch {
+                        label: "Timer 0.5ms";
+                        info: "Temporizador";
+                        accent-color: CS2Theme.status-success;
+                        hover-color: #059669;
+                        checked <=> root.timer-tweak-active;
+                        toggled(val) => {
+                            root.status-message = val ? "Timer: Definido para 0.5ms de alta precisão." : "Timer: Restaurado.";
+                            root.tweak-toggled("timer_resolution", val);
+                        }
+                    }
+
+                    TweakSwitch {
+                        label: "Prioridade Alta";
+                        info: "Processo CS2";
+                        accent-color: CS2Theme.accent-orange;
+                        hover-color: #ff771a;
+                        checked <=> root.priority-tweak-active;
+                        toggled(val) => {
+                            root.status-message = val ? "Prioridade de processo definida para Alta." : "Prioridade de processo: Normal.";
+                            root.tweak-toggled("process_priority", val);
+                        }
+                    }
+
+                    TweakSwitch {
+                        label: "Limpar RAM";
+                        info: "Empty Standby";
+                        accent-color: CS2Theme.accent-ct-blue;
+                        hover-color: #0284c7;
+                        checked <=> root.ram-tweak-active;
+                        toggled(val) => {
+                            root.status-message = val ? "Memória: Páginas em standby liberadas." : "Limpeza de RAM desativada.";
+                            root.tweak-toggled("empty_standby", val);
+                        }
+                    }
+                }
+            }
+
+            // Seção Central: 3 Módulos de Recursos (Sem fundo, integrados diretamente com separação limpa)
+            HorizontalLayout {
+                spacing: 20px;
+                min-height: 120px;
+                preferred-height: 140px;
+
+                // Módulo 1: Configs Pro (Ouro T-Side)
+                VerticalLayout {
+                    horizontal-stretch: 1;
+                    spacing: 8px;
+                    alignment: space-between;
+
+                    VerticalLayout {
+                        spacing: 4px;
+                        Text {
+                            text: "CONFIGS PRO";
+                            font-size: 13px;
+                            font-weight: 900;
+                            color: CS2Theme.accent-t-amber;
+                            letter-spacing: 0.5px;
+                        }
+
+                        Text {
+                            text: "Miras, resolução esticada (4:3) e sensibilidade dos principais profissionais.";
+                            font-size: 10px;
+                            color: CS2Theme.text-muted;
+                            wrap: word-wrap;
+                        }
+                    }
+
+                    // Botão com Cor Sólida Ouro
+                    Rectangle {
+                        height: 36px;
+                        background: touch1.has-hover ? #b45309 : CS2Theme.accent-t-gold;
+                        border-radius: CS2Theme.radius-xs;
+                        animate background { duration: 100ms; }
+
+                        HorizontalLayout {
+                            alignment: center;
+                            spacing: 6px;
+                            Text {
+                                text: "BAIXAR .CFG PRO";
+                                font-size: 10px;
+                                font-weight: 900;
+                                letter-spacing: 0.5px;
+                                color: #ffffff;
+                                vertical-alignment: center;
+                            }
+                        }
+
+                        touch1 := TouchArea {
+                            clicked => {
+                                root.status-message = "Abrindo catálogo de configs profissionais...";
+                                root.card-action-clicked("pro_cfg");
+                            }
+                        }
+                    }
+                }
+
+                // Divisor Vertical Fino e Discreto
+                Rectangle {
+                    width: 1px;
+                    background: rgba(36, 51, 74, 0.4);
+                }
+
+                // Módulo 2: Binds Táticas (Ciano CT)
+                VerticalLayout {
+                    horizontal-stretch: 1;
+                    spacing: 8px;
+                    alignment: space-between;
+
+                    VerticalLayout {
+                        spacing: 4px;
+                        Text {
+                            text: "BINDS TÁTICAS";
+                            font-size: 13px;
+                            font-weight: 900;
+                            color: CS2Theme.accent-ct-cyan;
+                            letter-spacing: 0.5px;
+                        }
+
+                        Text {
+                            text: "Atalhos rápidos para utilitários e jumpthrow permitidos em servidores oficiais.";
+                            font-size: 10px;
+                            color: CS2Theme.text-muted;
+                            wrap: word-wrap;
+                        }
+                    }
+
+                    // Botão com Cor Sólida Ciano
+                    Rectangle {
+                        height: 36px;
+                        background: touch2.has-hover ? #0369a1 : #0284c7;
+                        border-radius: CS2Theme.radius-xs;
+                        animate background { duration: 100ms; }
+
+                        HorizontalLayout {
+                            alignment: center;
+                            spacing: 6px;
+                            Text {
+                                text: "GERENCIAR BINDS";
+                                font-size: 10px;
+                                font-weight: 900;
+                                letter-spacing: 0.5px;
+                                color: #ffffff;
+                                vertical-alignment: center;
+                            }
+                        }
+
+                        touch2 := TouchArea {
+                            clicked => {
+                                root.status-message = "Abrindo gerador de atalhos e binds táticas...";
+                                root.card-action-clicked("binds");
+                            }
+                        }
+                    }
+                }
+
+                // Divisor Vertical Fino e Discreto
+                Rectangle {
+                    width: 1px;
+                    background: rgba(36, 51, 74, 0.4);
+                }
+
+                // Módulo 3: Treino & Oficina (Laranja CS2)
+                VerticalLayout {
+                    horizontal-stretch: 1;
+                    spacing: 8px;
+                    alignment: space-between;
+
+                    VerticalLayout {
+                        spacing: 4px;
+                        Text {
+                            text: "TREINO & MAPAS";
+                            font-size: 13px;
+                            font-weight: 900;
+                            color: CS2Theme.accent-orange-bright;
+                            letter-spacing: 0.5px;
+                        }
+
+                        Text {
+                            text: "Mapas essenciais da Oficina Steam para treino de mira e teste de frametime.";
+                            font-size: 10px;
+                            color: CS2Theme.text-muted;
+                            wrap: word-wrap;
+                        }
+                    }
+
+                    // Botão com Cor Sólida Laranja
+                    Rectangle {
+                        height: 36px;
+                        background: touch3.has-hover ? #c2410c : #ea580c;
+                        border-radius: CS2Theme.radius-xs;
+                        animate background { duration: 100ms; }
+
+                        HorizontalLayout {
+                            alignment: center;
+                            spacing: 6px;
+                            Text {
+                                text: "ACESSAR TREINO";
+                                font-size: 10px;
+                                font-weight: 900;
+                                letter-spacing: 0.5px;
+                                color: #ffffff;
+                                vertical-alignment: center;
+                            }
+                        }
+
+                        touch3 := TouchArea {
+                            clicked => {
+                                root.status-message = "Abrindo oficina de mapas e teste de desempenho...";
+                                root.card-action-clicked("workshop_maps");
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Seção Inferior: Botão JOGAR CS2 Centralizado (Sem Fundo Envelopador)
+            HorizontalLayout {
+                alignment: center;
+                padding-top: 10px;
+                padding-bottom: 4px;
+
+                TacticalButton {
+                    text: "JOGAR CS2";
+                    badge: "INICIAR COM ALTA PERFORMANCE";
+                    background-color: CS2Theme.accent-orange;
+                    hover-color: #ff771a;
+                    custom-border-color: #c2410c;
+                    custom-border-hover-color: #ff851b;
+                    custom-border-width: 3px;
+                    text-color: #ffffff;
+                    icon-src: @image-url("assets/icons/play.svg");
+                    clicked => {
+                        root.status-message = "Iniciando Counter-Strike 2 pela Steam com perfil otimizado...";
+                        root.launch-cs2-clicked();
+                    }
+                }
+            }
+        }
+    }
+}

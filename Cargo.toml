@@ -5,13 +5,11 @@ members = [
     "windows_api",
     "tweaks",
     "config",
+    "ui",
 ]
 
-# A UI (Slint) será adicionada como membro apenas quando iniciarmos essa etapa:
-# "ui",
-
 [workspace.package]
-version      = "0.1.0"
+version      = "0.8.0"
 edition      = "2021"
 rust-version = "1.75"
 authors      = ["Thainan Vinicis Katchan"]
