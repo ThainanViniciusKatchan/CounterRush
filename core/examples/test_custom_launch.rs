@@ -42,7 +42,7 @@ fn main() {
     println!("   - Render Queue: {}", config.apply_render_queue);
 
     println!("\n3. Verificando status dos tweaks e iniciando CS2 via Steam...");
-    match core.launch_custom(Some(&resolved), Duration::from_secs(60)) {
+    match core.launch_custom(Some(&resolved), Duration::from_secs(90)) {
         Ok(report) => {
             println!("\n4. Resumo da Execução de Tweaks:");
             if !report.skipped_tweaks.is_empty() {
