@@ -314,120 +314,181 @@ impl OptimizerCore {
         };
 
         if cfg.empty_standby_list {
-            self.empty_standby_list()?;
-            report.applied_tweaks.push("Limpeza da Standby List (RAM)");
+            match self.empty_standby_list() {
+                Ok(_) => report.applied_tweaks.push("Limpeza da Standby List (RAM)"),
+                Err(_) => report.skipped_tweaks.push("Limpeza da Standby List (RAM) [requer Administrador]"),
+            }
         }
 
         if cfg.disable_gpu_acceleration {
-            if tweaks::is_all_gpu_accel_disabled()? {
-                report.skipped_tweaks.push("Desativar Aceleração de GPU em Apps");
-            } else {
-                self.disable_all_gpu_acceleration()?;
-                report.applied_tweaks.push("Desativar Aceleração de GPU em Apps");
+            match tweaks::is_all_gpu_accel_disabled() {
+                Ok(true) => report.skipped_tweaks.push("Desativar Aceleração de GPU em Apps"),
+                Ok(false) => {
+                    if self.disable_all_gpu_acceleration().is_ok() {
+                        report.applied_tweaks.push("Desativar Aceleração de GPU em Apps");
+                    } else {
+                        report.skipped_tweaks.push("Desativar Aceleração de GPU em Apps [não aplicado]");
+                    }
+                }
+                Err(_) => report.skipped_tweaks.push("Desativar Aceleração de GPU em Apps [ignorado]"),
             }
         }
 
         if cfg.apply_dpi_optimization {
-            if tweaks::Cs2DpiOptimizationTweak.status()? == tweaks::TweakStatus::Applied {
-                report.skipped_tweaks.push("Otimização de DPI e Modo Janela");
-            } else {
-                self.apply_dpi_optimization()?;
-                report.applied_tweaks.push("Otimização de DPI e Modo Janela");
+            match tweaks::Cs2DpiOptimizationTweak.status() {
+                Ok(tweaks::TweakStatus::Applied) => {
+                    report.skipped_tweaks.push("Otimização de DPI e Modo Janela");
+                }
+                _ => {
+                    if self.apply_dpi_optimization().is_ok() {
+                        report.applied_tweaks.push("Otimização de DPI e Modo Janela");
+                    } else {
+                        report.skipped_tweaks.push("Otimização de DPI e Modo Janela [não aplicado]");
+                    }
+                }
             }
         }
 
         if cfg.disable_memory_compression {
-            let is_enabled = self.get_memory_compression_status()?;
-            if !is_enabled {
-                report.skipped_tweaks.push("Desativação da Compactação de Memória");
-            } else {
-                self.disable_memory_compression()?;
-                report.applied_tweaks.push("Desativação da Compactação de Memória");
+            match self.get_memory_compression_status() {
+                Ok(false) => report.skipped_tweaks.push("Desativação da Compactação de Memória"),
+                _ => {
+                    if self.disable_memory_compression().is_ok() {
+                        report.applied_tweaks.push("Desativação da Compactação de Memória");
+                    } else {
+                        report.skipped_tweaks.push("Desativação da Compactação de Memória [requer Administrador/RAM > 16GB]");
+                    }
+                }
             }
         }
 
         if cfg.apply_timer_resolution {
-            self.apply_timer_resolution()?;
-            report.applied_tweaks.push("Resolução do Temporizador do Sistema (0.5ms)");
+            if self.apply_timer_resolution().is_ok() {
+                report.applied_tweaks.push("Resolução do Temporizador do Sistema (0.5ms)");
+            } else {
+                report.skipped_tweaks.push("Resolução do Temporizador do Sistema [não aplicado]");
+            }
         }
 
         if cfg.apply_mmcss {
-            if self.is_mmcss_applied_for_current_hardware()? {
-                report.skipped_tweaks.push("Otimização do Agendador Multimídia (MMCSS)");
-            } else {
-                self.apply_all_mmcss()?;
-                report.applied_tweaks.push("Otimização do Agendador Multimídia (MMCSS)");
+            match self.is_mmcss_applied_for_current_hardware() {
+                Ok(true) => report.skipped_tweaks.push("Otimização do Agendador Multimídia (MMCSS)"),
+                _ => {
+                    if self.apply_all_mmcss().is_ok() {
+                        report.applied_tweaks.push("Otimização do Agendador Multimídia (MMCSS)");
+                    } else {
+                        report.skipped_tweaks.push("Otimização do Agendador Multimídia (MMCSS) [requer Administrador]");
+                    }
+                }
             }
         }
 
         if cfg.disable_hpet {
-            let status = self.get_hpet_status()?;
-            if status == tweaks::HpetStatus::Disabled {
-                report.skipped_tweaks.push("Desativação do HPET");
-            } else {
-                self.disable_hpet()?;
-                report.applied_tweaks.push("Desativação do HPET");
+            match self.get_hpet_status() {
+                Ok(tweaks::HpetStatus::Disabled) => report.skipped_tweaks.push("Desativação do HPET"),
+                _ => {
+                    if self.disable_hpet().is_ok() {
+                        report.applied_tweaks.push("Desativação do HPET");
+                    } else {
+                        report.skipped_tweaks.push("Desativação do HPET [requer Administrador]");
+                    }
+                }
             }
         }
 
         if cfg.disable_game_bar {
-            let status = self.get_game_bar_status()?;
-            if status.is_all_disabled() {
-                report.skipped_tweaks.push("Desativação do Xbox Game Bar e GameDVR");
-            } else {
-                self.disable_all_game_bar_features()?;
-                report.applied_tweaks.push("Desativação do Xbox Game Bar e GameDVR");
+            match self.get_game_bar_status() {
+                Ok(status) if status.is_all_disabled() => {
+                    report.skipped_tweaks.push("Desativação do Xbox Game Bar e GameDVR");
+                }
+                _ => {
+                    if self.disable_all_game_bar_features().is_ok() {
+                        report.applied_tweaks.push("Desativação do Xbox Game Bar e GameDVR");
+                    } else {
+                        report.skipped_tweaks.push("Desativação do Xbox Game Bar e GameDVR [requer Administrador]");
+                    }
+                }
             }
         }
 
         if cfg.enable_msi {
-            if tweaks::is_all_msi_enabled()? {
-                report.skipped_tweaks.push("Ativação do Modo MSI");
-            } else {
-                self.enable_all_msi()?;
-                report.applied_tweaks.push("Ativação do Modo MSI");
+            match tweaks::is_all_msi_enabled() {
+                Ok(true) => report.skipped_tweaks.push("Ativação do Modo MSI"),
+                _ => {
+                    if self.enable_all_msi().is_ok() {
+                        report.applied_tweaks.push("Ativação do Modo MSI");
+                    } else {
+                        report.skipped_tweaks.push("Ativação do Modo MSI [requer Administrador]");
+                    }
+                }
             }
         }
 
         if cfg.disable_power_saving {
-            let status = self.get_power_saving_status()?;
-            if status.is_all_optimized() {
-                report.skipped_tweaks.push("Desativação de Economia de Energia PCIe e USB");
-            } else {
-                self.disable_all_power_saving()?;
-                report.applied_tweaks.push("Desativação de Economia de Energia PCIe e USB");
+            match self.get_power_saving_status() {
+                Ok(status) if status.is_all_optimized() => {
+                    report.skipped_tweaks.push("Desativação de Economia de Energia PCIe e USB");
+                }
+                _ => {
+                    if self.disable_all_power_saving().is_ok() {
+                        report.applied_tweaks.push("Desativação de Economia de Energia PCIe e USB");
+                    } else {
+                        report.skipped_tweaks.push("Desativação de Economia de Energia PCIe e USB [requer Administrador]");
+                    }
+                }
             }
         }
 
         if cfg.apply_render_queue {
-            let status = self.get_render_queue_status()?;
-            if status.is_all_optimized() {
-                report.skipped_tweaks.push("Fila de Quadros Renderizados (Render Queue)");
-            } else {
-                self.apply_render_queue()?;
-                report.applied_tweaks.push("Fila de Quadros Renderizados (Render Queue)");
+            match self.get_render_queue_status() {
+                Ok(status) if status.is_all_optimized() => {
+                    report.skipped_tweaks.push("Fila de Quadros Renderizados (Render Queue)");
+                }
+                _ => {
+                    if self.apply_render_queue().is_ok() {
+                        report.applied_tweaks.push("Fila de Quadros Renderizados (Render Queue)");
+                    } else {
+                        report.skipped_tweaks.push("Fila de Quadros Renderizados [requer Administrador]");
+                    }
+                }
             }
         }
 
         windows_api::launch_cs2_with_args_slice(&cfg.launch_args)?;
-        windows_api::wait_for_process("cs2", timeout)?;
+        let process_found = windows_api::wait_for_process("cs2", timeout).is_ok();
 
-        if cfg.cs2_priority {
-            if tweaks::Cs2PriorityTweak.status()? == tweaks::TweakStatus::Applied {
-                report.skipped_tweaks.push("Prioridade em Tempo Real do CS2");
-            } else {
-                tweaks::Cs2PriorityTweak.apply()?;
-                report.applied_tweaks.push("Prioridade em Tempo Real do CS2");
+        if process_found {
+            if cfg.cs2_priority {
+                match tweaks::Cs2PriorityTweak.status() {
+                    Ok(tweaks::TweakStatus::Applied) => {
+                        report.skipped_tweaks.push("Prioridade em Tempo Real do CS2");
+                    }
+                    _ => {
+                        if tweaks::Cs2PriorityTweak.apply().is_ok() {
+                            report.applied_tweaks.push("Prioridade em Tempo Real do CS2");
+                        } else {
+                            report.skipped_tweaks.push("Prioridade em Tempo Real do CS2 [requer Administrador]");
+                        }
+                    }
+                }
             }
-        }
 
-        if cfg.cs2_affinity {
-            if tweaks::Cs2AffinityTweak.status()? == tweaks::TweakStatus::Applied {
-                report.skipped_tweaks.push("Afinidade de Processador do CS2 (sem Core 0)");
-            } else {
-                tweaks::Cs2AffinityTweak.apply()?;
-                report.applied_tweaks.push("Afinidade de Processador do CS2 (sem Core 0)");
+            if cfg.cs2_affinity {
+                match tweaks::Cs2AffinityTweak.status() {
+                    Ok(tweaks::TweakStatus::Applied) => {
+                        report.skipped_tweaks.push("Afinidade de Processador do CS2 (sem Core 0)");
+                    }
+                    _ => {
+                        if tweaks::Cs2AffinityTweak.apply().is_ok() {
+                            report.applied_tweaks.push("Afinidade de Processador do CS2 (sem Core 0)");
+                        } else {
+                            report.skipped_tweaks.push("Afinidade de Processador do CS2 [não aplicado]");
+                        }
+                    }
+                }
             }
+        } else {
+            report.skipped_tweaks.push("Tweaks pós-launch [CS2 inicializando em segundo plano]");
         }
 
         Ok(report)

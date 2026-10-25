@@ -16,6 +16,7 @@ export component MainWindow inherits Window {
     // Propriedades e estados reativos
     in-out property <int> active-tab: 0;
     in-out property <string> status-message: "Pronto para iniciar o CS2 com taxa de polling de 0.5ms e afinidade de CPU otimizada.";
+    in-out property <bool> is-launching: false;
     in-out property <bool> cpu-tweak-active: true;
     in-out property <bool> timer-tweak-active: true;
     in-out property <bool> priority-tweak-active: true;
@@ -313,25 +314,55 @@ export component MainWindow inherits Window {
                 }
             }
 
-            // Seção Inferior: Botão JOGAR CS2 Centralizado (Sem Fundo Envelopador)
-            HorizontalLayout {
+            // Seção Inferior: Botão JOGAR CS2 Centralizado + Barra de Status HUD
+            VerticalLayout {
+                spacing: 6px;
                 alignment: center;
-                padding-top: 10px;
-                padding-bottom: 4px;
 
-                TacticalButton {
-                    text: "JOGAR CS2";
-                    badge: "INICIAR COM ALTA PERFORMANCE";
-                    background-color: CS2Theme.accent-orange;
-                    hover-color: #ff771a;
-                    custom-border-color: #c2410c;
-                    custom-border-hover-color: #ff851b;
-                    custom-border-width: 3px;
-                    text-color: #ffffff;
-                    icon-src: @image-url("assets/icons/play.svg");
-                    clicked => {
-                        root.status-message = "Iniciando Counter-Strike 2 pela Steam com perfil otimizado...";
-                        root.launch-cs2-clicked();
+                HorizontalLayout {
+                    alignment: center;
+                    padding-top: 6px;
+                    padding-bottom: 2px;
+
+                    TacticalButton {
+                        text: root.is-launching ? "INICIANDO..." : "JOGAR CS2";
+                        badge: root.is-launching ? "APLICANDO TWEAKS & STEAM" : "INICIAR COM ALTA PERFORMANCE";
+                        enabled: !root.is-launching;
+                        background-color: CS2Theme.accent-orange;
+                        hover-color: #ff771a;
+                        custom-border-color: #c2410c;
+                        custom-border-hover-color: #ff851b;
+                        custom-border-width: 3px;
+                        text-color: #ffffff;
+                        icon-src: @image-url("assets/icons/play.svg");
+                        clicked => {
+                            root.is-launching = true;
+                            root.status-message = "Iniciando Counter-Strike 2 pela Steam com perfil otimizado...";
+                            root.launch-cs2-clicked();
+                        }
+                    }
+                }
+
+                // Barra de Status HUD Tática
+                HorizontalLayout {
+                    alignment: center;
+                    spacing: 8px;
+
+                    Rectangle {
+                        width: 6px;
+                        height: 6px;
+                        border-radius: 3px;
+                        y: (parent.height - self.height) / 2;
+                        background: root.is-launching ? CS2Theme.accent-orange : CS2Theme.status-success;
+                    }
+
+                    Text {
+                        text: root.status-message;
+                        font-size: 10px;
+                        font-weight: 600;
+                        letter-spacing: 0.3px;
+                        color: root.is-launching ? CS2Theme.accent-orange-bright : CS2Theme.text-dim;
+                        horizontal-alignment: center;
                     }
                 }
             }

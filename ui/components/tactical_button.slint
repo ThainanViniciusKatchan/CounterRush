@@ -11,16 +11,19 @@ export component TacticalButton inherits Rectangle {
     in property <length> button-width: 280px;
     in property <color> text-color: #ffffff;
     in property <image> icon-src;
+    in property <bool> enabled: true;
     callback clicked();
 
     width: root.button-width;
     height: 52px;
-    background: touch.has-hover ? root.hover-color : root.background-color;
+    opacity: root.enabled ? 1.0 : 0.65;
+    background: !root.enabled ? root.background-color : (touch.has-hover ? root.hover-color : root.background-color);
     border-radius: CS2Theme.radius-sm;
     border-width: root.custom-border-width;
-    border-color: touch.has-hover ? root.custom-border-hover-color : root.custom-border-color;
+    border-color: !root.enabled ? root.custom-border-color : (touch.has-hover ? root.custom-border-hover-color : root.custom-border-color);
     animate background { duration: 100ms; }
     animate border-color { duration: 100ms; }
+    animate opacity { duration: 150ms; }
 
     HorizontalLayout {
         padding-left: 18px;
@@ -61,6 +64,12 @@ export component TacticalButton inherits Rectangle {
     }
 
     touch := TouchArea {
-        clicked => { root.clicked(); }
+        enabled: root.enabled;
+        mouse-cursor: root.enabled ? pointer : default;
+        clicked => {
+            if root.enabled {
+                root.clicked();
+            }
+        }
     }
 }
