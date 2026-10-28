@@ -1,0 +1,14 @@
+[package]
+name = "counterrush-ui"
+version.workspace      = true
+edition.workspace      = true
+rust-version.workspace = true
+authors.workspace      = true
+license.workspace      = true
+
+[dependencies]
+slint = "1.8"
+counterrush_core = { package = "core", path = "../core" }
+
+[build-dependencies]
+slint-build = "1.8"

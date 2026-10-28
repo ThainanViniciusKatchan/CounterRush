@@ -1,6 +1,6 @@
 import { CS2Theme } from "theme.slint";
 import { Sidebar } from "components/sidebar.slint";
-import { TweakSwitch } from "components/tweak_switch.slint";
+import { TweakSwitch, MasterToggleSwitch } from "components/tweak_switch.slint";
 import { TacticalButton } from "components/tactical_button.slint";
 
 export component MainWindow inherits Window {
@@ -21,11 +21,37 @@ export component MainWindow inherits Window {
     in-out property <bool> timer-tweak-active: true;
     in-out property <bool> priority-tweak-active: true;
     in-out property <bool> ram-tweak-active: true;
+    in-out property <bool> gpu-accel-tweak-active: true;
+    in-out property <bool> dpi-tweak-active: true;
+    in-out property <bool> mem-compression-tweak-active: true;
+    in-out property <bool> mmcss-tweak-active: true;
+    in-out property <bool> hpet-tweak-active: true;
+    in-out property <bool> game-bar-tweak-active: true;
+    in-out property <bool> msi-tweak-active: true;
+    in-out property <bool> power-saving-tweak-active: true;
+    in-out property <bool> render-queue-tweak-active: true;
+
+    // Estado reativo geral para o botão mestre
+    property <bool> is-all-tweaks-active: 
+        root.cpu-tweak-active &&
+        root.timer-tweak-active &&
+        root.priority-tweak-active &&
+        root.ram-tweak-active &&
+        root.gpu-accel-tweak-active &&
+        root.dpi-tweak-active &&
+        root.mem-compression-tweak-active &&
+        root.mmcss-tweak-active &&
+        root.hpet-tweak-active &&
+        root.game-bar-tweak-active &&
+        root.msi-tweak-active &&
+        root.power-saving-tweak-active &&
+        root.render-queue-tweak-active;
 
     // Callbacks do backend Rust
     callback launch-cs2-clicked();
     callback card-action-clicked(string);
     callback tweak-toggled(string, bool);
+    callback bulk-tweaks-action(string);
 
     HorizontalLayout {
         // 1. Barra Lateral Tática Sólida (Sem Bordas)
@@ -45,7 +71,7 @@ export component MainWindow inherits Window {
         }
 
         // 2. Área Central com Distribuição Limpa e Sem Fundos Pesados
-        VerticalLayout {
+        if root.active-tab == 0 : VerticalLayout {
             padding-left: 24px;
             padding-right: 24px;
             padding-top: 18px;
@@ -364,6 +390,441 @@ export component MainWindow inherits Window {
                         color: root.is-launching ? CS2Theme.accent-orange-bright : CS2Theme.text-dim;
                         horizontal-alignment: center;
                     }
+                }
+            }
+        }
+
+        // 3. Aba de Otimizações Completas (Todas as 13 Otimizações de Sistema e Hardware)
+        if root.active-tab == 1 : VerticalLayout {
+            padding-left: 19px;
+            padding-right: 19px;
+            padding-top: 18px;
+            padding-bottom: 16px;
+            spacing: 14px;
+            alignment: space-between;
+
+            // Cabeçalho da Central de Otimizações
+            HorizontalLayout {
+                alignment: space-between;
+                Text {
+                    text: "CENTRAL DE OTIMIZAÇÕES";
+                    font-size: 16px;
+                    font-weight: 900;
+                    letter-spacing: 0.6px;
+                    color: CS2Theme.text-primary;
+                }
+                Text {
+                    text: "13 Módulos de Baixa Latência";
+                    font-size: 11px;
+                    font-weight: 800;
+                    color: CS2Theme.status-success-bright;
+                    vertical-alignment: center;
+                }
+            }
+
+            // Grade de Otimizações (4 Colunas, Distância Ampliada e Largura Rigorosamente Igual à Aba Painel)
+            VerticalLayout {
+                spacing: 14px;
+
+                // Linha 1: 4 Módulos de CPU, Timer, Prioridade e Memória
+                HorizontalLayout {
+                    spacing: 14px;
+
+                    TweakSwitch {
+                        button-width: 188px;
+                        tooltip-width: 220px;
+                        label: "Núcleo 0 Off";
+                        info: "Afinidade CPU";
+                        tooltip-text: "Afinidade de CPU: Desativa o Núcleo 0 para o CS2 mitigando interrupções do SO.";
+                        accent-color: CS2Theme.accent-orange;
+                        hover-color: #ff771a;
+                        checked <=> root.cpu-tweak-active;
+                        toggled(val) => {
+                            root.status-message = val ? "Afinidade: Núcleo 0 desativado para o CS2." : "Afinidade: Restaurada ao padrão.";
+                            root.tweak-toggled("cpu_core_0", val);
+                        }
+                    }
+
+                    TweakSwitch {
+                        button-width: 188px;
+                        tooltip-width: 215px;
+                        label: "Timer 0.5ms";
+                        info: "Temporizador";
+                        tooltip-text: "Temporizador do Sistema: Define resolução de alta precisão de 0.5ms.";
+                        accent-color: CS2Theme.status-success;
+                        hover-color: #059669;
+                        checked <=> root.timer-tweak-active;
+                        toggled(val) => {
+                            root.status-message = val ? "Timer: Definido para 0.5ms de alta precisão." : "Timer: Restaurado ao padrão do Windows.";
+                            root.tweak-toggled("timer_resolution", val);
+                        }
+                    }
+
+                    TweakSwitch {
+                        button-width: 188px;
+                        tooltip-width: 220px;
+                        label: "Prioridade Alta";
+                        info: "Processo CS2";
+                        tooltip-text: "Prioridade de Processo: Eleva a prioridade do executável cs2.exe para Tempo Real.";
+                        accent-color: CS2Theme.accent-orange;
+                        hover-color: #ff771a;
+                        checked <=> root.priority-tweak-active;
+                        toggled(val) => {
+                            root.status-message = val ? "Prioridade de processo definida para Alta." : "Prioridade de processo: Normal.";
+                            root.tweak-toggled("process_priority", val);
+                        }
+                    }
+
+                    TweakSwitch {
+                        button-width: 188px;
+                        tooltip-width: 215px;
+                        label: "Limpar RAM";
+                        info: "Empty Standby";
+                        tooltip-text: "Empty Standby List: Libera páginas de cache em standby na memória RAM.";
+                        accent-color: CS2Theme.accent-ct-blue;
+                        hover-color: #0284c7;
+                        checked <=> root.ram-tweak-active;
+                        toggled(val) => {
+                            root.status-message = val ? "Memória: Páginas em standby liberadas." : "Limpeza de RAM desativada.";
+                            root.tweak-toggled("empty_standby", val);
+                        }
+                    }
+                }
+
+                // Linha 2: 4 Módulos de GPU, DPI, Compactação e Agendador
+                HorizontalLayout {
+                    spacing: 14px;
+
+                    TweakSwitch {
+                        button-width: 188px;
+                        tooltip-width: 225px;
+                        label: "GPU Apps Off";
+                        info: "VRAM & Apps";
+                        tooltip-text: "Aceleração GPU: Desativa aceleração de hardware em Discord, Steam e navegadores.";
+                        accent-color: CS2Theme.accent-orange;
+                        hover-color: #ff771a;
+                        checked <=> root.gpu-accel-tweak-active;
+                        toggled(val) => {
+                            root.status-message = val ? "GPU em apps desativada (mais VRAM para CS2)." : "GPU em apps reativada.";
+                            root.tweak-toggled("gpu_acceleration", val);
+                        }
+                    }
+
+                    TweakSwitch {
+                        button-width: 188px;
+                        tooltip-width: 220px;
+                        label: "Otimização DPI";
+                        info: "Tela Cheia CS2";
+                        tooltip-text: "Otimização DPI: Aplica flags de tela cheia exclusiva e reduz input lag no CS2.";
+                        accent-color: CS2Theme.accent-ct-cyan;
+                        hover-color: #0284c7;
+                        checked <=> root.dpi-tweak-active;
+                        toggled(val) => {
+                            root.status-message = val ? "DPI & Tela cheia: Flags de baixa latência aplicadas." : "DPI: Configuração de compatibilidade removida.";
+                            root.tweak-toggled("dpi_optimization", val);
+                        }
+                    }
+
+                    TweakSwitch {
+                        button-width: 188px;
+                        tooltip-width: 230px;
+                        label: "Compactar RAM";
+                        info: "MMAgent Off";
+                        tooltip-text: "Compactação de Memória: Desativa compressão de páginas do Windows (>16GB RAM).";
+                        accent-color: CS2Theme.accent-ct-blue;
+                        hover-color: #0284c7;
+                        checked <=> root.mem-compression-tweak-active;
+                        toggled(val) => {
+                            root.status-message = val ? "Compactação de RAM desativada (menor latência de CPU)." : "Compactação de RAM reativada.";
+                            root.tweak-toggled("memory_compression", val);
+                        }
+                    }
+
+                    TweakSwitch {
+                        button-width: 188px;
+                        tooltip-width: 235px;
+                        label: "Agendador MMCSS";
+                        info: "Agendador Win";
+                        tooltip-text: "MMCSS Games: Otimiza prioridade de rede, áudio e GPU para perfis de jogos.";
+                        accent-color: CS2Theme.accent-t-gold;
+                        hover-color: #b45309;
+                        checked <=> root.mmcss-tweak-active;
+                        toggled(val) => {
+                            root.status-message = val ? "MMCSS: Perfil de jogos otimizado no registro do Windows." : "MMCSS: Restaurado ao padrão do Windows.";
+                            root.tweak-toggled("mmcss", val);
+                        }
+                    }
+                }
+
+                // Linha 3: 4 Módulos de HPET, Game Bar, MSI e Economia de Energia
+                HorizontalLayout {
+                    spacing: 14px;
+
+                    TweakSwitch {
+                        button-width: 188px;
+                        tooltip-width: 225px;
+                        label: "HPET Off";
+                        info: "Timer BCD";
+                        tooltip-text: "Desativar HPET: Desativa o relógio de plataforma no BCD priorizando o TSC da CPU.";
+                        accent-color: CS2Theme.status-success;
+                        hover-color: #059669;
+                        checked <=> root.hpet-tweak-active;
+                        toggled(val) => {
+                            root.status-message = val ? "HPET desativado no BCD (usando TSC da CPU)." : "HPET restaurado ao padrão de boot.";
+                            root.tweak-toggled("hpet", val);
+                        }
+                    }
+
+                    TweakSwitch {
+                        button-width: 188px;
+                        tooltip-width: 225px;
+                        label: "Game Bar Off";
+                        info: "DVR & Overlay";
+                        tooltip-text: "Xbox Game Bar: Desativa sobreposições, modo Xbox e gravações de fundo GameDVR.";
+                        accent-color: CS2Theme.accent-orange;
+                        hover-color: #ff771a;
+                        checked <=> root.game-bar-tweak-active;
+                        toggled(val) => {
+                            root.status-message = val ? "Xbox Game Bar, GameDVR e capturas desativados." : "Xbox Game Bar e capturas restaurados.";
+                            root.tweak-toggled("game_bar", val);
+                        }
+                    }
+
+                    TweakSwitch {
+                        button-width: 188px;
+                        tooltip-width: 230px;
+                        label: "Modo MSI";
+                        info: "PCIe IRQ Mode";
+                        tooltip-text: "Modo MSI: Ativa interrupções baseadas em mensagens para GPU, Rede e portas USB.";
+                        accent-color: CS2Theme.accent-ct-cyan;
+                        hover-color: #0284c7;
+                        checked <=> root.msi-tweak-active;
+                        toggled(val) => {
+                            root.status-message = val ? "Modo MSI ativado para GPU (Alta prioridade), Rede e USB." : "Modo MSI desativado (retornado para INTx).";
+                            root.tweak-toggled("msi", val);
+                        }
+                    }
+
+                    TweakSwitch {
+                        button-width: 188px;
+                        tooltip-width: 230px;
+                        label: "Power Save Off";
+                        info: "PCIe & USB";
+                        tooltip-text: "Economia de Energia: Desativa PCIe ASPM e suspensão seletiva de portas USB.";
+                        accent-color: CS2Theme.accent-t-gold;
+                        hover-color: #b45309;
+                        checked <=> root.power-saving-tweak-active;
+                        toggled(val) => {
+                            root.status-message = val ? "Economia de energia desativada (PCIe ASPM e Suspensão USB)." : "Economia de energia restaurada ao padrão.";
+                            root.tweak-toggled("power_saving", val);
+                        }
+                    }
+                }
+
+                // Linha 4: 13º Módulo (Render Queue) + Botão Único de Ativar/Desativar Tudo + Espaçadores
+                HorizontalLayout {
+                    spacing: 14px;
+
+                    TweakSwitch {
+                        button-width: 188px;
+                        tooltip-width: 230px;
+                        label: "Render Queue";
+                        info: "Flip & Persist";
+                        tooltip-text: "Fila de Renderização: FlipQueue AMD = 1 e Persistence Mode em placas NVIDIA.";
+                        accent-color: CS2Theme.status-success;
+                        hover-color: #059669;
+                        checked <=> root.render-queue-tweak-active;
+                        toggled(val) => {
+                            root.status-message = val ? "Render Queue: FlipQueue AMD definido para 1 / NVIDIA PM ativo." : "Render Queue restaurada ao padrão de fábrica.";
+                            root.tweak-toggled("render_queue", val);
+                        }
+                    }
+
+                    MasterToggleSwitch {
+                        button-width: 188px;
+                        tooltip-width: 240px;
+                        all-active: root.is-all-tweaks-active;
+                        toggled(val) => {
+                            root.cpu-tweak-active = val;
+                            root.timer-tweak-active = val;
+                            root.priority-tweak-active = val;
+                            root.ram-tweak-active = val;
+                            root.gpu-accel-tweak-active = val;
+                            root.dpi-tweak-active = val;
+                            root.mem-compression-tweak-active = val;
+                            root.mmcss-tweak-active = val;
+                            root.hpet-tweak-active = val;
+                            root.game-bar-tweak-active = val;
+                            root.msi-tweak-active = val;
+                            root.power-saving-tweak-active = val;
+                            root.render-queue-tweak-active = val;
+                            root.status-message = val ? "Todos os 13 módulos de otimização ativados." : "Todos os módulos desativados (Modo Padrão Windows).";
+                            root.bulk-tweaks-action(val ? "activate_all" : "deactivate_all");
+                        }
+                    }
+
+                    Rectangle {
+                        min-width: 188px;
+                        max-width: 188px;
+                        height: 50px;
+                        horizontal-stretch: 0;
+                        background: transparent;
+                    }
+
+                    Rectangle {
+                        min-width: 188px;
+                        max-width: 188px;
+                        height: 50px;
+                        horizontal-stretch: 0;
+                        background: transparent;
+                    }
+                }
+            }
+
+            // Barra de Status HUD Tática
+            HorizontalLayout {
+                alignment: center;
+                spacing: 8px;
+
+                Rectangle {
+                    width: 6px;
+                    height: 6px;
+                    border-radius: 3px;
+                    y: (parent.height - self.height) / 2;
+                    background: CS2Theme.status-success;
+                }
+
+                Text {
+                    text: root.status-message;
+                    font-size: 10px;
+                    font-weight: 600;
+                    letter-spacing: 0.3px;
+                    color: CS2Theme.text-dim;
+                    horizontal-alignment: center;
+                }
+            }
+        }
+
+        // 4. Aba de Configurações
+        if root.active-tab == 2 : VerticalLayout {
+            padding-left: 24px;
+            padding-right: 24px;
+            padding-top: 18px;
+            padding-bottom: 16px;
+            spacing: 16px;
+            alignment: space-between;
+
+            Text {
+                text: "CONFIGURAÇÕES GERAIS";
+                font-size: 16px;
+                font-weight: 900;
+                letter-spacing: 0.6px;
+                color: CS2Theme.text-primary;
+            }
+
+            Rectangle {
+                background: CS2Theme.bg-card;
+                border-radius: CS2Theme.radius-sm;
+                VerticalLayout {
+                    padding: 24px;
+                    spacing: 8px;
+                    alignment: center;
+
+                    Text {
+                        text: "Parâmetros de Inicialização e Diretórios";
+                        font-size: 13px;
+                        font-weight: 700;
+                        color: CS2Theme.text-primary;
+                        horizontal-alignment: center;
+                    }
+                    Text {
+                        text: "Detecção automática da Steam e perfis de inicialização do Counter-Strike 2.";
+                        font-size: 11px;
+                        color: CS2Theme.text-muted;
+                        horizontal-alignment: center;
+                    }
+                }
+            }
+
+            HorizontalLayout {
+                alignment: center;
+                spacing: 8px;
+
+                Rectangle {
+                    width: 6px;
+                    height: 6px;
+                    border-radius: 3px;
+                    y: (parent.height - self.height) / 2;
+                    background: CS2Theme.status-success;
+                }
+
+                Text {
+                    text: root.status-message;
+                    font-size: 10px;
+                    font-weight: 600;
+                    color: CS2Theme.text-dim;
+                }
+            }
+        }
+
+        // 5. Aba de Ranking
+        if root.active-tab == 3 : VerticalLayout {
+            padding-left: 24px;
+            padding-right: 24px;
+            padding-top: 18px;
+            padding-bottom: 16px;
+            spacing: 16px;
+            alignment: space-between;
+
+            Text {
+                text: "RANKING CS & TABELA VALVE";
+                font-size: 16px;
+                font-weight: 900;
+                letter-spacing: 0.6px;
+                color: CS2Theme.text-primary;
+            }
+
+            Rectangle {
+                background: CS2Theme.bg-card;
+                border-radius: CS2Theme.radius-sm;
+                VerticalLayout {
+                    padding: 24px;
+                    spacing: 8px;
+                    alignment: center;
+
+                    Text {
+                        text: "Tabela de Classificação Global & Regional";
+                        font-size: 13px;
+                        font-weight: 700;
+                        color: CS2Theme.text-primary;
+                        horizontal-alignment: center;
+                    }
+                    Text {
+                        text: "CS Rating oficial do Modo Premier e histórico de partidas competitivas.";
+                        font-size: 11px;
+                        color: CS2Theme.text-muted;
+                        horizontal-alignment: center;
+                    }
+                }
+            }
+
+            HorizontalLayout {
+                alignment: center;
+                spacing: 8px;
+
+                Rectangle {
+                    width: 6px;
+                    height: 6px;
+                    border-radius: 3px;
+                    y: (parent.height - self.height) / 2;
+                    background: CS2Theme.status-success;
+                }
+
+                Text {
+                    text: root.status-message;
+                    font-size: 10px;
+                    font-weight: 600;
+                    color: CS2Theme.text-dim;
                 }
             }
         }

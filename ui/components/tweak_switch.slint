@@ -3,13 +3,18 @@ import { CS2Theme } from "../theme.slint";
 export component TweakSwitch inherits Rectangle {
     in property <string> label: "Otimização";
     in property <string> info: "CPU Affinity";
+    in property <string> tooltip-text: "";
+    in property <length> tooltip-width: 215px;
     in property <color> accent-color: CS2Theme.accent-orange;
     in property <color> hover-color: #ff771a;
     in-out property <bool> checked: false;
+    in property <length> button-width: 0px;
     callback toggled(bool);
 
     height: 50px;
-    horizontal-stretch: 1;
+    min-width: root.button-width > 0px ? root.button-width : 0px;
+    max-width: root.button-width > 0px ? root.button-width : 10000px;
+    horizontal-stretch: root.button-width > 0px ? 0 : 1;
     background: root.checked 
         ? (touch.has-hover ? root.hover-color : root.accent-color) 
         : (touch.has-hover ? CS2Theme.bg-card-hover : CS2Theme.bg-card);
@@ -17,32 +22,35 @@ export component TweakSwitch inherits Rectangle {
     animate background { duration: 120ms; }
 
     HorizontalLayout {
-        padding-left: 14px;
-        padding-right: 14px;
-        spacing: 10px;
+        padding-left: 12px;
+        padding-right: 12px;
+        spacing: 8px;
         alignment: space-between;
 
         VerticalLayout {
             alignment: center;
             spacing: 2px;
+            horizontal-stretch: 1;
 
             Text {
                 text: root.label;
                 font-size: 11px;
                 font-weight: 800;
+                overflow: elide;
                 color: root.checked ? #ffffff : CS2Theme.text-muted;
             }
 
             Text {
                 text: root.info;
                 font-size: 9px;
+                overflow: elide;
                 color: root.checked ? rgba(255, 255, 255, 0.85) : CS2Theme.text-dim;
             }
         }
 
         // Pílula Indicadora de Estado
         Rectangle {
-            width: 46px;
+            width: 44px;
             height: 22px;
             background: root.checked ? #ffffff : CS2Theme.bg-surface;
             border-radius: CS2Theme.radius-xs;
@@ -50,7 +58,7 @@ export component TweakSwitch inherits Rectangle {
             animate background { duration: 120ms; }
 
             HorizontalLayout {
-                spacing: 5px;
+                spacing: 4px;
                 alignment: center;
 
                 Rectangle {
@@ -73,10 +81,175 @@ export component TweakSwitch inherits Rectangle {
         }
     }
 
+    // Balão informativo flutuante (Tooltip) com quebra de linha e dimensionamento adaptativo
+    if touch.has-hover : Rectangle {
+        x: (parent.width - self.width) / 2;
+        y: - self.height - 8px;
+        width: root.tooltip-width;
+        background: #0f172a;
+        border-width: 1px;
+        border-color: root.accent-color;
+        border-radius: CS2Theme.radius-xs;
+        z: 100;
+
+        VerticalLayout {
+            padding-left: 10px;
+            padding-right: 10px;
+            padding-top: 6px;
+            padding-bottom: 6px;
+            spacing: 3px;
+            alignment: center;
+
+            Text {
+                text: root.label;
+                font-size: 10px;
+                font-weight: 800;
+                color: root.accent-color;
+                wrap: word-wrap;
+            }
+
+            Text {
+                text: root.tooltip-text != "" ? root.tooltip-text : root.info;
+                font-size: 9px;
+                font-weight: 600;
+                color: #f8fafc;
+                wrap: word-wrap;
+            }
+        }
+    }
+
     touch := TouchArea {
         clicked => {
             root.checked = !root.checked;
             root.toggled(root.checked);
+        }
+    }
+}
+
+export component MasterToggleSwitch inherits Rectangle {
+    in-out property <bool> all-active: false;
+    in property <length> button-width: 188px;
+    in property <length> tooltip-width: 220px;
+    callback toggled(bool);
+
+    height: 50px;
+    min-width: root.button-width;
+    max-width: root.button-width;
+    horizontal-stretch: 0;
+
+    // Alternância de cor conforme o status
+    property <color> active-color: CS2Theme.status-success;
+    property <color> active-hover: #059669;
+    property <color> inactive-color: CS2Theme.accent-orange;
+    property <color> inactive-hover: #ff771a;
+
+    background: root.all-active
+        ? (touch.has-hover ? root.active-hover : root.active-color)
+        : (touch.has-hover ? root.inactive-hover : root.inactive-color);
+    border-radius: CS2Theme.radius-sm;
+    animate background { duration: 150ms; }
+
+    HorizontalLayout {
+        padding-left: 12px;
+        padding-right: 12px;
+        spacing: 8px;
+        alignment: space-between;
+
+        VerticalLayout {
+            alignment: center;
+            spacing: 2px;
+            horizontal-stretch: 1;
+
+            Text {
+                text: root.all-active ? "Desativar Tudo" : "Ativar Tudo";
+                font-size: 11px;
+                font-weight: 900;
+                overflow: elide;
+                color: #ffffff;
+            }
+
+            Text {
+                text: root.all-active ? "13 Módulos On" : "Padrão Windows";
+                font-size: 9px;
+                overflow: elide;
+                color: rgba(255, 255, 255, 0.9);
+            }
+        }
+
+        // Pílula Indicadora de Estado Mestre
+        Rectangle {
+            width: 44px;
+            height: 22px;
+            background: #ffffff;
+            border-radius: CS2Theme.radius-xs;
+            y: (parent.height - self.height) / 2;
+            animate background { duration: 150ms; }
+
+            HorizontalLayout {
+                spacing: 4px;
+                alignment: center;
+
+                Rectangle {
+                    width: 5px;
+                    height: 5px;
+                    border-radius: 2.5px;
+                    background: root.all-active ? root.active-color : root.inactive-color;
+                    y: (parent.height - self.height) / 2;
+                }
+
+                Text {
+                    text: root.all-active ? "ALL" : "OFF";
+                    font-size: 8px;
+                    font-weight: 900;
+                    letter-spacing: 0.5px;
+                    color: #0b0f17;
+                    vertical-alignment: center;
+                }
+            }
+        }
+    }
+
+    // Balão informativo flutuante (Tooltip) com quebra de linha e dimensionamento adaptativo
+    if touch.has-hover : Rectangle {
+        x: (parent.width - self.width) / 2;
+        y: - self.height - 8px;
+        width: root.tooltip-width;
+        background: #0f172a;
+        border-width: 1px;
+        border-color: root.all-active ? root.active-color : root.inactive-color;
+        border-radius: CS2Theme.radius-xs;
+        z: 100;
+
+        VerticalLayout {
+            padding-left: 10px;
+            padding-right: 10px;
+            padding-top: 6px;
+            padding-bottom: 6px;
+            spacing: 3px;
+            alignment: center;
+
+            Text {
+                text: root.all-active ? "Desativar Todas as Otimizações" : "Ativar Todas as Otimizações";
+                font-size: 10px;
+                font-weight: 800;
+                color: root.all-active ? root.active-color : root.inactive-color;
+                wrap: word-wrap;
+            }
+
+            Text {
+                text: root.all-active ? "Clique para desativar todas as 13 otimizações e restaurar o padrão de fábrica do Windows." : "Clique para ativar simultaneamente todos os 13 ajustes de alta performance e baixa latência.";
+                font-size: 9px;
+                font-weight: 600;
+                color: #f8fafc;
+                wrap: word-wrap;
+            }
+        }
+    }
+
+    touch := TouchArea {
+        clicked => {
+            root.all-active = !root.all-active;
+            root.toggled(root.all-active);
         }
     }
 }
