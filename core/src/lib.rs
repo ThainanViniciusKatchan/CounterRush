@@ -16,6 +16,7 @@ pub enum CoreError {
 
 pub mod classifier;
 pub use classifier::{classify_pc, PcCategory};
+pub use config;
 
 #[derive(Debug, Clone, Default)]
 pub struct CustomLaunchReport {
@@ -531,6 +532,16 @@ pub fn resolve_custom_config_path(custom: Option<&Path>) -> PathBuf {
     if let Some(p) = custom {
         return p.to_path_buf();
     }
+
+    let compile_time_config = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .map(|p| p.join("config").join("custom_optimization.json"));
+    if let Some(ref p) = compile_time_config {
+        if p.exists() {
+            return p.clone();
+        }
+    }
+
     let direct = PathBuf::from("config/custom_optimization.json");
     if direct.exists() || Path::new("config").is_dir() {
         return direct;
@@ -539,6 +550,31 @@ pub fn resolve_custom_config_path(custom: Option<&Path>) -> PathBuf {
     if parent_config.exists() || Path::new("../config").is_dir() {
         return parent_config;
     }
+    let grand_parent_config = PathBuf::from("../../config/custom_optimization.json");
+    if grand_parent_config.exists() || Path::new("../../config").is_dir() {
+        return grand_parent_config;
+    }
+
+    if let Ok(exe_path) = std::env::current_exe() {
+        if let Some(exe_dir) = exe_path.parent() {
+            let candidates = [
+                exe_dir.join("config").join("custom_optimization.json"),
+                exe_dir.join("..").join("config").join("custom_optimization.json"),
+                exe_dir.join("..").join("..").join("config").join("custom_optimization.json"),
+                exe_dir.join("..").join("..").join("..").join("config").join("custom_optimization.json"),
+            ];
+            for candidate in &candidates {
+                if candidate.exists() {
+                    return candidate.clone();
+                }
+            }
+        }
+    }
+
+    if let Some(p) = compile_time_config {
+        return p;
+    }
+
     direct
 }
 

@@ -102,7 +102,7 @@ export component MainWindow inherits Window {
                         color: CS2Theme.text-muted;
                     }
                     Text {
-                        text: "4 Módulos Ativos";
+                        text: ((root.cpu-tweak-active ? 1 : 0) + (root.timer-tweak-active ? 1 : 0) + (root.priority-tweak-active ? 1 : 0) + (root.ram-tweak-active ? 1 : 0)) + " Módulos Ativos";
                         font-size: 10px;
                         font-weight: 800;
                         color: CS2Theme.status-success-bright;

@@ -7,24 +7,106 @@ fn main() -> Result<(), slint::PlatformError> {
 
     // Inicializa o estado dos tweaks a partir do arquivo de configuração persistido
     let core = counterrush_core::OptimizerCore::default();
-    if let Ok((_, config)) = core.load_or_create_custom_config(None) {
-        main_window.set_cpu_tweak_active(config.cs2_affinity);
-        main_window.set_timer_tweak_active(config.apply_timer_resolution);
-        main_window.set_priority_tweak_active(config.cs2_priority);
-        main_window.set_ram_tweak_active(config.empty_standby_list);
-        main_window.set_gpu_accel_tweak_active(config.disable_gpu_acceleration);
-        main_window.set_dpi_tweak_active(config.apply_dpi_optimization);
-        main_window.set_mem_compression_tweak_active(config.disable_memory_compression);
-        main_window.set_mmcss_tweak_active(config.apply_mmcss);
-        main_window.set_hpet_tweak_active(config.disable_hpet);
-        main_window.set_game_bar_tweak_active(config.disable_game_bar);
-        main_window.set_msi_tweak_active(config.enable_msi);
-        main_window.set_power_saving_tweak_active(config.disable_power_saving);
-        main_window.set_render_queue_tweak_active(config.apply_render_queue);
-    }
+    let (resolved_path, config) = match core.load_or_create_custom_config(None) {
+        Ok(res) => res,
+        Err(e) => {
+            eprintln!("Erro ao carregar configuração: {e}");
+            (
+                counterrush_core::resolve_custom_config_path(None),
+                counterrush_core::config::CustomOptimizationConfig::default(),
+            )
+        }
+    };
+
+    main_window.set_cpu_tweak_active(config.cs2_affinity);
+    main_window.set_timer_tweak_active(config.apply_timer_resolution);
+    main_window.set_priority_tweak_active(config.cs2_priority);
+    main_window.set_ram_tweak_active(config.empty_standby_list);
+    main_window.set_gpu_accel_tweak_active(config.disable_gpu_acceleration);
+    main_window.set_dpi_tweak_active(config.apply_dpi_optimization);
+    main_window.set_mem_compression_tweak_active(config.disable_memory_compression);
+    main_window.set_mmcss_tweak_active(config.apply_mmcss);
+    main_window.set_hpet_tweak_active(config.disable_hpet);
+    main_window.set_game_bar_tweak_active(config.disable_game_bar);
+    main_window.set_msi_tweak_active(config.enable_msi);
+    main_window.set_power_saving_tweak_active(config.disable_power_saving);
+    main_window.set_render_queue_tweak_active(config.apply_render_queue);
+
+    // Sincronização em tempo real (Arquivo JSON no disco -> UI)
+    let sync_window_handle = main_window.as_weak();
+    let sync_config_path = resolved_path.clone();
+    std::thread::spawn(move || {
+        let mut last_modified = std::fs::metadata(&sync_config_path)
+            .and_then(|m| m.modified())
+            .ok();
+
+        loop {
+            std::thread::sleep(std::time::Duration::from_millis(500));
+            if let Ok(metadata) = std::fs::metadata(&sync_config_path) {
+                if let Ok(modified) = metadata.modified() {
+                    let should_check = match last_modified {
+                        Some(prev) => modified > prev,
+                        None => true,
+                    };
+                    if should_check {
+                        last_modified = Some(modified);
+                        if let Ok(cfg) = counterrush_core::config::CustomOptimizationConfig::load_from_file(&sync_config_path) {
+                            let _ = slint::invoke_from_event_loop({
+                                let handle = sync_window_handle.clone();
+                                move || {
+                                    if let Some(ui) = handle.upgrade() {
+                                        if ui.get_cpu_tweak_active() != cfg.cs2_affinity {
+                                            ui.set_cpu_tweak_active(cfg.cs2_affinity);
+                                        }
+                                        if ui.get_timer_tweak_active() != cfg.apply_timer_resolution {
+                                            ui.set_timer_tweak_active(cfg.apply_timer_resolution);
+                                        }
+                                        if ui.get_priority_tweak_active() != cfg.cs2_priority {
+                                            ui.set_priority_tweak_active(cfg.cs2_priority);
+                                        }
+                                        if ui.get_ram_tweak_active() != cfg.empty_standby_list {
+                                            ui.set_ram_tweak_active(cfg.empty_standby_list);
+                                        }
+                                        if ui.get_gpu_accel_tweak_active() != cfg.disable_gpu_acceleration {
+                                            ui.set_gpu_accel_tweak_active(cfg.disable_gpu_acceleration);
+                                        }
+                                        if ui.get_dpi_tweak_active() != cfg.apply_dpi_optimization {
+                                            ui.set_dpi_tweak_active(cfg.apply_dpi_optimization);
+                                        }
+                                        if ui.get_mem_compression_tweak_active() != cfg.disable_memory_compression {
+                                            ui.set_mem_compression_tweak_active(cfg.disable_memory_compression);
+                                        }
+                                        if ui.get_mmcss_tweak_active() != cfg.apply_mmcss {
+                                            ui.set_mmcss_tweak_active(cfg.apply_mmcss);
+                                        }
+                                        if ui.get_hpet_tweak_active() != cfg.disable_hpet {
+                                            ui.set_hpet_tweak_active(cfg.disable_hpet);
+                                        }
+                                        if ui.get_game_bar_tweak_active() != cfg.disable_game_bar {
+                                            ui.set_game_bar_tweak_active(cfg.disable_game_bar);
+                                        }
+                                        if ui.get_msi_tweak_active() != cfg.enable_msi {
+                                            ui.set_msi_tweak_active(cfg.enable_msi);
+                                        }
+                                        if ui.get_power_saving_tweak_active() != cfg.disable_power_saving {
+                                            ui.set_power_saving_tweak_active(cfg.disable_power_saving);
+                                        }
+                                        if ui.get_render_queue_tweak_active() != cfg.apply_render_queue {
+                                            ui.set_render_queue_tweak_active(cfg.apply_render_queue);
+                                        }
+                                    }
+                                }
+                            });
+                        }
+                    }
+                }
+            }
+        }
+    });
 
     // Callback para Lançamento do CS2 com Otimizações Personalizadas (test_custom_launch)
     let window_handle = main_window.as_weak();
+    let launch_config_path = resolved_path.clone();
     main_window.on_launch_cs2_clicked(move || {
         let (
             cpu_active,
@@ -63,9 +145,10 @@ fn main() -> Result<(), slint::PlatformError> {
         };
 
         let handle_for_thread = window_handle.clone();
+        let target_cfg_path = launch_config_path.clone();
         std::thread::spawn(move || {
             let core = counterrush_core::OptimizerCore::default();
-            let (resolved, mut config) = match core.load_or_create_custom_config(None) {
+            let (resolved, mut config) = match core.load_or_create_custom_config(Some(&target_cfg_path)) {
                 Ok(res) => res,
                 Err(err) => {
                     let err_msg = format!("Erro na configuração: {err}");
@@ -149,8 +232,9 @@ fn main() -> Result<(), slint::PlatformError> {
         }
     });
 
-    // Callback para alternância dos switches modulares
+    // Callback para alternância dos switches modulares (UI -> Arquivo JSON no disco)
     let window_handle = main_window.as_weak();
+    let tweak_config_path = resolved_path.clone();
     main_window.on_tweak_toggled(move |tweak_name, active| {
         if let Some(ui) = window_handle.upgrade() {
             let state = if active { "ativado" } else { "desativado" };
@@ -175,7 +259,7 @@ fn main() -> Result<(), slint::PlatformError> {
 
             // Persiste a preferência atualizada no arquivo de configuração
             let core = counterrush_core::OptimizerCore::default();
-            if let Ok((resolved, mut config)) = core.load_or_create_custom_config(None) {
+            if let Ok((resolved, mut config)) = core.load_or_create_custom_config(Some(&tweak_config_path)) {
                 match tweak_name.as_str() {
                     "cpu_core_0" => config.cs2_affinity = active,
                     "timer_resolution" => config.apply_timer_resolution = active,
@@ -198,9 +282,10 @@ fn main() -> Result<(), slint::PlatformError> {
     });
 
     // Callback para ações em lote dos tweaks
+    let bulk_config_path = resolved_path.clone();
     main_window.on_bulk_tweaks_action(move |action| {
         let core = counterrush_core::OptimizerCore::default();
-        if let Ok((resolved, mut config)) = core.load_or_create_custom_config(None) {
+        if let Ok((resolved, mut config)) = core.load_or_create_custom_config(Some(&bulk_config_path)) {
             match action.as_str() {
                 "activate_all" => {
                     config.cs2_affinity = true;
