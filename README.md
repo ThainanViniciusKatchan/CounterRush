@@ -35,6 +35,10 @@
 ### O que está sendo feito:
 
 - [ ] Interface gráfica moderna (Slint) com switches e controles modulares.
+- [ ] Sistema para idêntificar o que está ativado e desativado no computador do usuário.
+- [ ] Controle do arquivo .json de otmizações ativas diretamente pela interface.
+- [ ] Verificação de hardware na primeira vez que o usuário abrir o software.
+- [ ] Criar sistema de temas para o layout do software.
 
 ### O que ainda vai ser feito:
 
