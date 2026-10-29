@@ -326,5 +326,49 @@ fn main() -> Result<(), slint::PlatformError> {
         }
     });
 
+    // Callback para o botão "Otimizar Automaticamente" na aba Otimizações
+    let window_handle = main_window.as_weak();
+    let auto_opt_path = resolved_path.clone();
+    main_window.on_auto_optimize_clicked(move || {
+        if let Some(ui) = window_handle.upgrade() {
+            ui.set_status_message("Aplicando otimização automática de alta performance...".into());
+
+            let core = counterrush_core::OptimizerCore::default();
+            if let Ok((resolved, mut config)) = core.load_or_create_custom_config(Some(&auto_opt_path)) {
+                config.cs2_affinity = true;
+                config.apply_timer_resolution = true;
+                config.cs2_priority = true;
+                config.empty_standby_list = true;
+                config.disable_gpu_acceleration = true;
+                config.apply_dpi_optimization = true;
+                config.disable_memory_compression = true;
+                config.apply_mmcss = true;
+                config.disable_hpet = true;
+                config.disable_game_bar = true;
+                config.enable_msi = true;
+                config.disable_power_saving = true;
+                config.apply_render_queue = true;
+
+                let _ = config.save_to_file(&resolved);
+
+                ui.set_cpu_tweak_active(true);
+                ui.set_timer_tweak_active(true);
+                ui.set_priority_tweak_active(true);
+                ui.set_ram_tweak_active(true);
+                ui.set_gpu_accel_tweak_active(true);
+                ui.set_dpi_tweak_active(true);
+                ui.set_mem_compression_tweak_active(true);
+                ui.set_mmcss_tweak_active(true);
+                ui.set_hpet_tweak_active(true);
+                ui.set_game_bar_tweak_active(true);
+                ui.set_msi_tweak_active(true);
+                ui.set_power_saving_tweak_active(true);
+                ui.set_render_queue_tweak_active(true);
+
+                ui.set_status_message("Otimização automática aplicada com sucesso! Todos os módulos recomendados ativos.".into());
+            }
+        }
+    });
+
     main_window.run()
 }

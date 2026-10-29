@@ -52,6 +52,7 @@ export component MainWindow inherits Window {
     callback card-action-clicked(string);
     callback tweak-toggled(string, bool);
     callback bulk-tweaks-action(string);
+    callback auto-optimize-clicked();
 
     HorizontalLayout {
         // 1. Barra Lateral Tática Sólida (Sem Bordas)
@@ -400,10 +401,13 @@ export component MainWindow inherits Window {
             padding-right: 19px;
             padding-top: 18px;
             padding-bottom: 16px;
-            spacing: 14px;
             alignment: space-between;
 
-            // Cabeçalho da Central de Otimizações
+            // Seção Superior: Cabeçalho + Grade de Otimizações
+            VerticalLayout {
+                spacing: 16px;
+
+                // Cabeçalho da Central de Otimizações
             HorizontalLayout {
                 alignment: space-between;
                 Text {
@@ -680,27 +684,57 @@ export component MainWindow inherits Window {
                     }
                 }
             }
+        }
 
-            // Barra de Status HUD Tática
-            HorizontalLayout {
+            // Seção Inferior: Botão OTIMIZAR AUTOMATICAMENTE Centralizado + Barra de Status HUD
+            VerticalLayout {
+                spacing: 6px;
                 alignment: center;
-                spacing: 8px;
 
-                Rectangle {
-                    width: 6px;
-                    height: 6px;
-                    border-radius: 3px;
-                    y: (parent.height - self.height) / 2;
-                    background: CS2Theme.status-success;
+                HorizontalLayout {
+                    alignment: center;
+                    padding-top: 6px;
+                    padding-bottom: 2px;
+
+                    TacticalButton {
+                        text: "OTIMIZAR AUTOMATICAMENTE";
+                        badge: "PERFIL RECOMENDADO • BAIXA LATÊNCIA";
+                        enabled: !root.is-launching;
+                        background-color: CS2Theme.accent-orange;
+                        hover-color: #ff771a;
+                        custom-border-color: #c2410c;
+                        custom-border-hover-color: #ff851b;
+                        custom-border-width: 3px;
+                        button-width: 280px;
+                        text-color: #ffffff;
+                        icon-src: @image-url("assets/icons/rocket.svg");
+                        clicked => {
+                            root.auto-optimize-clicked();
+                        }
+                    }
                 }
 
-                Text {
-                    text: root.status-message;
-                    font-size: 10px;
-                    font-weight: 600;
-                    letter-spacing: 0.3px;
-                    color: CS2Theme.text-dim;
-                    horizontal-alignment: center;
+                // Barra de Status HUD Tática
+                HorizontalLayout {
+                    alignment: center;
+                    spacing: 8px;
+
+                    Rectangle {
+                        width: 6px;
+                        height: 6px;
+                        border-radius: 3px;
+                        y: (parent.height - self.height) / 2;
+                        background: CS2Theme.status-success;
+                    }
+
+                    Text {
+                        text: root.status-message;
+                        font-size: 10px;
+                        font-weight: 600;
+                        letter-spacing: 0.3px;
+                        color: CS2Theme.text-dim;
+                        horizontal-alignment: center;
+                    }
                 }
             }
         }
