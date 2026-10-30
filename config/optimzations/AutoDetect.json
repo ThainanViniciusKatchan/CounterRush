@@ -1,0 +1,25 @@
+{
+  "launch_args": [
+    "-fullscreen",
+    "-console",
+    "-nojoy",
+    "+engine_low_latency_sleep_after_client_tick",
+    "true",
+    "+fps_max",
+    "240",
+    "+mat_queue_mode"
+  ],
+  "empty_standby_list": false,
+  "cs2_priority": false,
+  "cs2_affinity": false,
+  "disable_gpu_acceleration": false,
+  "apply_dpi_optimization": false,
+  "disable_memory_compression": false,
+  "apply_timer_resolution": false,
+  "apply_mmcss": false,
+  "disable_hpet": false,
+  "disable_game_bar": false,
+  "enable_msi": false,
+  "disable_power_saving": false,
+  "apply_render_queue": false
+}

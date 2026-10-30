@@ -2,6 +2,16 @@ import { CS2Theme } from "theme.slint";
 import { Sidebar } from "components/sidebar.slint";
 import { TweakSwitch, MasterToggleSwitch } from "components/tweak_switch.slint";
 import { TacticalButton } from "components/tactical_button.slint";
+import { PresetButton } from "components/preset_button.slint";
+import { AddPresetButton } from "components/add_preset_button.slint";
+import { CreateProfileDialog, NewProfileData } from "components/create_profile_dialog.slint";
+
+export struct PresetModel {
+    name: string,
+    tag: string,
+}
+
+export { NewProfileData }
 
 export component MainWindow inherits Window {
     title: "CounterRush - CS2 Performance";
@@ -17,19 +27,23 @@ export component MainWindow inherits Window {
     in-out property <int> active-tab: 0;
     in-out property <string> status-message: "Pronto para iniciar o CS2 com taxa de polling de 0.5ms e afinidade de CPU otimizada.";
     in-out property <bool> is-launching: false;
-    in-out property <bool> cpu-tweak-active: true;
-    in-out property <bool> timer-tweak-active: true;
-    in-out property <bool> priority-tweak-active: true;
-    in-out property <bool> ram-tweak-active: true;
-    in-out property <bool> gpu-accel-tweak-active: true;
-    in-out property <bool> dpi-tweak-active: true;
-    in-out property <bool> mem-compression-tweak-active: true;
-    in-out property <bool> mmcss-tweak-active: true;
-    in-out property <bool> hpet-tweak-active: true;
-    in-out property <bool> game-bar-tweak-active: true;
-    in-out property <bool> msi-tweak-active: true;
-    in-out property <bool> power-saving-tweak-active: true;
-    in-out property <bool> render-queue-tweak-active: true;
+    in-out property <bool> cpu-tweak-active: false;
+    in-out property <bool> timer-tweak-active: false;
+    in-out property <bool> priority-tweak-active: false;
+    in-out property <bool> ram-tweak-active: false;
+    in-out property <bool> gpu-accel-tweak-active: false;
+    in-out property <bool> dpi-tweak-active: false;
+    in-out property <bool> mem-compression-tweak-active: false;
+    in-out property <bool> mmcss-tweak-active: false;
+    in-out property <bool> hpet-tweak-active: false;
+    in-out property <bool> game-bar-tweak-active: false;
+    in-out property <bool> msi-tweak-active: false;
+    in-out property <bool> power-saving-tweak-active: false;
+    in-out property <bool> render-queue-tweak-active: false;
+    in-out property <string> active-preset: "";
+    in-out property <[PresetModel]> presets: [];
+    in-out property <bool> show-create-modal: false;
+    in-out property <string> create-modal-error: "";
 
     // Estado reativo geral para o botão mestre
     property <bool> is-all-tweaks-active: 
@@ -53,6 +67,8 @@ export component MainWindow inherits Window {
     callback tweak-toggled(string, bool);
     callback bulk-tweaks-action(string);
     callback auto-optimize-clicked();
+    callback preset-selected(string);
+    callback create-profile-confirmed(NewProfileData);
 
     HorizontalLayout {
         // 1. Barra Lateral Tática Sólida (Sem Bordas)
@@ -686,6 +702,67 @@ export component MainWindow inherits Window {
             }
         }
 
+            // Seção Intermediária: Perfis de Otimização (config/optimzations) - Seleção Única
+            VerticalLayout {
+                spacing: 8px;
+                alignment: center;
+
+                HorizontalLayout {
+                    alignment: center;
+                    spacing: 8px;
+
+                    Rectangle {
+                        width: 18px;
+                        height: 1px;
+                        background: CS2Theme.border;
+                        y: (parent.height - self.height) / 2;
+                    }
+
+                    Text {
+                        text: "PERFIS DE OTIMIZAÇÃO (CONFIG/OPTIMZATIONS)";
+                        font-size: 10px;
+                        font-weight: 800;
+                        letter-spacing: 0.8px;
+                        color: CS2Theme.text-dim;
+                        vertical-alignment: center;
+                    }
+
+                    Rectangle {
+                        width: 18px;
+                        height: 1px;
+                        background: CS2Theme.border;
+                        y: (parent.height - self.height) / 2;
+                    }
+                }
+
+                HorizontalLayout {
+                    alignment: center;
+                    spacing: root.presets.length > 2 ? 10px : 16px;
+
+                    for preset in root.presets : PresetButton {
+                        file-name: preset.name;
+                        tag: preset.tag;
+                        is-active: root.active-preset == preset.name;
+                        accent-color: preset.name == "AutoDetect" ? CS2Theme.accent-ct-cyan : CS2Theme.accent-orange;
+                        active-bg: preset.name == "AutoDetect" ? CS2Theme.accent-ct-soft : CS2Theme.accent-orange-soft;
+                        button-width: root.presets.length > 2 ? 250px : 350px;
+                        selected => {
+                            root.active-preset = preset.name;
+                            root.status-message = "Perfil ativo: " + preset.name;
+                            root.preset-selected(preset.name);
+                        }
+                    }
+
+                    AddPresetButton {
+                        is-empty: root.presets.length == 0;
+                        clicked => {
+                            root.create-modal-error = "";
+                            root.show-create-modal = true;
+                        }
+                    }
+                }
+            }
+
             // Seção Inferior: Botão OTIMIZAR AUTOMATICAMENTE Centralizado + Barra de Status HUD
             VerticalLayout {
                 spacing: 6px;
@@ -861,6 +938,18 @@ export component MainWindow inherits Window {
                     color: CS2Theme.text-dim;
                 }
             }
+        }
+    }
+
+    // Modal Overlay de Criação de Perfil de Otimização (.json)
+    if root.show-create-modal : CreateProfileDialog {
+        error-message: root.create-modal-error;
+        cancel => {
+            root.show-create-modal = false;
+            root.create-modal-error = "";
+        }
+        confirmed(data) => {
+            root.create-profile-confirmed(data);
         }
     }
 }

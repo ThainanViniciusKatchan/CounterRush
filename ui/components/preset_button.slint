@@ -1,0 +1,124 @@
+import { CS2Theme } from "../theme.slint";
+
+export component PresetButton inherits Rectangle {
+    in property <string> file-name: "custom_optimization";
+    in property <string> tag: "PERFIL JSON";
+    in property <bool> is-active: false;
+    in property <color> accent-color: CS2Theme.accent-ct-blue;
+    in property <color> active-bg: CS2Theme.accent-ct-soft;
+    in property <length> button-width: 350px;
+    callback selected();
+
+    width: root.button-width;
+    height: 44px;
+    background: root.is-active 
+        ? (touch.has-hover ? root.accent-color.transparentize(75%) : root.active-bg)
+        : (touch.has-hover ? CS2Theme.bg-card-hover : CS2Theme.bg-card);
+    border-radius: CS2Theme.radius-sm;
+    border-width: root.is-active ? 2px : 1px;
+    border-color: root.is-active 
+        ? root.accent-color 
+        : (touch.has-hover ? CS2Theme.border-hover : CS2Theme.border);
+
+    animate background { duration: 120ms; }
+    animate border-color { duration: 120ms; }
+
+    HorizontalLayout {
+        padding-left: root.button-width < 300px ? 10px : 12px;
+        padding-right: root.button-width < 300px ? 10px : 12px;
+        spacing: 6px;
+        alignment: space-between;
+
+        // Bloco Esquerdo: Indicador Tático + Ícone + Nomes
+        HorizontalLayout {
+            spacing: 6px;
+            alignment: start;
+
+            // Indicador de Beacon Tático Luminoso
+            Rectangle {
+                width: 7px;
+                height: 7px;
+                border-radius: 3.5px;
+                background: root.is-active ? root.accent-color : #475569;
+                y: (parent.height - self.height) / 2;
+                animate background { duration: 150ms; }
+            }
+
+            // Ícone do Arquivo de Configuração
+            Image {
+                source: @image-url("../assets/icons/cfg.svg");
+                width: 14px;
+                height: 14px;
+                colorize: root.is-active ? root.accent-color : CS2Theme.text-dim;
+                y: (parent.height - self.height) / 2;
+                animate colorize { duration: 120ms; }
+            }
+
+            VerticalLayout {
+                alignment: center;
+                spacing: 2px;
+
+                Text {
+                    text: root.file-name;
+                    font-size: root.button-width < 300px ? 10px : 11px;
+                    font-weight: 800;
+                    letter-spacing: 0.3px;
+                    color: root.is-active ? #ffffff : CS2Theme.text-muted;
+                    overflow: elide;
+                    animate color { duration: 120ms; }
+                }
+
+                Text {
+                    text: root.tag;
+                    font-size: 8px;
+                    font-weight: 700;
+                    letter-spacing: 0.6px;
+                    color: root.is-active ? root.accent-color : CS2Theme.text-dim;
+                    animate color { duration: 120ms; }
+                }
+            }
+        }
+
+        // Pílula Lateral Direita de Estado HUD (ATIVO / USAR)
+        Rectangle {
+            width: root.is-active ? 62px : 56px;
+            height: 22px;
+            background: root.is-active ? root.active-bg : CS2Theme.bg-surface;
+            border-radius: CS2Theme.radius-xs;
+            border-width: 1px;
+            border-color: root.is-active ? root.accent-color : CS2Theme.border;
+            y: (parent.height - self.height) / 2;
+            animate background { duration: 120ms; }
+            animate border-color { duration: 120ms; }
+
+            HorizontalLayout {
+                spacing: 4px;
+                alignment: center;
+
+                Rectangle {
+                    width: 5px;
+                    height: 5px;
+                    border-radius: 2.5px;
+                    background: root.is-active ? root.accent-color : CS2Theme.text-dim;
+                    y: (parent.height - self.height) / 2;
+                }
+
+                Text {
+                    text: root.is-active ? "ATIVO" : "USAR";
+                    font-size: 8px;
+                    font-weight: 900;
+                    letter-spacing: 0.5px;
+                    color: root.is-active ? #ffffff : CS2Theme.text-dim;
+                    vertical-alignment: center;
+                }
+            }
+        }
+    }
+
+    touch := TouchArea {
+        mouse-cursor: pointer;
+        clicked => {
+            root.selected();
+        }
+    }
+}

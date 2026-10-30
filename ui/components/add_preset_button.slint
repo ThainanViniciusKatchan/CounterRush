@@ -1,0 +1,49 @@
+import { CS2Theme } from "../theme.slint";
+
+export component AddPresetButton inherits Rectangle {
+    in property <bool> is-empty: false;
+    callback clicked();
+
+    width: root.is-empty ? 180px : 44px;
+    height: 44px;
+    background: touch.has-hover ? CS2Theme.bg-card-hover : CS2Theme.bg-card;
+    border-radius: CS2Theme.radius-sm;
+    border-width: touch.has-hover ? 2px : 1px;
+    border-color: touch.has-hover ? CS2Theme.accent-orange : CS2Theme.border;
+
+    animate width { duration: 150ms; }
+    animate background { duration: 120ms; }
+    animate border-color { duration: 120ms; }
+
+    HorizontalLayout {
+        alignment: center;
+        spacing: 8px;
+
+        Text {
+            text: "+";
+            font-size: 20px;
+            font-weight: 900;
+            color: touch.has-hover ? CS2Theme.accent-orange-bright : CS2Theme.accent-orange;
+            vertical-alignment: center;
+            horizontal-alignment: center;
+            animate color { duration: 120ms; }
+        }
+
+        if root.is-empty : Text {
+            text: "NOVO PERFIL";
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: 0.8px;
+            color: touch.has-hover ? CS2Theme.text-primary : CS2Theme.text-muted;
+            vertical-alignment: center;
+            animate color { duration: 120ms; }
+        }
+    }
+
+    touch := TouchArea {
+        mouse-cursor: pointer;
+        clicked => {
+            root.clicked();
+        }
+    }
+}

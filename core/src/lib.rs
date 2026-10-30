@@ -822,170 +822,205 @@ pub fn get_default_launch_args_for_category(category: PcCategory) -> Vec<String>
     }
 }
 
+pub fn resolve_optimizations_dir() -> PathBuf {
+    if let Ok(exe_path) = std::env::current_exe() {
+        if let Some(exe_dir) = exe_path.parent() {
+            let candidate = exe_dir.join("config").join("optimzations");
+            if candidate.is_dir() {
+                return candidate;
+            }
+        }
+    }
+
+    let direct = PathBuf::from("config/optimzations");
+    if direct.is_dir() {
+        return direct;
+    }
+
+    if let Ok(exe_path) = std::env::current_exe() {
+        if let Some(exe_dir) = exe_path.parent() {
+            return exe_dir.join("config").join("optimzations");
+        }
+    }
+
+    direct
+}
+
+pub fn list_optimization_configs_in_dir<P: AsRef<Path>>(dir: P) -> Vec<PathBuf> {
+    let mut files = Vec::new();
+    if let Ok(entries) = std::fs::read_dir(dir.as_ref()) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_file()
+                && path
+                    .extension()
+                    .and_then(|s| s.to_str())
+                    .map(|ext| ext.eq_ignore_ascii_case("json"))
+                    == Some(true)
+            {
+                files.push(path);
+            }
+        }
+    }
+    files.sort();
+    files
+}
+
+pub fn list_optimization_configs() -> Vec<PathBuf> {
+    list_optimization_configs_in_dir(resolve_optimizations_dir())
+}
+
+pub fn resolve_optimization_file_path(name: &str) -> PathBuf {
+    let opt_dir = resolve_optimizations_dir();
+    let filename = if name.ends_with(".json") {
+        name.to_string()
+    } else {
+        format!("{name}.json")
+    };
+    opt_dir.join(&filename)
+}
+
+pub fn validate_profile_name(name: &str) -> Result<String, String> {
+    let trimmed = name.trim();
+    if trimmed.is_empty() {
+        return Err("O nome do perfil não pode ser vazio.".to_string());
+    }
+
+    let base_name = if trimmed.len() >= 5
+        && trimmed[trimmed.len() - 5..].eq_ignore_ascii_case(".json")
+    {
+        trimmed[..trimmed.len() - 5].trim()
+    } else {
+        trimmed
+    };
+
+    if base_name.is_empty() {
+        return Err("O nome do perfil não pode ser vazio.".to_string());
+    }
+
+    if base_name.contains(|c: char| matches!(c, '\\' | '/' | ':' | '*' | '?' | '"' | '<' | '>' | '|')) {
+        return Err("O nome contém caracteres proibidos pelo sistema operacional.".to_string());
+    }
+
+    let reserved = [
+        "CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7",
+        "COM8", "COM9", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+    ];
+    if reserved.contains(&base_name.to_uppercase().as_str()) {
+        return Err("Nome de arquivo reservado pelo sistema operacional.".to_string());
+    }
+
+    Ok(base_name.to_string())
+}
+
 pub fn resolve_custom_config_path(custom: Option<&Path>) -> PathBuf {
+    let opt_dir = resolve_optimizations_dir();
+
     if let Some(p) = custom {
         if p.exists() {
             return p.to_path_buf();
+        }
+        let p_json = if p.extension().is_none() {
+            p.with_extension("json")
+        } else {
+            p.to_path_buf()
+        };
+        if p_json.exists() {
+            return p_json;
+        }
+
+        let in_opt = opt_dir.join(&p_json);
+        if in_opt.exists() {
+            return in_opt;
+        }
+
+        if p_json.parent().map_or(true, |parent| parent.as_os_str().is_empty()) {
+            return opt_dir.join(&p_json);
+        }
+
+        return p_json;
+    }
+
+    let default_file = opt_dir.join("custom_optimization.json");
+    if default_file.exists() || opt_dir.is_dir() {
+        return default_file;
+    }
+
+    default_file
+}
+
+pub fn resolve_autodetect_config_path(custom: Option<&Path>) -> PathBuf {
+    let opt_dir = resolve_optimizations_dir();
+
+    if let Some(p) = custom {
+        if p.exists() {
+            return p.to_path_buf();
+        }
+        let in_opt = opt_dir.join(p);
+        if in_opt.exists() {
+            return in_opt;
+        }
+        return in_opt;
+    }
+
+    let default_file = opt_dir.join("AutoDetect.json");
+    if default_file.exists() || opt_dir.is_dir() {
+        return default_file;
+    }
+
+    default_file
+}
+
+pub fn resolve_hardware_config_path(custom: Option<&Path>) -> PathBuf {
+    if let Some(p) = custom {
+        if p.exists() {
+            return p.to_path_buf();
+        }
+        if p.starts_with("config") || p.starts_with("../config") {
+            return p.to_path_buf();
+        }
+        if let Ok(exe_path) = std::env::current_exe() {
+            if let Some(exe_dir) = exe_path.parent() {
+                let in_exe_hw = exe_dir.join("config").join("hardware").join(p);
+                if in_exe_hw.exists() {
+                    return in_exe_hw;
+                }
+            }
+        }
+        let in_hardware = Path::new("config").join("hardware").join(p);
+        if in_hardware.exists() {
+            return in_hardware;
         }
         let in_config = Path::new("config").join(p);
         if in_config.exists() {
             return in_config;
         }
-        let parent_in_config = Path::new("../config").join(p);
-        if parent_in_config.exists() {
-            return parent_in_config;
-        }
-        let compile_time_in_config = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .parent()
-            .map(|base| base.join("config").join(p));
-        if let Some(ref cp) = compile_time_in_config {
-            if cp.exists() {
-                return cp.clone();
+        if let Ok(exe_path) = std::env::current_exe() {
+            if let Some(exe_dir) = exe_path.parent() {
+                return exe_dir.join("config").join("hardware").join(p);
             }
         }
-        return p.to_path_buf();
-    }
-
-    let compile_time_config = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .map(|p| p.join("config").join("custom_optimization.json"));
-    if let Some(ref p) = compile_time_config {
-        if p.exists() {
-            return p.clone();
-        }
-    }
-
-    let direct = PathBuf::from("config/custom_optimization.json");
-    if direct.exists() || Path::new("config").is_dir() {
-        return direct;
-    }
-    let parent_config = PathBuf::from("../config/custom_optimization.json");
-    if parent_config.exists() || Path::new("../config").is_dir() {
-        return parent_config;
-    }
-    let grand_parent_config = PathBuf::from("../../config/custom_optimization.json");
-    if grand_parent_config.exists() || Path::new("../../config").is_dir() {
-        return grand_parent_config;
+        return in_hardware;
     }
 
     if let Ok(exe_path) = std::env::current_exe() {
         if let Some(exe_dir) = exe_path.parent() {
-            let candidates = [
-                exe_dir.join("config").join("custom_optimization.json"),
-                exe_dir.join("..").join("config").join("custom_optimization.json"),
-                exe_dir.join("..").join("..").join("config").join("custom_optimization.json"),
-                exe_dir.join("..").join("..").join("..").join("config").join("custom_optimization.json"),
-            ];
-            for candidate in &candidates {
-                if candidate.exists() {
-                    return candidate.clone();
-                }
+            let candidate = exe_dir.join("config").join("hardware").join("Hardware.json");
+            if candidate.exists() {
+                return candidate;
             }
         }
     }
 
-    if let Some(p) = compile_time_config {
-        return p;
-    }
-
-    direct
-}
-
-pub fn resolve_autodetect_config_path(custom: Option<&Path>) -> PathBuf {
-    if let Some(p) = custom {
-        return p.to_path_buf();
-    }
-
-    let compile_time_config = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .map(|p| p.join("config").join("AutoDetect.json"));
-    if let Some(ref p) = compile_time_config {
-        if p.exists() {
-            return p.clone();
-        }
-    }
-
-    let direct = PathBuf::from("config/AutoDetect.json");
-    if direct.exists() || Path::new("config").is_dir() {
+    let direct = PathBuf::from("config/hardware/Hardware.json");
+    if direct.exists() || Path::new("config/hardware").is_dir() {
         return direct;
-    }
-    let parent_config = PathBuf::from("../config/AutoDetect.json");
-    if parent_config.exists() || Path::new("../config").is_dir() {
-        return parent_config;
-    }
-    let grand_parent_config = PathBuf::from("../../config/AutoDetect.json");
-    if grand_parent_config.exists() || Path::new("../../config").is_dir() {
-        return grand_parent_config;
     }
 
     if let Ok(exe_path) = std::env::current_exe() {
         if let Some(exe_dir) = exe_path.parent() {
-            let candidates = [
-                exe_dir.join("config").join("AutoDetect.json"),
-                exe_dir.join("..").join("config").join("AutoDetect.json"),
-                exe_dir.join("..").join("..").join("config").join("AutoDetect.json"),
-                exe_dir.join("..").join("..").join("..").join("config").join("AutoDetect.json"),
-            ];
-            for candidate in &candidates {
-                if candidate.exists() {
-                    return candidate.clone();
-                }
-            }
+            return exe_dir.join("config").join("hardware").join("Hardware.json");
         }
-    }
-
-    if let Some(p) = compile_time_config {
-        return p;
-    }
-
-    direct
-}
-
-pub fn resolve_hardware_config_path(custom: Option<&Path>) -> PathBuf {
-    if let Some(p) = custom {
-        return p.to_path_buf();
-    }
-
-    let compile_time_config = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .map(|p| p.join("config").join("Hardware.json"));
-    if let Some(ref p) = compile_time_config {
-        if p.exists() {
-            return p.clone();
-        }
-    }
-
-    let direct = PathBuf::from("config/Hardware.json");
-    if direct.exists() || Path::new("config").is_dir() {
-        return direct;
-    }
-    let parent_config = PathBuf::from("../config/Hardware.json");
-    if parent_config.exists() || Path::new("../config").is_dir() {
-        return parent_config;
-    }
-    let grand_parent_config = PathBuf::from("../../config/Hardware.json");
-    if grand_parent_config.exists() || Path::new("../../config").is_dir() {
-        return grand_parent_config;
-    }
-
-    if let Ok(exe_path) = std::env::current_exe() {
-        if let Some(exe_dir) = exe_path.parent() {
-            let candidates = [
-                exe_dir.join("config").join("Hardware.json"),
-                exe_dir.join("..").join("config").join("Hardware.json"),
-                exe_dir.join("..").join("..").join("config").join("Hardware.json"),
-                exe_dir.join("..").join("..").join("..").join("config").join("Hardware.json"),
-            ];
-            for candidate in &candidates {
-                if candidate.exists() {
-                    return candidate.clone();
-                }
-            }
-        }
-    }
-
-    if let Some(p) = compile_time_config {
-        return p;
     }
 
     direct
@@ -1054,5 +1089,119 @@ pub fn enforce_hardware_restrictions_for_info(
 impl Default for OptimizerCore {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_profile_name_validation() {
+        // Nomes válidos
+        assert_eq!(validate_profile_name("competitivo").unwrap(), "competitivo");
+        assert_eq!(validate_profile_name("  treino_cs2  ").unwrap(), "treino_cs2");
+        assert_eq!(validate_profile_name("perfil.json").unwrap(), "perfil");
+        assert_eq!(validate_profile_name("perfil.JSON").unwrap(), "perfil");
+        assert_eq!(validate_profile_name("perfil.JsOn").unwrap(), "perfil");
+        assert_eq!(validate_profile_name("meu perfil gamer.json").unwrap(), "meu perfil gamer");
+
+        // Nomes vazios ou somente espaços
+        assert!(validate_profile_name("").is_err());
+        assert!(validate_profile_name("   ").is_err());
+        assert!(validate_profile_name("\t\n").is_err());
+        assert!(validate_profile_name(".json").is_err());
+        assert!(validate_profile_name(" .JSON ").is_err());
+        assert!(validate_profile_name(".Json").is_err());
+
+        // Caracteres ilegais NTFS/Windows (\ / : * ? " < > |)
+        for illegal in &['\\', '/', ':', '*', '?', '"', '<', '>', '|'] {
+            let bad_name = format!("perfil{}teste", illegal);
+            assert!(
+                validate_profile_name(&bad_name).is_err(),
+                "Deveria rejeitar o caractere ilegal: {}",
+                illegal
+            );
+        }
+
+        // Nomes de dispositivos reservados do Windows
+        let reserved_names = [
+            "CON", "con", "con.json", "PRN", "prn.JSON", "AUX", "aux.Json", "NUL", "nul",
+            "COM1", "com1.json", "COM9", "com9", "LPT1", "lpt1.json", "LPT9", "lpt9",
+        ];
+        for res in &reserved_names {
+            assert!(
+                validate_profile_name(res).is_err(),
+                "Deveria rejeitar nome reservado: {}",
+                res
+            );
+        }
+    }
+
+    #[test]
+    fn test_list_optimization_configs_empty_directory() {
+        let temp_dir = tempfile::tempdir().expect("Falha ao criar diretório temporário");
+        let configs = list_optimization_configs_in_dir(temp_dir.path());
+        assert!(configs.is_empty(), "Lista de configs em diretório vazio deve ser vazia");
+
+        // Verifica que nenhum arquivo foi criado no diretório temporário
+        let count = std::fs::read_dir(temp_dir.path())
+            .expect("Falha ao ler diretório temporário")
+            .count();
+        assert_eq!(count, 0, "Nenhum arquivo deve ser criado ao listar diretório vazio");
+    }
+
+    #[test]
+    fn test_create_and_persist_new_profile() {
+        let temp_dir = tempfile::tempdir().expect("Falha ao criar diretório temporário");
+
+        let input_name = "ultra_fps.json";
+        let clean_name = validate_profile_name(input_name).expect("Nome deveria ser válido");
+        assert_eq!(clean_name, "ultra_fps");
+
+        let target_file = temp_dir.path().join(format!("{clean_name}.json"));
+
+        let mut config = config::CustomOptimizationConfig::all_disabled();
+        config.launch_args = vec!["-novid".to_string(), "-high".to_string(), "+fps_max 0".to_string()];
+        config.apply_timer_resolution = true;
+        config.disable_hpet = true;
+        config.cs2_priority = true;
+
+        config.save_to_file(&target_file).expect("Falha ao persistir perfil de otimização");
+        assert!(target_file.exists());
+
+        let configs = list_optimization_configs_in_dir(temp_dir.path());
+        assert_eq!(configs.len(), 1);
+        assert_eq!(configs[0], target_file);
+
+        let loaded = config::CustomOptimizationConfig::load_from_file(&target_file)
+            .expect("Falha ao recarregar perfil persistido");
+        assert_eq!(config, loaded);
+        assert_eq!(loaded.launch_args, vec!["-novid", "-high", "+fps_max 0"]);
+        assert!(loaded.apply_timer_resolution);
+        assert!(loaded.disable_hpet);
+        assert!(loaded.cs2_priority);
+        assert!(!loaded.apply_render_queue);
+    }
+
+    #[test]
+    fn test_isolated_build_dir_does_not_escape_to_project_dir() {
+        let temp_build_dir = tempfile::tempdir().expect("Falha ao criar diretório temporário");
+        let non_existent_opt_dir = temp_build_dir.path().join("config").join("optimzations");
+
+        // Em uma pasta de compilação sem a pasta config/optimzations, a lista de configurações deve ser estritamente vazia
+        let configs = list_optimization_configs_in_dir(&non_existent_opt_dir);
+        assert!(configs.is_empty(), "Build sem pasta config não deve retornar nenhuma configuração");
+
+        // Criação de perfil no local isolado da build deve ser mantida estritamente no local
+        std::fs::create_dir_all(&non_existent_opt_dir).expect("Falha ao criar config/optimzations na build");
+        let local_profile = non_existent_opt_dir.join("meu_build_perfil.json");
+        let mut cfg = config::CustomOptimizationConfig::all_disabled();
+        cfg.cs2_priority = true;
+        cfg.save_to_file(&local_profile).expect("Falha ao salvar no build");
+
+        let configs_after = list_optimization_configs_in_dir(&non_existent_opt_dir);
+        assert_eq!(configs_after.len(), 1);
+        assert_eq!(configs_after[0], local_profile);
     }
 }

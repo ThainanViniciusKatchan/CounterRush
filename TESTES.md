@@ -20,7 +20,7 @@ cargo build --workspace --examples
 
 ## 2. Detecção e Classificação de Hardware
 
-Coleta informações detalhadas de CPU, GPU e memória RAM, classifica o computador nos perfis **Econômico**, **Intermediário** ou **Potente** com base nos requisitos do CS2, e persiste os dados coletados no arquivo `config/Hardware.json` para reutilização rápida nas próximas operações ou atualizações de perfil.
+Coleta informações detalhadas de CPU, GPU e memória RAM, classifica o computador nos perfis **Econômico**, **Intermediário** ou **Potente** com base nos requisitos do CS2, e persiste os dados coletados no arquivo `config/hardware/Hardware.json` para reutilização rápida nas próximas operações ou atualizações de perfil.
 
 ```powershell
 cargo run -p core --example test_hardware_detection
@@ -96,15 +96,15 @@ cargo run -p core --example test_custom_launch -- AutoDetect.json
 cargo run -p core --example test_custom_launch -- custom_optimization.json
 
 # Também suporta caminho relativo ou flag explícita:
-cargo run -p core --example test_custom_launch -- config/AutoDetect.json
-cargo run -p core --example test_custom_launch -- --config config/custom_optimization.json
+cargo run -p core --example test_custom_launch -- config/optimzations/AutoDetect.json
+cargo run -p core --example test_custom_launch -- --config config/optimzations/custom_optimization.json
 ```
 
 ---
 
 ## 6.2. Autodetecção de Hardware e Geração de Otimizações Compatíveis (AutoDetect.json)
 
-Verifica se o arquivo `config/Hardware.json` já existe: caso exista, lê os dados de hardware diretamente do arquivo; caso contrário, executa a detecção nativa (`windows_api/src/hardware.rs`) e cria o `config/Hardware.json`. A partir do diagnóstico e do perfil classificado, gera o arquivo `config/AutoDetect.json` com otimizações estritamente compatíveis:
+Verifica se o arquivo `config/hardware/Hardware.json` já existe: caso exista, lê os dados de hardware diretamente do arquivo; caso contrário, executa a detecção nativa (`windows_api/src/hardware.rs`) e cria o `config/hardware/Hardware.json`. A partir do diagnóstico e do perfil classificado, gera o arquivo `config/optimzations/AutoDetect.json` com otimizações estritamente compatíveis:
 - **Prioridade em Tempo Real (`cs2_priority`):** Desativada por padrão (`false`) em todas as configurações geradas, ficando como otimização opcional.
 - **Afinidade de CPU (`cs2_affinity`):** Requer mais de 4 núcleos físicos (`physical_cores > 4`). Se o processador tiver 4 núcleos ou menos, permanece desativada e bloqueada contra ativação indevida para não degradar o CS2.
 - **Compactação de Memória (`disable_memory_compression`):** Requer estritamente mais de 16 GB de RAM (`ram.total_gb > 16.0`). Em computadores com 16 GB ou menos, permanece desativada e bloqueada para prevenir falta de memória física.

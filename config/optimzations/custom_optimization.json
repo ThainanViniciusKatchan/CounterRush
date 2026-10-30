@@ -4,7 +4,7 @@
     "-console",
     "-nojoy",
     "+engine_low_latency_sleep_after_client_tick",
-    "true",
+    "false",
     "+fps_max",
     "240",
     "+mat_queue_mode"

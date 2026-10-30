@@ -32,22 +32,29 @@ fn main() {
             eprintln!("  cargo run -p core --example test_custom_launch -- --config <arquivo.json>\n");
             eprintln!("Exemplos:");
             eprintln!("  cargo run -p core --example test_custom_launch -- AutoDetect.json");
-            eprintln!("  cargo run -p core --example test_custom_launch -- config/AutoDetect.json");
-            eprintln!("  cargo run -p core --example test_custom_launch -- config/custom_optimization.json");
+            eprintln!("  cargo run -p core --example test_custom_launch -- config/optimzations/AutoDetect.json");
+            eprintln!("  cargo run -p core --example test_custom_launch -- config/optimzations/custom_optimization.json");
 
-            let config_dir = Path::new("config");
-            if config_dir.is_dir() {
-                if let Ok(entries) = std::fs::read_dir(config_dir) {
-                    let json_files: Vec<String> = entries
-                        .filter_map(|e| e.ok())
-                        .map(|e| e.path())
-                        .filter(|p| p.extension().map_or(false, |ext| ext == "json"))
-                        .filter_map(|p| p.file_name().map(|n| n.to_string_lossy().to_string()))
-                        .collect();
-                    if !json_files.is_empty() {
-                        eprintln!("\nArquivos disponíveis encontrados em 'config/':");
-                        for f in json_files {
-                            eprintln!("  - {}", f);
+            let search_dirs = [
+                Path::new("config/optimzations"),
+                Path::new("config/optimizations"),
+                Path::new("config"),
+            ];
+            for dir in &search_dirs {
+                if dir.is_dir() {
+                    if let Ok(entries) = std::fs::read_dir(dir) {
+                        let json_files: Vec<String> = entries
+                            .filter_map(|e| e.ok())
+                            .map(|e| e.path())
+                            .filter(|p| p.extension().map_or(false, |ext| ext == "json"))
+                            .filter_map(|p| p.file_name().map(|n| n.to_string_lossy().to_string()))
+                            .collect();
+                        if !json_files.is_empty() {
+                            eprintln!("\nArquivos disponíveis encontrados em '{}':", dir.display());
+                            for f in json_files {
+                                eprintln!("  - {}", f);
+                            }
+                            break;
                         }
                     }
                 }
@@ -61,21 +68,21 @@ fn main() {
     println!("   - Informado:   {}", input_path);
     println!("   - Localizado:  {}", resolved_path.display());
 
-    if !resolved_path.exists() {
-        eprintln!("\n[ERRO CRÍTICO] O arquivo de configuração especificado não foi encontrado: {}", resolved_path.display());
-        std::process::exit(1);
-    }
-
+    let was_created = !resolved_path.exists();
     let core = OptimizerCore::default();
     let (resolved, config) = match core.load_or_create_custom_config(Some(&resolved_path)) {
         Ok(res) => res,
         Err(err) => {
-            eprintln!("\n[ERRO ESTRITO] Falha ao carregar configuração: {err}");
+            eprintln!("\n[ERRO ESTRITO] Falha ao carregar ou criar configuração: {err}");
             std::process::exit(1);
         }
     };
 
-    println!("   - Status:      Carregado com sucesso.");
+    if was_created {
+        println!("   - Status:      Arquivo não existia e foi gerado com os parâmetros recomendados do seu hardware.");
+    } else {
+        println!("   - Status:      Carregado com sucesso.");
+    }
 
     println!("\n2. Parâmetros e Tweaks definidos no JSON:");
     println!("   - Arquivo: {}", resolved.display());
