@@ -10,7 +10,7 @@
     "+mat_queue_mode"
   ],
   "empty_standby_list": true,
-  "cs2_priority": false,
+  "cs2_priority": true,
   "cs2_affinity": true,
   "disable_gpu_acceleration": true,
   "apply_dpi_optimization": true,

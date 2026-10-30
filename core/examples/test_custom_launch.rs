@@ -1,28 +1,81 @@
+use std::path::Path;
 use std::time::Duration;
 use core::{OptimizerCore, resolve_custom_config_path};
 
 fn main() {
-    println!("=== Teste de Inicialização com Otimizações Personalizadas (JSON) ===");
+    println!("=== CounterRush — Inicialização com Otimizações Personalizadas (JSON) ===");
 
-    let core = OptimizerCore::default();
-    let config_path = resolve_custom_config_path(None);
+    let args: Vec<String> = std::env::args().collect();
+    let mut chosen_path: Option<String> = None;
 
-    println!("\n1. Verificando configuração em: {}", config_path.display());
-    let was_created = !config_path.exists();
+    let mut i = 1;
+    while i < args.len() {
+        let arg = &args[i];
+        if arg == "--config" || arg == "-c" {
+            if i + 1 < args.len() {
+                chosen_path = Some(args[i + 1].clone());
+                i += 1;
+            }
+        } else if !arg.starts_with('-') {
+            chosen_path = Some(arg.clone());
+        }
+        i += 1;
+    }
 
-    let (resolved, config) = match core.load_or_create_custom_config(None) {
-        Ok(res) => res,
-        Err(err) => {
-            eprintln!("   [ERRO ESTRITO] Falha ao carregar ou criar configuração: {err}");
+    let input_path = match chosen_path {
+        Some(p) => p,
+        None => {
+            eprintln!("\n[ERRO DE USO] Nenhum arquivo .json de configuração foi especificado!");
+            eprintln!("Você deve indicar qual arquivo de configuração o custom_launch deve seguir.\n");
+            eprintln!("Sintaxe:");
+            eprintln!("  cargo run -p core --example test_custom_launch -- <arquivo.json>");
+            eprintln!("  cargo run -p core --example test_custom_launch -- --config <arquivo.json>\n");
+            eprintln!("Exemplos:");
+            eprintln!("  cargo run -p core --example test_custom_launch -- AutoDetect.json");
+            eprintln!("  cargo run -p core --example test_custom_launch -- config/AutoDetect.json");
+            eprintln!("  cargo run -p core --example test_custom_launch -- config/custom_optimization.json");
+
+            let config_dir = Path::new("config");
+            if config_dir.is_dir() {
+                if let Ok(entries) = std::fs::read_dir(config_dir) {
+                    let json_files: Vec<String> = entries
+                        .filter_map(|e| e.ok())
+                        .map(|e| e.path())
+                        .filter(|p| p.extension().map_or(false, |ext| ext == "json"))
+                        .filter_map(|p| p.file_name().map(|n| n.to_string_lossy().to_string()))
+                        .collect();
+                    if !json_files.is_empty() {
+                        eprintln!("\nArquivos disponíveis encontrados em 'config/':");
+                        for f in json_files {
+                            eprintln!("  - {}", f);
+                        }
+                    }
+                }
+            }
             std::process::exit(1);
         }
     };
 
-    if was_created {
-        println!("   [CRIADO] Arquivo não existia e foi gerado com parâmetros do seu perfil de hardware!");
-    } else {
-        println!("   [LIDO] Configuração personalizada existente carregada com sucesso.");
+    let resolved_path = resolve_custom_config_path(Some(Path::new(&input_path)));
+    println!("\n1. Arquivo de configuração especificado:");
+    println!("   - Informado:   {}", input_path);
+    println!("   - Localizado:  {}", resolved_path.display());
+
+    if !resolved_path.exists() {
+        eprintln!("\n[ERRO CRÍTICO] O arquivo de configuração especificado não foi encontrado: {}", resolved_path.display());
+        std::process::exit(1);
     }
+
+    let core = OptimizerCore::default();
+    let (resolved, config) = match core.load_or_create_custom_config(Some(&resolved_path)) {
+        Ok(res) => res,
+        Err(err) => {
+            eprintln!("\n[ERRO ESTRITO] Falha ao carregar configuração: {err}");
+            std::process::exit(1);
+        }
+    };
+
+    println!("   - Status:      Carregado com sucesso.");
 
     println!("\n2. Parâmetros e Tweaks definidos no JSON:");
     println!("   - Arquivo: {}", resolved.display());
@@ -41,12 +94,12 @@ fn main() {
     println!("   - Desativar Economia Energia: {}", config.disable_power_saving);
     println!("   - Render Queue: {}", config.apply_render_queue);
 
-    println!("\n3. Verificando status dos tweaks e iniciando CS2 via Steam...");
+    println!("\n3. Validando restrições de hardware, aplicando tweaks e iniciando CS2 via Steam...");
     match core.launch_custom(Some(&resolved), Duration::from_secs(90)) {
         Ok(report) => {
             println!("\n4. Resumo da Execução de Tweaks:");
             if !report.skipped_tweaks.is_empty() {
-                println!("   Tweaks pulados (já estavam aplicados no sistema):");
+                println!("   Tweaks pulados ou bloqueados pelo sistema:");
                 for tweak in &report.skipped_tweaks {
                     println!("     [PULADO] {tweak}");
                 }
@@ -61,7 +114,7 @@ fn main() {
                 }
             }
 
-            println!("\n[SUCESSO] CS2 iniciado com todas as otimizações ativas!");
+            println!("\n[SUCESSO] CS2 iniciado seguindo a configuração '{}'!", resolved.display());
         }
         Err(err) => {
             eprintln!("\n[ERRO ESTRITO] Processo interrompido devido a falha: {err}");

@@ -124,7 +124,7 @@ fn main() -> Result<(), slint::PlatformError> {
             render_queue_active,
         ) = match window_handle.upgrade() {
             Some(ui) => {
-                ui.set_status_message("Iniciando CS2 com otimizações personalizadas...".into());
+                ui.set_status_message("Otimizando sistema o CS2...".into());
                 (
                     ui.get_cpu_tweak_active(),
                     ui.get_timer_tweak_active(),
@@ -192,7 +192,7 @@ fn main() -> Result<(), slint::PlatformError> {
                     let count_applied = report.applied_tweaks.len();
                     let count_skipped = report.skipped_tweaks.len();
                     let msg = format!(
-                        "CS2 iniciado com sucesso! ({} tweaks ativos, {} pulados)",
+                        "Sistema otimizado com sucesso! ({} tweaks aplicados, {} pulados)",
                         count_applied, count_skipped
                     );
                     let _ = slint::invoke_from_event_loop(move || {

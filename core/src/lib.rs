@@ -1,4 +1,5 @@
 use std::path::{Path, PathBuf};
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tweaks::{Tweak, TweakError};
 
@@ -12,6 +13,10 @@ pub enum CoreError {
     WindowsApi(#[from] windows_api::WindowsApiError),
     #[error("Erro nas configurações: {0}")]
     Config(#[from] config::ConfigError),
+    #[error("Erro de I/O ao acessar arquivos: {0}")]
+    Io(#[from] std::io::Error),
+    #[error("Falha ao processar arquivo JSON: {0}")]
+    Json(#[from] serde_json::Error),
 }
 
 pub mod classifier;
@@ -23,6 +28,24 @@ pub struct CustomLaunchReport {
     pub config: config::CustomOptimizationConfig,
     pub applied_tweaks: Vec<&'static str>,
     pub skipped_tweaks: Vec<&'static str>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TweakEvaluation {
+    pub id: String,
+    pub name: String,
+    pub active: bool,
+    pub supported: bool,
+    pub optional_default_off: bool,
+    pub reason: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HardwareRestrictionsReport {
+    pub hardware: windows_api::HardwareInfo,
+    pub category: PcCategory,
+    pub evaluations: Vec<TweakEvaluation>,
+    pub blocked_tweaks: Vec<String>,
 }
 
 pub struct OptimizerCore {
@@ -78,6 +101,31 @@ impl OptimizerCore {
         let info = windows_api::detect_hardware()?;
         let category = classify_pc(&info);
         Ok((info, category))
+    }
+
+    pub fn detect_and_save_hardware(
+        &self,
+        custom_path: Option<&Path>,
+    ) -> Result<(PathBuf, windows_api::HardwareInfo, PcCategory), CoreError> {
+        let (info, category) = self.get_hardware_profile()?;
+        let path = resolve_hardware_config_path(custom_path);
+        save_hardware_info(&path, &info)?;
+        Ok((path, info, category))
+    }
+
+    pub fn get_or_detect_hardware(
+        &self,
+        custom_path: Option<&Path>,
+    ) -> Result<(PathBuf, windows_api::HardwareInfo, PcCategory, bool), CoreError> {
+        let path = resolve_hardware_config_path(custom_path);
+        if path.exists() {
+            let info = load_hardware_info(&path)?;
+            let category = classify_pc(&info);
+            Ok((path, info, category, true))
+        } else {
+            let (path, info, category) = self.detect_and_save_hardware(Some(&path))?;
+            Ok((path, info, category, false))
+        }
     }
 
     pub fn launch_economico(&self) -> Result<(), CoreError> {
@@ -300,6 +348,243 @@ impl OptimizerCore {
         };
         let cfg = config::CustomOptimizationConfig::load_or_create(&path, default_args)?;
         Ok((path, cfg))
+
+    }
+
+    pub fn generate_autodetect_config(
+        &self,
+    ) -> Result<(config::CustomOptimizationConfig, HardwareRestrictionsReport), CoreError> {
+        let (_hw_path, hardware, category, _from_cache) = self.get_or_detect_hardware(None)?;
+        self.generate_autodetect_config_for_hardware(hardware, category)
+    }
+
+    pub fn generate_autodetect_config_for_hardware(
+        &self,
+        hardware: windows_api::HardwareInfo,
+        category: PcCategory,
+    ) -> Result<(config::CustomOptimizationConfig, HardwareRestrictionsReport), CoreError> {
+        let launch_args = get_default_launch_args_for_category(category);
+
+        let mut evaluations = Vec::new();
+        let mut blocked_tweaks = Vec::new();
+
+        evaluations.push(TweakEvaluation {
+            id: "cs2_priority".to_string(),
+            name: "Prioridade em Tempo Real do CS2".to_string(),
+            active: false,
+            supported: true,
+            optional_default_off: true,
+            reason: "Desativada por padrão conforme diretriz do sistema. Mantida como otimização opcional para controle do usuário.".to_string(),
+        });
+
+        let affinity_supported = hardware.cpu.physical_cores > 4;
+        let affinity_active = affinity_supported;
+        let affinity_reason = if affinity_supported {
+            format!("Compatível: CPU com {} núcleos físicos permite isolar o Core 0 sem sobrecarregar as threads do CS2.", hardware.cpu.physical_cores)
+        } else {
+            let msg = format!("Bloqueada por hardware: CPU com {} núcleos físicos (mínimo exigido: mais de 4 núcleos). Isolar o Core 0 causaria perda de desempenho no jogo.", hardware.cpu.physical_cores);
+            blocked_tweaks.push(msg.clone());
+            msg
+        };
+        evaluations.push(TweakEvaluation {
+            id: "cs2_affinity".to_string(),
+            name: "Afinidade de Processador do CS2 (sem Core 0)".to_string(),
+            active: affinity_active,
+            supported: affinity_supported,
+            optional_default_off: false,
+            reason: affinity_reason,
+        });
+
+        let mem_comp_supported = hardware.ram.total_gb > 16.0;
+        let mem_comp_active = mem_comp_supported;
+        let mem_comp_reason = if mem_comp_supported {
+            format!("Compatível: Sistema possui {:.2} GB de RAM (> 16 GB). Desativar compactação reduz latência de CPU sem risco de exaustão de memória.", hardware.ram.total_gb)
+        } else {
+            let msg = format!("Bloqueada por hardware: Sistema possui {:.2} GB de RAM (mínimo exigido: mais de 16 GB). A compactação é necessária para evitar esgotamento de RAM.", hardware.ram.total_gb);
+            blocked_tweaks.push(msg.clone());
+            msg
+        };
+        evaluations.push(TweakEvaluation {
+            id: "disable_memory_compression".to_string(),
+            name: "Desativação da Compactação de Memória".to_string(),
+            active: mem_comp_active,
+            supported: mem_comp_supported,
+            optional_default_off: false,
+            reason: mem_comp_reason,
+        });
+
+        let gpu_lower = hardware.gpu.model.to_lowercase();
+        let is_nvidia = gpu_lower.contains("nvidia")
+            || gpu_lower.contains("geforce")
+            || gpu_lower.contains("rtx")
+            || gpu_lower.contains("gtx")
+            || tweaks::is_nvidia_smi_available();
+        let is_amd = gpu_lower.contains("amd") || gpu_lower.contains("radeon");
+        let render_queue_supported = is_nvidia || is_amd;
+        let render_queue_active = render_queue_supported;
+        let render_queue_reason = if is_nvidia {
+            "Compatível: GPU NVIDIA detectada. Modo de persistência do driver suportado para baixa latência.".to_string()
+        } else if is_amd {
+            "Compatível: GPU AMD detectada. FlipQueueSize = 1 suportado no Registro.".to_string()
+        } else {
+            let msg = format!("Bloqueada por hardware: GPU dedicada compatível (AMD/NVIDIA) não identificada (detectado: '{}').", hardware.gpu.model);
+            blocked_tweaks.push(msg.clone());
+            msg
+        };
+        evaluations.push(TweakEvaluation {
+            id: "apply_render_queue".to_string(),
+            name: "Fila de Quadros Renderizados (Render Queue)".to_string(),
+            active: render_queue_active,
+            supported: render_queue_supported,
+            optional_default_off: false,
+            reason: render_queue_reason,
+        });
+
+        let gpu_accel_active = category != PcCategory::Potente;
+        let gpu_accel_reason = if gpu_accel_active {
+            format!("Ativado: Recomendado para perfil {} para poupar VRAM dedicada e ciclos de decodificação.", category)
+        } else {
+            "Desativado: Perfil Potente com VRAM abundante; aceleração de hardware mantida nos aplicativos secundários.".to_string()
+        };
+        evaluations.push(TweakEvaluation {
+            id: "disable_gpu_acceleration".to_string(),
+            name: "Desativar Aceleração de GPU em Apps".to_string(),
+            active: gpu_accel_active,
+            supported: true,
+            optional_default_off: category == PcCategory::Potente,
+            reason: gpu_accel_reason,
+        });
+
+        evaluations.push(TweakEvaluation {
+            id: "empty_standby_list".to_string(),
+            name: "Limpeza da Standby List (RAM)".to_string(),
+            active: true,
+            supported: true,
+            optional_default_off: false,
+            reason: "Compatível: Universalmente suportado. Libera memória cache antes da inicialização.".to_string(),
+        });
+
+        evaluations.push(TweakEvaluation {
+            id: "apply_dpi_optimization".to_string(),
+            name: "Otimização de DPI e Modo Janela".to_string(),
+            active: true,
+            supported: true,
+            optional_default_off: false,
+            reason: "Compatível: Universalmente suportado. Elimina latência de composição de janelas do DirectX.".to_string(),
+        });
+
+        evaluations.push(TweakEvaluation {
+            id: "apply_timer_resolution".to_string(),
+            name: "Resolução do Temporizador do Sistema (0.5ms)".to_string(),
+            active: true,
+            supported: true,
+            optional_default_off: false,
+            reason: "Compatível: Universalmente suportado. Crava o timer do kernel em 0.5ms para menor input lag.".to_string(),
+        });
+
+        evaluations.push(TweakEvaluation {
+            id: "apply_mmcss".to_string(),
+            name: "Otimização do Agendador Multimídia (MMCSS)".to_string(),
+            active: true,
+            supported: true,
+            optional_default_off: false,
+            reason: "Compatível: Universalmente suportado com calibração automática conforme núcleos e RAM.".to_string(),
+        });
+
+        evaluations.push(TweakEvaluation {
+            id: "disable_hpet".to_string(),
+            name: "Desativação do HPET".to_string(),
+            active: true,
+            supported: true,
+            optional_default_off: false,
+            reason: "Compatível: Universalmente suportado para uso de contadores TSC de alta frequência da CPU.".to_string(),
+        });
+
+        evaluations.push(TweakEvaluation {
+            id: "disable_game_bar".to_string(),
+            name: "Desativação do Xbox Game Bar e GameDVR".to_string(),
+            active: true,
+            supported: true,
+            optional_default_off: false,
+            reason: "Compatível: Universalmente suportado. Elimina overlays e gravação em segundo plano.".to_string(),
+        });
+
+        evaluations.push(TweakEvaluation {
+            id: "enable_msi".to_string(),
+            name: "Ativação do Modo MSI".to_string(),
+            active: true,
+            supported: true,
+            optional_default_off: false,
+            reason: "Compatível: Ativa interrupções baseadas em mensagem para barramentos PCI.".to_string(),
+        });
+
+        evaluations.push(TweakEvaluation {
+            id: "disable_power_saving".to_string(),
+            name: "Desativação de Economia de Energia PCIe e USB".to_string(),
+            active: true,
+            supported: true,
+            optional_default_off: false,
+            reason: "Compatível: Previne estados de suspensão em dispositivos PCIe e USB durante o jogo.".to_string(),
+        });
+
+        let config = config::CustomOptimizationConfig {
+            launch_args,
+            empty_standby_list: true,
+            cs2_priority: false,
+            cs2_affinity: affinity_active,
+            disable_gpu_acceleration: gpu_accel_active,
+            apply_dpi_optimization: true,
+            disable_memory_compression: mem_comp_active,
+            apply_timer_resolution: true,
+            apply_mmcss: true,
+            disable_hpet: true,
+            disable_game_bar: true,
+            enable_msi: true,
+            disable_power_saving: true,
+            apply_render_queue: render_queue_active,
+        };
+
+        let report = HardwareRestrictionsReport {
+            hardware,
+            category,
+            evaluations,
+            blocked_tweaks,
+        };
+
+        Ok((config, report))
+    }
+
+    pub fn save_autodetect_config(
+        &self,
+        custom_path: Option<&Path>,
+    ) -> Result<(PathBuf, config::CustomOptimizationConfig, HardwareRestrictionsReport), CoreError> {
+        let (config, report) = self.generate_autodetect_config()?;
+        let path = resolve_autodetect_config_path(custom_path);
+        config.save_to_file(&path)?;
+        Ok((path, config, report))
+    }
+
+    pub fn load_or_create_autodetect_config(
+        &self,
+        config_path: Option<&Path>,
+    ) -> Result<(PathBuf, config::CustomOptimizationConfig, HardwareRestrictionsReport), CoreError> {
+        let path = resolve_autodetect_config_path(config_path);
+        if path.exists() {
+            let cfg = config::CustomOptimizationConfig::load_from_file(&path)?;
+            let (_, report) = self.generate_autodetect_config()?;
+            Ok((path, cfg, report))
+        } else {
+            self.save_autodetect_config(Some(&path))
+        }
+    }
+
+    pub fn enforce_hardware_restrictions(
+        &self,
+        config: &mut config::CustomOptimizationConfig,
+    ) -> Result<Vec<String>, CoreError> {
+        let (hardware, _) = self.get_hardware_profile()?;
+        Ok(enforce_hardware_restrictions_for_info(config, &hardware))
+
     }
 
     pub fn launch_custom(
@@ -307,11 +592,20 @@ impl OptimizerCore {
         config_path: Option<&Path>,
         timeout: std::time::Duration,
     ) -> Result<CustomLaunchReport, CoreError> {
-        let (_resolved_path, cfg) = self.load_or_create_custom_config(config_path)?;
+        let (_resolved_path, mut cfg) = self.load_or_create_custom_config(config_path)?;
+
         let mut report = CustomLaunchReport {
             config: cfg.clone(),
             applied_tweaks: Vec::new(),
             skipped_tweaks: Vec::new(),
+        };
+
+        if let Ok((hw_info, _)) = self.get_hardware_profile() {
+            let blocked = enforce_hardware_restrictions_for_info(&mut cfg, &hw_info);
+            for b in blocked {
+                report.skipped_tweaks.push(Box::leak(b.into_boxed_str()));
+            }
+            report.config = cfg.clone();
         };
 
         if cfg.empty_standby_list {
@@ -530,6 +824,25 @@ pub fn get_default_launch_args_for_category(category: PcCategory) -> Vec<String>
 
 pub fn resolve_custom_config_path(custom: Option<&Path>) -> PathBuf {
     if let Some(p) = custom {
+        if p.exists() {
+            return p.to_path_buf();
+        }
+        let in_config = Path::new("config").join(p);
+        if in_config.exists() {
+            return in_config;
+        }
+        let parent_in_config = Path::new("../config").join(p);
+        if parent_in_config.exists() {
+            return parent_in_config;
+        }
+        let compile_time_in_config = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .map(|base| base.join("config").join(p));
+        if let Some(ref cp) = compile_time_in_config {
+            if cp.exists() {
+                return cp.clone();
+            }
+        }
         return p.to_path_buf();
     }
 
@@ -576,6 +889,166 @@ pub fn resolve_custom_config_path(custom: Option<&Path>) -> PathBuf {
     }
 
     direct
+}
+
+pub fn resolve_autodetect_config_path(custom: Option<&Path>) -> PathBuf {
+    if let Some(p) = custom {
+        return p.to_path_buf();
+    }
+
+    let compile_time_config = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .map(|p| p.join("config").join("AutoDetect.json"));
+    if let Some(ref p) = compile_time_config {
+        if p.exists() {
+            return p.clone();
+        }
+    }
+
+    let direct = PathBuf::from("config/AutoDetect.json");
+    if direct.exists() || Path::new("config").is_dir() {
+        return direct;
+    }
+    let parent_config = PathBuf::from("../config/AutoDetect.json");
+    if parent_config.exists() || Path::new("../config").is_dir() {
+        return parent_config;
+    }
+    let grand_parent_config = PathBuf::from("../../config/AutoDetect.json");
+    if grand_parent_config.exists() || Path::new("../../config").is_dir() {
+        return grand_parent_config;
+    }
+
+    if let Ok(exe_path) = std::env::current_exe() {
+        if let Some(exe_dir) = exe_path.parent() {
+            let candidates = [
+                exe_dir.join("config").join("AutoDetect.json"),
+                exe_dir.join("..").join("config").join("AutoDetect.json"),
+                exe_dir.join("..").join("..").join("config").join("AutoDetect.json"),
+                exe_dir.join("..").join("..").join("..").join("config").join("AutoDetect.json"),
+            ];
+            for candidate in &candidates {
+                if candidate.exists() {
+                    return candidate.clone();
+                }
+            }
+        }
+    }
+
+    if let Some(p) = compile_time_config {
+        return p;
+    }
+
+    direct
+}
+
+pub fn resolve_hardware_config_path(custom: Option<&Path>) -> PathBuf {
+    if let Some(p) = custom {
+        return p.to_path_buf();
+    }
+
+    let compile_time_config = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .map(|p| p.join("config").join("Hardware.json"));
+    if let Some(ref p) = compile_time_config {
+        if p.exists() {
+            return p.clone();
+        }
+    }
+
+    let direct = PathBuf::from("config/Hardware.json");
+    if direct.exists() || Path::new("config").is_dir() {
+        return direct;
+    }
+    let parent_config = PathBuf::from("../config/Hardware.json");
+    if parent_config.exists() || Path::new("../config").is_dir() {
+        return parent_config;
+    }
+    let grand_parent_config = PathBuf::from("../../config/Hardware.json");
+    if grand_parent_config.exists() || Path::new("../../config").is_dir() {
+        return grand_parent_config;
+    }
+
+    if let Ok(exe_path) = std::env::current_exe() {
+        if let Some(exe_dir) = exe_path.parent() {
+            let candidates = [
+                exe_dir.join("config").join("Hardware.json"),
+                exe_dir.join("..").join("config").join("Hardware.json"),
+                exe_dir.join("..").join("..").join("config").join("Hardware.json"),
+                exe_dir.join("..").join("..").join("..").join("config").join("Hardware.json"),
+            ];
+            for candidate in &candidates {
+                if candidate.exists() {
+                    return candidate.clone();
+                }
+            }
+        }
+    }
+
+    if let Some(p) = compile_time_config {
+        return p;
+    }
+
+    direct
+}
+
+pub fn save_hardware_info<P: AsRef<Path>>(path: P, info: &windows_api::HardwareInfo) -> Result<(), CoreError> {
+    let path = path.as_ref();
+    if let Some(parent) = path.parent() {
+        if !parent.as_os_str().is_empty() && !parent.exists() {
+            std::fs::create_dir_all(parent)?;
+        }
+    }
+    let json = serde_json::to_string_pretty(info)?;
+    std::fs::write(path, json)?;
+    Ok(())
+}
+
+pub fn load_hardware_info<P: AsRef<Path>>(path: P) -> Result<windows_api::HardwareInfo, CoreError> {
+    let content = std::fs::read_to_string(path)?;
+    let info = serde_json::from_str(&content)?;
+    Ok(info)
+}
+
+pub fn enforce_hardware_restrictions_for_info(
+    config: &mut config::CustomOptimizationConfig,
+    hardware: &windows_api::HardwareInfo,
+) -> Vec<String> {
+    let mut blocked = Vec::new();
+
+    if config.cs2_affinity && hardware.cpu.physical_cores <= 4 {
+        config.cs2_affinity = false;
+        blocked.push(format!(
+            "Afinidade de CPU (cs2_affinity) bloqueada por hardware: requer mais de 4 núcleos físicos (detectado: {}).",
+            hardware.cpu.physical_cores
+        ));
+    }
+
+    if config.disable_memory_compression && hardware.ram.total_gb <= 16.0 {
+        config.disable_memory_compression = false;
+        blocked.push(format!(
+            "Compactação de memória (disable_memory_compression) bloqueada por hardware: requer mais de 16 GB de RAM (detectado: {:.2} GB).",
+            hardware.ram.total_gb
+        ));
+    }
+
+    if config.apply_render_queue {
+        let gpu_lower = hardware.gpu.model.to_lowercase();
+        let is_nvidia = gpu_lower.contains("nvidia")
+            || gpu_lower.contains("geforce")
+            || gpu_lower.contains("rtx")
+            || gpu_lower.contains("gtx")
+            || tweaks::is_nvidia_smi_available();
+        let is_amd = gpu_lower.contains("amd") || gpu_lower.contains("radeon");
+        if !is_nvidia && !is_amd {
+            config.apply_render_queue = false;
+            blocked.push(format!(
+                "Fila de renderização (apply_render_queue) bloqueada por hardware: GPU dedicada compatível (AMD/NVIDIA) não identificada (detectado: '{}').",
+                hardware.gpu.model
+            ));
+        }
+    }
+
+    blocked
 }
 
 impl Default for OptimizerCore {

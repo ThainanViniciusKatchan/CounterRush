@@ -1,0 +1,16 @@
+{
+  "cpu": {
+    "model": "AMD Ryzen 5 3600 6-Core Processor",
+    "physical_cores": 6,
+    "logical_cores": 12,
+    "frequency_mhz": 3600
+  },
+  "gpu": {
+    "model": "AMD Radeon RX 7600",
+    "vram_gb": 7.98
+  },
+  "ram": {
+    "total_gb": 31.93,
+    "speed_mhz": 2666
+  }
+}

@@ -4,8 +4,10 @@ fn main() {
     println!("=== CounterRush — Detecção e Classificação de Hardware ===");
     let core = OptimizerCore::default();
 
-    match core.get_hardware_profile() {
-        Ok((info, category)) => {
+    println!("\nExecutando detecção de hardware nativa e atualizando Hardware.json...");
+
+    match core.detect_and_save_hardware(None) {
+        Ok((path, info, category)) => {
             println!("\n[1] Processador (CPU):");
             println!("  - Modelo:            {}", info.cpu.model);
             println!("  - Núcleos Físicos:   {}", info.cpu.physical_cores);
@@ -23,13 +25,17 @@ fn main() {
                 None => println!("  - Velocidade:        Não identificada"),
             }
 
+            println!("\n[4] Persistência dos Dados de Hardware:");
+            println!("  - Arquivo:           {}", path.display());
+            println!("  - Status:            Dados gravados com sucesso em Hardware.json para consultas e autodetecção.");
+
             println!("\n=======================================================");
             println!("  Classificação do Sistema: {}", category);
             println!("=======================================================");
             println!("Classificação baseada nos requisitos e benchmarks do CS2.");
         }
         Err(err) => {
-            eprintln!("\nErro ao detectar hardware: {err}");
+            eprintln!("\nErro ao detectar e salvar hardware: {err}");
         }
     }
 }
