@@ -1,8 +1,17 @@
 use std::process::Command;
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
 use crate::WindowsApiError;
 
+#[cfg(windows)]
+const CREATE_NO_WINDOW: u32 = 0x08000000;
+
 pub fn run_powershell(script: &str) -> Result<String, WindowsApiError> {
-    let output = Command::new("powershell")
+    let mut cmd = Command::new("powershell");
+    #[cfg(windows)]
+    cmd.creation_flags(CREATE_NO_WINDOW);
+
+    let output = cmd
         .args(["-NoProfile", "-Command", script])
         .output()
         .map_err(WindowsApiError::Io)?;
@@ -46,7 +55,11 @@ fn base64_encode(bytes: &[u8]) -> String {
 pub fn run_powershell_script(script: &str) -> Result<String, WindowsApiError> {
     let utf16_bytes: Vec<u8> = script.encode_utf16().flat_map(|u| u.to_le_bytes()).collect();
     let encoded = base64_encode(&utf16_bytes);
-    let output = Command::new("powershell")
+    let mut cmd = Command::new("powershell");
+    #[cfg(windows)]
+    cmd.creation_flags(CREATE_NO_WINDOW);
+
+    let output = cmd
         .args(["-NoProfile", "-EncodedCommand", &encoded])
         .output()
         .map_err(WindowsApiError::Io)?;

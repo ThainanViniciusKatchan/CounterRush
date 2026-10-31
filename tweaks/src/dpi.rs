@@ -1,4 +1,4 @@
-use std::process::Command;
+use crate::silent_command;
 use crate::{Tweak, TweakError, TweakStatus};
 
 pub const CS2_REG_KEY: &str = r#"HKCU\Software\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\Layers"#;
@@ -10,7 +10,7 @@ pub const CS2_DPI_ROLLBACK_CMD: &str = r#"reg delete "HKCU\Software\Microsoft\Wi
 pub const CS2_DPI_QUERY_CMD: &str = r#"reg query "HKCU\Software\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\Layers" /v "C:\Program Files (x86)\Steam\steamapps\common\Counter-Strike Global Offensive\game\bin\win64\cs2.exe""#;
 
 pub fn apply_cs2_dpi_tweak() -> Result<(), TweakError> {
-    let output = Command::new("reg")
+    let output = silent_command("reg")
         .args([
             "add",
             CS2_REG_KEY,
@@ -37,7 +37,7 @@ pub fn apply_cs2_dpi_tweak() -> Result<(), TweakError> {
 }
 
 pub fn rollback_cs2_dpi_tweak() -> Result<(), TweakError> {
-    let output = Command::new("reg")
+    let output = silent_command("reg")
         .args([
             "delete",
             CS2_REG_KEY,
@@ -95,7 +95,7 @@ impl Tweak for Cs2DpiOptimizationTweak {
     }
 
     fn status(&self) -> Result<TweakStatus, TweakError> {
-        let output = Command::new("reg")
+        let output = silent_command("reg")
             .args([
                 "query",
                 CS2_REG_KEY,

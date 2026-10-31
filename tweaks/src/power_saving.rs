@@ -1,4 +1,4 @@
-use std::process::Command;
+use crate::silent_command;
 use crate::{Tweak, TweakError, TweakStatus};
 use windows_api::WindowsApiError;
 
@@ -48,7 +48,7 @@ impl PowerSavingStatus {
 fn set_powercfg_ac_dc(subgroup: &str, setting: &str, value: u32) -> Result<(), TweakError> {
     let val_str = value.to_string();
 
-    let output_ac = Command::new("powercfg")
+    let output_ac = silent_command("powercfg")
         .args(["/setacvalueindex", "SCHEME_CURRENT", subgroup, setting, &val_str])
         .output()
         .map_err(|e| TweakError::WindowsApi(WindowsApiError::Io(e)))?;
@@ -68,7 +68,7 @@ fn set_powercfg_ac_dc(subgroup: &str, setting: &str, value: u32) -> Result<(), T
         ))));
     }
 
-    let output_dc = Command::new("powercfg")
+    let output_dc = silent_command("powercfg")
         .args(["/setdcvalueindex", "SCHEME_CURRENT", subgroup, setting, &val_str])
         .output()
         .map_err(|e| TweakError::WindowsApi(WindowsApiError::Io(e)))?;
@@ -92,7 +92,7 @@ fn set_powercfg_ac_dc(subgroup: &str, setting: &str, value: u32) -> Result<(), T
 }
 
 fn apply_powercfg_active_scheme() -> Result<(), TweakError> {
-    let output = Command::new("powercfg")
+    let output = silent_command("powercfg")
         .args(["/setactive", "SCHEME_CURRENT"])
         .output()
         .map_err(|e| TweakError::WindowsApi(WindowsApiError::Io(e)))?;
@@ -219,7 +219,7 @@ pub fn rollback_all_power_saving() -> Result<(), TweakError> {
 }
 
 pub fn get_power_saving_status() -> Result<PowerSavingStatus, TweakError> {
-    let output_pcie = Command::new("powercfg")
+    let output_pcie = silent_command("powercfg")
         .args(["/q", "SCHEME_CURRENT", SUB_PCIEXPRESS, PCI_ASPM_GUID])
         .output();
 
@@ -228,7 +228,7 @@ pub fn get_power_saving_status() -> Result<PowerSavingStatus, TweakError> {
             parse_powercfg_ac_dc(&String::from_utf8_lossy(&out.stdout))
         }
         _ => {
-            if let Ok(out_alias) = Command::new("powercfg")
+            if let Ok(out_alias) = silent_command("powercfg")
                 .args(["/q", "SCHEME_CURRENT", SUB_PCIEXPRESS, PCI_ASPM_ALIAS])
                 .output()
             {
@@ -243,7 +243,7 @@ pub fn get_power_saving_status() -> Result<PowerSavingStatus, TweakError> {
         }
     };
 
-    let output_usb = Command::new("powercfg")
+    let output_usb = silent_command("powercfg")
         .args(["/q", "SCHEME_CURRENT", SUB_USB_GUID, USB_SELECTIVE_SUSPEND_GUID])
         .output();
 

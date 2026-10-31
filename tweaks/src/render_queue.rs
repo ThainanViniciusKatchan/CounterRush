@@ -1,4 +1,4 @@
-use std::process::Command;
+use crate::silent_command;
 use crate::{Tweak, TweakError, TweakStatus};
 use windows_api::WindowsApiError;
 
@@ -154,7 +154,7 @@ foreach ($gpu in $gpuKeys) {
 }
 
 pub fn is_nvidia_smi_available() -> bool {
-    Command::new("nvidia-smi")
+    silent_command("nvidia-smi")
         .arg("-h")
         .output()
         .map(|out| out.status.success() || !out.stdout.is_empty() || !out.stderr.is_empty())
@@ -168,7 +168,7 @@ pub fn apply_nvidia_persistence_mode() -> Result<(), TweakError> {
         ));
     }
 
-    let output = Command::new("nvidia-smi")
+    let output = silent_command("nvidia-smi")
         .args(["-pm", "1"])
         .output()
         .map_err(|e| TweakError::WindowsApi(WindowsApiError::Io(e)))?;
@@ -198,7 +198,7 @@ pub fn rollback_nvidia_persistence_mode() -> Result<(), TweakError> {
         ));
     }
 
-    let output = Command::new("nvidia-smi")
+    let output = silent_command("nvidia-smi")
         .args(["-pm", "0"])
         .output()
         .map_err(|e| TweakError::WindowsApi(WindowsApiError::Io(e)))?;
@@ -226,7 +226,7 @@ pub fn get_nvidia_persistence_mode_status() -> Result<Vec<NvidiaGpuPersistenceSt
         return Ok(Vec::new());
     }
 
-    let output = Command::new("nvidia-smi")
+    let output = silent_command("nvidia-smi")
         .args(["--query-gpu=name,persistence_mode", "--format=csv,noheader"])
         .output()
         .map_err(|e| TweakError::WindowsApi(WindowsApiError::Io(e)))?;

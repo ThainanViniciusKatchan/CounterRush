@@ -1,4 +1,4 @@
-use std::process::Command;
+use crate::silent_command;
 use crate::{Tweak, TweakError, TweakStatus};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -19,7 +19,7 @@ impl std::fmt::Display for HpetStatus {
 }
 
 pub fn get_hpet_status() -> Result<HpetStatus, TweakError> {
-    let output = Command::new("bcdedit")
+    let output = silent_command("bcdedit")
         .args(["/enum", "{current}"])
         .output()
         .map_err(|e| TweakError::WindowsApi(windows_api::WindowsApiError::Io(e)))?;
@@ -51,7 +51,7 @@ pub fn get_hpet_status() -> Result<HpetStatus, TweakError> {
 }
 
 pub fn disable_hpet() -> Result<(), TweakError> {
-    let output = Command::new("bcdedit")
+    let output = silent_command("bcdedit")
         .args(["/set", "useplatformclock", "false"])
         .output()
         .map_err(|e| TweakError::WindowsApi(windows_api::WindowsApiError::Io(e)))?;
@@ -75,7 +75,7 @@ pub fn disable_hpet() -> Result<(), TweakError> {
 }
 
 pub fn rollback_hpet() -> Result<(), TweakError> {
-    let output = Command::new("bcdedit")
+    let output = silent_command("bcdedit")
         .args(["/deletevalue", "useplatformclock"])
         .output()
         .map_err(|e| TweakError::WindowsApi(windows_api::WindowsApiError::Io(e)))?;

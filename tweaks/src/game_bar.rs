@@ -1,4 +1,4 @@
-use std::process::Command;
+use crate::silent_command;
 use crate::{Tweak, TweakError, TweakStatus};
 
 pub const REG_GAME_BAR_KEY: &str = r#"HKCU\Software\Microsoft\GameBar"#;
@@ -54,7 +54,7 @@ impl GameBarStatus {
 }
 
 fn set_reg_dword(key: &str, value_name: &str, value: u32) -> Result<(), TweakError> {
-    let output = Command::new("reg")
+    let output = silent_command("reg")
         .args([
             "add",
             key,
@@ -83,7 +83,7 @@ fn set_reg_dword(key: &str, value_name: &str, value: u32) -> Result<(), TweakErr
 }
 
 fn set_reg_sz(key: &str, value_name: &str, value: &str) -> Result<(), TweakError> {
-    let output = Command::new("reg")
+    let output = silent_command("reg")
         .args([
             "add",
             key,
@@ -112,7 +112,7 @@ fn set_reg_sz(key: &str, value_name: &str, value: &str) -> Result<(), TweakError
 }
 
 fn delete_reg_value(key: &str, value_name: &str) -> Result<(), TweakError> {
-    let output = Command::new("reg")
+    let output = silent_command("reg")
         .args(["delete", key, "/v", value_name, "/f"])
         .output()
         .map_err(|e| TweakError::WindowsApi(windows_api::WindowsApiError::Io(e)))?;
@@ -142,7 +142,7 @@ fn delete_reg_value(key: &str, value_name: &str) -> Result<(), TweakError> {
 }
 
 fn query_reg_value(key: &str, value_name: &str) -> Result<Option<String>, TweakError> {
-    let output = Command::new("reg")
+    let output = silent_command("reg")
         .args(["query", key, "/v", value_name])
         .output()
         .map_err(|e| TweakError::WindowsApi(windows_api::WindowsApiError::Io(e)))?;

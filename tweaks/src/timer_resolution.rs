@@ -1,4 +1,4 @@
-use std::process::Command;
+use crate::silent_command;
 use crate::{Tweak, TweakError, TweakStatus};
 use windows_api::run_powershell_script;
 
@@ -100,7 +100,7 @@ pub fn is_precision_reduced(pauses: &[f64]) -> bool {
 }
 
 pub fn apply_timer_registry() -> Result<(), TweakError> {
-    let output = Command::new("reg")
+    let output = silent_command("reg")
         .args([
             "add",
             REG_KERNEL_KEY,
@@ -127,7 +127,7 @@ pub fn apply_timer_registry() -> Result<(), TweakError> {
 }
 
 pub fn rollback_timer_registry() -> Result<(), TweakError> {
-    let output = Command::new("reg")
+    let output = silent_command("reg")
         .args(["delete", REG_KERNEL_KEY, "/v", REG_TIMER_VALUE, "/f"])
         .output()
         .map_err(|e| TweakError::WindowsApi(windows_api::WindowsApiError::Io(e)))?;
@@ -153,7 +153,7 @@ pub fn rollback_timer_registry() -> Result<(), TweakError> {
 }
 
 pub fn is_timer_registry_applied() -> Result<bool, TweakError> {
-    let output = Command::new("reg")
+    let output = silent_command("reg")
         .args(["query", REG_KERNEL_KEY, "/v", REG_TIMER_VALUE])
         .output()
         .map_err(|e| TweakError::WindowsApi(windows_api::WindowsApiError::Io(e)))?;
