@@ -31,12 +31,12 @@
 - [x] Desativar Economia de Energia PCIe (Link State Power Management) e USB (Suspensão Seletiva e Hubs).
 - [x] Otimização da Fila de Quadros Renderizados (Render Queue / Flip Queue) para placas AMD e NVIDIA.
 - [x] Função para lançamento do CS com otimizações personalizadas salvas em arquivo JSON.
+- [x] Sistema para idêntificar o que está ativado e desativado no computador do usuário.
+- [x] Controle do arquivo .json de otmizações ativas diretamente pela interface.
 
 ### O que está sendo feito:
 
 - [ ] Interface gráfica moderna (Slint) com switches e controles modulares.
-- [ ] Sistema para idêntificar o que está ativado e desativado no computador do usuário.
-- [ ] Controle do arquivo .json de otmizações ativas diretamente pela interface.
 - [ ] Verificação de hardware na primeira vez que o usuário abrir o software.
 - [ ] Criar sistema de temas para o layout do software.
 

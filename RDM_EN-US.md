@@ -1,8 +1,8 @@
 [🇧🇷 Leia em Português](README.md)
 
-| **COUNTER RUSH**                                                                        |
-| --------------------------------------------------------------------------------------- |
-| Play CS with higher performance, boost your FPS, eliminate stutter and frame drops.     |
+| **COUNTER RUSH**                                                                    |
+| ----------------------------------------------------------------------------------- |
+| Play CS with higher performance, boost your FPS, eliminate stutter and frame drops. |
 
 > <span style="color:#e64340">Project still in early development stage; all modules are currently under testing and may change considerably until the release version.</span>
 
@@ -31,17 +31,22 @@
 - [x] Disable PCIe (Link State Power Management) and USB Power Saving (Selective Suspend and Hubs).
 - [x] Render Queue / Flip Queue Configuration for AMD and NVIDIA GPUs.
 - [x] Launch the game with custom optimizations read from a JSON configuration.
+- [x] System to identify what is enabled and disabled on the user's computer.
+- [x] Control active optimizations JSON file directly through the interface.
 
 ### What is currently in progress:
 
 - [ ] Modern graphical interface (Slint) with modular switches and controls.
+- [ ] Hardware verification the first time the user opens the software.
+- [ ] Create a theme system for the software layout.
 
 ### What is planned:
 
 - Feature to create keybinds (in-game shortcuts) for all commands allowed in official and practice servers.
 - Modern graphical interface (Slint) with modular switches and controls.
 - Feature to configure a custom `autoexec.cfg` or download pro players' configs.
-- Ability to browse and download Workshop maps directly through the software.
+- Ability to open and, potentially, download Workshop maps directly through the software.
+- View Valve Ranking directly in the software interface.
 
 <p align="center">
   <a href="https://feitonobrasil.dev.br"><img src="https://selo.feitonobrasil.dev.br/en/branco-colorido/1x.svg" alt="Made in Brazil" height="56"></a>
