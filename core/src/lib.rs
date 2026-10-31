@@ -355,7 +355,195 @@ impl OptimizerCore {
         &self,
     ) -> Result<(config::CustomOptimizationConfig, HardwareRestrictionsReport), CoreError> {
         let (_hw_path, hardware, category, _from_cache) = self.get_or_detect_hardware(None)?;
-        self.generate_autodetect_config_for_hardware(hardware, category)
+        let launch_args = get_default_launch_args_for_category(category);
+
+        // Invoca os verificadores das otimizações existentes
+        let is_priority_applied = matches!(tweaks::Cs2PriorityTweak.status(), Ok(tweaks::TweakStatus::Applied));
+        let _affinity_status = tweaks::Cs2AffinityTweak.status();
+        let _standby_status = tweaks::EmptyStandbyListTweak.status();
+        let _timer_status = tweaks::TimerResolutionTweak.status();
+        let is_gpu_accel_disabled = tweaks::is_all_gpu_accel_disabled().unwrap_or(false);
+        let is_dpi_applied = matches!(tweaks::Cs2DpiOptimizationTweak.status(), Ok(tweaks::TweakStatus::Applied));
+        let is_mem_comp_disabled = matches!(tweaks::MemoryCompressionTweak.status(), Ok(tweaks::TweakStatus::Applied));
+        let is_mmcss_applied = tweaks::is_mmcss_applied_for_current_hardware().unwrap_or(false);
+        let is_hpet_disabled = matches!(tweaks::HpetTweak.status(), Ok(tweaks::TweakStatus::Applied));
+        let is_game_bar_disabled = matches!(tweaks::GameBarTweak.status(), Ok(tweaks::TweakStatus::Applied));
+        let is_msi_enabled = tweaks::is_all_msi_enabled().unwrap_or(false);
+        let is_power_saving_disabled = matches!(tweaks::PcieUsbPowerSavingTweak.status(), Ok(tweaks::TweakStatus::Applied));
+        let is_render_queue_applied = matches!(tweaks::RenderQueueTweak.status(), Ok(tweaks::TweakStatus::Applied));
+
+        let config = config::CustomOptimizationConfig {
+            launch_args,
+            empty_standby_list: true,
+            cs2_priority: is_priority_applied,
+            cs2_affinity: true,
+            disable_gpu_acceleration: is_gpu_accel_disabled,
+            apply_dpi_optimization: is_dpi_applied,
+            disable_memory_compression: is_mem_comp_disabled,
+            apply_timer_resolution: true,
+            apply_mmcss: is_mmcss_applied,
+            disable_hpet: is_hpet_disabled,
+            disable_game_bar: is_game_bar_disabled,
+            enable_msi: is_msi_enabled,
+            disable_power_saving: is_power_saving_disabled,
+            apply_render_queue: is_render_queue_applied,
+        };
+
+        let evaluations = vec![
+            TweakEvaluation {
+                id: "cs2_priority".to_string(),
+                name: "Prioridade em Tempo Real do CS2".to_string(),
+                active: config.cs2_priority,
+                supported: true,
+                optional_default_off: false,
+                reason: if config.cs2_priority {
+                    "Verificado: Prioridade em tempo real ativa no processo.".to_string()
+                } else {
+                    "Verificado: Prioridade em tempo real não está aplicada no processo.".to_string()
+                },
+            },
+            TweakEvaluation {
+                id: "cs2_affinity".to_string(),
+                name: "Afinidade de Processador do CS2 (sem Core 0)".to_string(),
+                active: true,
+                supported: true,
+                optional_default_off: false,
+                reason: "Otimização de tempo de execução (runtime). Configurada como true para aplicação durante a execução do jogo.".to_string(),
+            },
+            TweakEvaluation {
+                id: "disable_memory_compression".to_string(),
+                name: "Desativação da Compactação de Memória".to_string(),
+                active: config.disable_memory_compression,
+                supported: true,
+                optional_default_off: false,
+                reason: if config.disable_memory_compression {
+                    "Verificado: Compactação de memória está desativada no sistema.".to_string()
+                } else {
+                    "Verificado: Compactação de memória está ativa no sistema.".to_string()
+                },
+            },
+            TweakEvaluation {
+                id: "apply_render_queue".to_string(),
+                name: "Fila de Quadros Renderizados (Render Queue)".to_string(),
+                active: config.apply_render_queue,
+                supported: true,
+                optional_default_off: false,
+                reason: if config.apply_render_queue {
+                    "Verificado: Fila de renderização configurada (FlipQueue/Persistência GPU).".to_string()
+                } else {
+                    "Verificado: Fila de renderização não configurada no driver/registro.".to_string()
+                },
+            },
+            TweakEvaluation {
+                id: "disable_gpu_acceleration".to_string(),
+                name: "Desativar Aceleração de GPU em Apps".to_string(),
+                active: config.disable_gpu_acceleration,
+                supported: true,
+                optional_default_off: false,
+                reason: if config.disable_gpu_acceleration {
+                    "Verificado: Aceleração de hardware desativada nos aplicativos secundários.".to_string()
+                } else {
+                    "Verificado: Aceleração de hardware mantida ativa nos aplicativos secundários.".to_string()
+                },
+            },
+            TweakEvaluation {
+                id: "empty_standby_list".to_string(),
+                name: "Limpeza da Standby List (RAM)".to_string(),
+                active: true,
+                supported: true,
+                optional_default_off: false,
+                reason: "Otimização de tempo de execução (runtime). Configurada como true para execução antes da inicialização do jogo.".to_string(),
+            },
+            TweakEvaluation {
+                id: "apply_dpi_optimization".to_string(),
+                name: "Otimização de DPI e Modo Janela".to_string(),
+                active: config.apply_dpi_optimization,
+                supported: true,
+                optional_default_off: false,
+                reason: if config.apply_dpi_optimization {
+                    "Verificado: Flags de compatibilidade e DPI aplicadas no Registro.".to_string()
+                } else {
+                    "Verificado: Flags de compatibilidade e DPI não aplicadas no Registro.".to_string()
+                },
+            },
+            TweakEvaluation {
+                id: "apply_timer_resolution".to_string(),
+                name: "Resolução do Temporizador do Sistema (0.5ms)".to_string(),
+                active: true,
+                supported: true,
+                optional_default_off: false,
+                reason: "Otimização de tempo de execução (runtime). Configurada como true para cravar timer em 0.5ms durante o jogo.".to_string(),
+            },
+            TweakEvaluation {
+                id: "apply_mmcss".to_string(),
+                name: "Otimização do Agendador Multimídia (MMCSS)".to_string(),
+                active: config.apply_mmcss,
+                supported: true,
+                optional_default_off: false,
+                reason: if config.apply_mmcss {
+                    "Verificado: Parâmetros do Multimedia Class Scheduler Service configurados.".to_string()
+                } else {
+                    "Verificado: Parâmetros MMCSS em padrão do Windows.".to_string()
+                },
+            },
+            TweakEvaluation {
+                id: "disable_hpet".to_string(),
+                name: "Desativação do HPET".to_string(),
+                active: config.disable_hpet,
+                supported: true,
+                optional_default_off: false,
+                reason: if config.disable_hpet {
+                    "Verificado: HPET desativado (useplatformclock=false) no BCD.".to_string()
+                } else {
+                    "Verificado: HPET padrão ou ativo no BCD.".to_string()
+                },
+            },
+            TweakEvaluation {
+                id: "disable_game_bar".to_string(),
+                name: "Desativação do Xbox Game Bar e GameDVR".to_string(),
+                active: config.disable_game_bar,
+                supported: true,
+                optional_default_off: false,
+                reason: if config.disable_game_bar {
+                    "Verificado: Xbox Game Bar e gravação GameDVR desativados no Registro.".to_string()
+                } else {
+                    "Verificado: Xbox Game Bar ou GameDVR ativos no Registro.".to_string()
+                },
+            },
+            TweakEvaluation {
+                id: "enable_msi".to_string(),
+                name: "Ativação do Modo MSI".to_string(),
+                active: config.enable_msi,
+                supported: true,
+                optional_default_off: false,
+                reason: if config.enable_msi {
+                    "Verificado: Interrupções baseadas em mensagem ativas nos barramentos PCI.".to_string()
+                } else {
+                    "Verificado: Modo MSI não habilitado nos dispositivos PCI.".to_string()
+                },
+            },
+            TweakEvaluation {
+                id: "disable_power_saving".to_string(),
+                name: "Desativação de Economia de Energia PCIe e USB".to_string(),
+                active: config.disable_power_saving,
+                supported: true,
+                optional_default_off: false,
+                reason: if config.disable_power_saving {
+                    "Verificado: Estados de suspensão PCIe ASPM e USB desativados.".to_string()
+                } else {
+                    "Verificado: Economia de energia PCIe/USB ativa no sistema.".to_string()
+                },
+            },
+        ];
+
+        let report = HardwareRestrictionsReport {
+            hardware,
+            category,
+            evaluations,
+            blocked_tweaks: Vec::new(),
+        };
+
+        Ok((config, report))
     }
 
     pub fn generate_autodetect_config_for_hardware(
@@ -953,22 +1141,26 @@ pub fn resolve_autodetect_config_path(custom: Option<&Path>) -> PathBuf {
     let opt_dir = resolve_optimizations_dir();
 
     if let Some(p) = custom {
-        if p.exists() {
-            return p.to_path_buf();
+        if !p.as_os_str().is_empty() && !p.to_string_lossy().trim().is_empty() {
+            if p.is_dir() {
+                return p.join("AutoDetect.json");
+            }
+            let p_json = if p.extension().is_none() {
+                p.with_extension("json")
+            } else {
+                p.to_path_buf()
+            };
+            if p_json.is_absolute() || p_json.exists() {
+                return p_json;
+            }
+            if p_json.parent().map_or(false, |parent| !parent.as_os_str().is_empty()) {
+                return p_json;
+            }
+            return opt_dir.join(p_json);
         }
-        let in_opt = opt_dir.join(p);
-        if in_opt.exists() {
-            return in_opt;
-        }
-        return in_opt;
     }
 
-    let default_file = opt_dir.join("AutoDetect.json");
-    if default_file.exists() || opt_dir.is_dir() {
-        return default_file;
-    }
-
-    default_file
+    opt_dir.join("AutoDetect.json")
 }
 
 pub fn resolve_hardware_config_path(custom: Option<&Path>) -> PathBuf {
@@ -1264,5 +1456,124 @@ mod tests {
         assert!(cfg_potente.apply_render_queue, "GPU NVIDIA deve ativar fila de renderização");
         assert!(!cfg_potente.disable_gpu_acceleration, "Perfil potente mantém aceleração de GPU secundária");
         assert!(report_potente.blocked_tweaks.is_empty(), "Hardware potente não deve ter tweaks bloqueados");
+    }
+
+    #[test]
+    fn test_autodetect_config_generation_and_no_custom_optimization() {
+        let core = OptimizerCore::new();
+        let temp_dir = tempfile::tempdir().expect("Falha ao criar diretório temporário");
+        let autodetect_path = temp_dir.path().join("AutoDetect.json");
+        let custom_opt_path = temp_dir.path().join("custom_optimization.json");
+
+        let (path, config, report) = core
+            .save_autodetect_config(Some(&autodetect_path))
+            .expect("Falha ao executar save_autodetect_config");
+
+        assert_eq!(path, autodetect_path);
+        assert!(autodetect_path.exists(), "O arquivo AutoDetect.json deve ser criado");
+        assert!(
+            !custom_opt_path.exists(),
+            "O arquivo custom_optimization.json NÃO deve ser criado sob nenhuma circunstância"
+        );
+
+        // Verifica que no diretório de destino unicamente o arquivo AutoDetect.json foi gerado
+        let created_files: Vec<String> = std::fs::read_dir(temp_dir.path())
+            .expect("Falha ao ler diretório temporário de teste")
+            .filter_map(|e| e.ok().map(|entry| entry.file_name().to_string_lossy().to_string()))
+            .collect();
+        assert_eq!(
+            created_files,
+            vec!["AutoDetect.json".to_string()],
+            "A execução da função deve resultar exclusivamente na criação de AutoDetect.json"
+        );
+
+        // R3: Otimizações de runtime devem ser obrigatoriamente true
+        assert!(config.cs2_affinity, "Afinidade de CS2 deve ser true (runtime)");
+        assert!(config.apply_timer_resolution, "Timer 0.5ms deve ser true (runtime)");
+        assert!(config.empty_standby_list, "Limpeza da Standby List deve ser true (runtime)");
+
+        // R2: Entradas de otimizações com valores booleanos conforme retorno dos verificadores
+        let raw_json = std::fs::read_to_string(&autodetect_path).expect("Falha ao ler AutoDetect.json gerado");
+        let parsed: serde_json::Value = serde_json::from_str(&raw_json).expect("Falha ao parsear AutoDetect.json");
+
+        assert_eq!(parsed["cs2_affinity"], true);
+        assert_eq!(parsed["apply_timer_resolution"], true);
+        assert_eq!(parsed["empty_standby_list"], true);
+
+        assert!(parsed["cs2_priority"].is_boolean());
+        assert!(parsed["disable_gpu_acceleration"].is_boolean());
+        assert!(parsed["apply_dpi_optimization"].is_boolean());
+        assert!(parsed["disable_memory_compression"].is_boolean());
+        assert!(parsed["apply_mmcss"].is_boolean());
+        assert!(parsed["disable_hpet"].is_boolean());
+        assert!(parsed["disable_game_bar"].is_boolean());
+        assert!(parsed["enable_msi"].is_boolean());
+        assert!(parsed["disable_power_saving"].is_boolean());
+        assert!(parsed["apply_render_queue"].is_boolean());
+
+        // Confirma correspondência com o retorno dos verificadores
+        let expected_priority = matches!(tweaks::Cs2PriorityTweak.status(), Ok(tweaks::TweakStatus::Applied));
+        let expected_gpu_accel = tweaks::is_all_gpu_accel_disabled().unwrap_or(false);
+        let expected_dpi = matches!(tweaks::Cs2DpiOptimizationTweak.status(), Ok(tweaks::TweakStatus::Applied));
+        let expected_mem_comp = matches!(tweaks::MemoryCompressionTweak.status(), Ok(tweaks::TweakStatus::Applied));
+        let expected_mmcss = tweaks::is_mmcss_applied_for_current_hardware().unwrap_or(false);
+        let expected_hpet = matches!(tweaks::HpetTweak.status(), Ok(tweaks::TweakStatus::Applied));
+        let expected_game_bar = matches!(tweaks::GameBarTweak.status(), Ok(tweaks::TweakStatus::Applied));
+        let expected_msi = tweaks::is_all_msi_enabled().unwrap_or(false);
+        let expected_power_saving = matches!(tweaks::PcieUsbPowerSavingTweak.status(), Ok(tweaks::TweakStatus::Applied));
+        let expected_render_queue = matches!(tweaks::RenderQueueTweak.status(), Ok(tweaks::TweakStatus::Applied));
+
+        assert_eq!(config.cs2_priority, expected_priority);
+        assert_eq!(parsed["cs2_priority"], expected_priority);
+        assert_eq!(config.disable_gpu_acceleration, expected_gpu_accel);
+        assert_eq!(parsed["disable_gpu_acceleration"], expected_gpu_accel);
+        assert_eq!(config.apply_dpi_optimization, expected_dpi);
+        assert_eq!(parsed["apply_dpi_optimization"], expected_dpi);
+        assert_eq!(config.disable_memory_compression, expected_mem_comp);
+        assert_eq!(parsed["disable_memory_compression"], expected_mem_comp);
+        assert_eq!(config.apply_mmcss, expected_mmcss);
+        assert_eq!(parsed["apply_mmcss"], expected_mmcss);
+        assert_eq!(config.disable_hpet, expected_hpet);
+        assert_eq!(parsed["disable_hpet"], expected_hpet);
+        assert_eq!(config.disable_game_bar, expected_game_bar);
+        assert_eq!(parsed["disable_game_bar"], expected_game_bar);
+        assert_eq!(config.enable_msi, expected_msi);
+        assert_eq!(parsed["enable_msi"], expected_msi);
+        assert_eq!(config.disable_power_saving, expected_power_saving);
+        assert_eq!(parsed["disable_power_saving"], expected_power_saving);
+        assert_eq!(config.apply_render_queue, expected_render_queue);
+        assert_eq!(parsed["apply_render_queue"], expected_render_queue);
+
+        assert_eq!(report.evaluations.len(), 13);
+    }
+
+    #[test]
+    fn test_resolve_autodetect_config_path_edge_cases() {
+        let temp_dir = tempfile::tempdir().expect("Falha ao criar diretório temporário");
+        let temp_file = temp_dir.path().join("CustomAuto.json");
+
+        // Caso 1: None -> aponta para AutoDetect.json no diretório padrão de otimizações
+        let default_path = resolve_autodetect_config_path(None);
+        assert!(default_path.ends_with("AutoDetect.json"));
+
+        // Caso 2: Path vazio -> fallback para AutoDetect.json
+        let empty_path = resolve_autodetect_config_path(Some(Path::new("")));
+        assert!(empty_path.ends_with("AutoDetect.json"));
+
+        // Caso 3: Nome relativo sem extensão .json -> deve assegurar extensão .json
+        let no_ext_path = resolve_autodetect_config_path(Some(Path::new("AutoDetect")));
+        assert!(no_ext_path.ends_with("AutoDetect.json"));
+
+        // Caso 4: Caminho absoluto -> preservado integralmente
+        let abs_path = resolve_autodetect_config_path(Some(&temp_file));
+        assert_eq!(abs_path, temp_file);
+
+        // Caso 5: Passagem de diretório existente -> aponta para AutoDetect.json dentro do diretório
+        let dir_path = resolve_autodetect_config_path(Some(temp_dir.path()));
+        assert_eq!(dir_path, temp_dir.path().join("AutoDetect.json"));
+
+        // Caso 6: String somente de espaços -> fallback para AutoDetect.json
+        let whitespace_path = resolve_autodetect_config_path(Some(Path::new("   ")));
+        assert!(whitespace_path.ends_with("AutoDetect.json"));
     }
 }

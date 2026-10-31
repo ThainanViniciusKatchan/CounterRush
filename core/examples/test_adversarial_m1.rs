@@ -1,7 +1,6 @@
 use config::CustomOptimizationConfig;
 use core::validate_profile_name;
 use std::fs;
-use std::path::PathBuf;
 
 fn main() {
     println!("================================================================================");

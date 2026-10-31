@@ -9,7 +9,7 @@ fn main() {
     let hw_config_path = core::resolve_hardware_config_path(None);
 
     println!("\n[1] Verificando arquivo de cache de hardware: {}", hw_config_path.display());
-    let (hw_path, hardware, category, from_cache) = match core.get_or_detect_hardware(None) {
+    let (hw_path, _hardware, _category, from_cache) = match core.get_or_detect_hardware(None) {
         Ok(res) => res,
         Err(err) => {
             eprintln!("\n[ERRO CRÍTICO] Falha ao obter especificações de hardware: {err}");
@@ -23,19 +23,13 @@ fn main() {
         println!("  -> [CACHE INEXISTENTE] 'Hardware.json' não encontrado. Executada detecção e arquivo criado.");
     }
 
-    let (config, report) = match core.generate_autodetect_config_for_hardware(hardware, category) {
+    let (autodetect_path, config, report) = match core.save_autodetect_config(None) {
         Ok(res) => res,
         Err(err) => {
-            eprintln!("\n[ERRO CRÍTICO] Falha ao processar regras de autodetecção: {err}");
+            eprintln!("\n[ERRO CRÍTICO] Falha ao processar autodetecção e gravar AutoDetect.json: {err}");
             std::process::exit(1);
         }
     };
-
-    let autodetect_path = core::resolve_autodetect_config_path(None);
-    if let Err(err) = config.save_to_file(&autodetect_path) {
-        eprintln!("\n[ERRO CRÍTICO] Falha ao gravar AutoDetect.json: {err}");
-        std::process::exit(1);
-    }
 
     println!("\n[2] Especificações de Hardware Utilizadas:");
     println!("  - Processador (CPU):  {}", report.hardware.cpu.model);
@@ -61,11 +55,18 @@ fn main() {
             println!("    ID no JSON:  {}", eval.id);
             println!("    Estado:      Desativado (false) — Bloqueado até upgrade de hardware");
             println!("    Motivo:      {}", eval.reason);
-        } else if eval.optional_default_off {
-            println!("  [OPCIONAL / PADRÃO OFF] {}", eval.name);
-            println!("    ID no JSON:  {}", eval.id);
-            println!("    Estado:      Desativado (false) — Otimização opcional");
-            println!("    Critério:    {}", eval.reason);
+        } else if !eval.active {
+            if eval.optional_default_off {
+                println!("  [OPCIONAL / PADRÃO OFF] {}", eval.name);
+                println!("    ID no JSON:  {}", eval.id);
+                println!("    Estado:      Desativado (false) — Otimização opcional");
+                println!("    Critério:    {}", eval.reason);
+            } else {
+                println!("  [NÃO APLICADO / DESATIVADO] {}", eval.name);
+                println!("    ID no JSON:  {}", eval.id);
+                println!("    Estado:      Desativado (false) — Verificador retornou inativo");
+                println!("    Critério:    {}", eval.reason);
+            }
         } else {
             println!("  [COMPATÍVEL / ATIVADO] {}", eval.name);
             println!("    ID no JSON:  {}", eval.id);

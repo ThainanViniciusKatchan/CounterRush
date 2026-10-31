@@ -31,6 +31,8 @@ fn main() -> Result<(), slint::PlatformError> {
     // Se não existirem perfis salvos no disco, inicia no estado neutro desligado (R1)
     let (resolved_path, _config) = if initial_presets.is_empty() {
         main_window.set_active_preset("".into());
+        main_window.set_launch_args_text("".into());
+        main_window.set_is_editing_launch_args(false);
         main_window.set_cpu_tweak_active(false);
         main_window.set_timer_tweak_active(false);
         main_window.set_priority_tweak_active(false);
@@ -46,15 +48,17 @@ fn main() -> Result<(), slint::PlatformError> {
         main_window.set_render_queue_tweak_active(false);
         (std::path::PathBuf::new(), counterrush_core::config::CustomOptimizationConfig::all_disabled())
     } else {
-        let core = counterrush_core::OptimizerCore::default();
-        let (p, c) = match core.load_or_create_custom_config(None) {
+
+        let first_preset_name = &initial_presets[0].name;
+        let p = counterrush_core::resolve_optimization_file_path(first_preset_name.as_str());
+        let c = match counterrush_core::config::CustomOptimizationConfig::load_from_file(&p) {
             Ok(res) => res,
             Err(e) => {
                 eprintln!("Erro ao carregar configuração: {e}");
-                (
-                    counterrush_core::resolve_custom_config_path(None),
-                    counterrush_core::config::CustomOptimizationConfig::default(),
-                )
+                counterrush_core::config::CustomOptimizationConfig::default()
+
+
+
             }
         };
 
@@ -63,6 +67,8 @@ fn main() -> Result<(), slint::PlatformError> {
             main_window.set_active_preset(clean_name.into());
         }
 
+        main_window.set_launch_args_text(c.launch_args.join(" ").into());
+        main_window.set_is_editing_launch_args(false);
         main_window.set_cpu_tweak_active(c.cs2_affinity);
         main_window.set_timer_tweak_active(c.apply_timer_resolution);
         main_window.set_priority_tweak_active(c.cs2_priority);
@@ -99,12 +105,36 @@ fn main() -> Result<(), slint::PlatformError> {
                 let current_presets = scan_presets();
                 let current_names: Vec<String> = current_presets.iter().map(|p| p.name.to_string()).collect();
                 if current_names != last_preset_names {
-                    last_preset_names = current_names;
+                    last_preset_names = current_names.clone();
                     let _ = slint::invoke_from_event_loop({
                         let handle = sync_window_handle.clone();
+                        let sync_active_ref = sync_config_ref.clone();
+                        let names_clone = current_names.clone();
                         move || {
                             if let Some(ui) = handle.upgrade() {
                                 ui.set_presets(slint::ModelRc::new(slint::VecModel::from(current_presets)));
+                                if names_clone.is_empty() {
+                                    ui.set_active_preset("".into());
+                                    ui.set_launch_args_text("".into());
+                                    ui.set_is_editing_launch_args(false);
+                                    if let Ok(mut cur) = sync_active_ref.write() {
+                                        *cur = std::path::PathBuf::new();
+                                    }
+                                } else {
+                                    let current_active = ui.get_active_preset().to_string();
+                                    if !names_clone.contains(&current_active) {
+                                        let first_preset = &names_clone[0];
+                                        let target = counterrush_core::resolve_optimization_file_path(first_preset);
+                                        if let Ok(mut cur) = sync_active_ref.write() {
+                                            *cur = target.clone();
+                                        }
+                                        ui.set_active_preset(first_preset.as_str().into());
+                                        if let Ok(cfg) = counterrush_core::config::CustomOptimizationConfig::load_from_file(&target) {
+                                            ui.set_launch_args_text(cfg.launch_args.join(" ").into());
+                                        }
+                                        ui.set_is_editing_launch_args(false);
+                                    }
+                                }
                             }
                         }
                     });
@@ -139,6 +169,12 @@ fn main() -> Result<(), slint::PlatformError> {
                                 let handle = sync_window_handle.clone();
                                 move || {
                                     if let Some(ui) = handle.upgrade() {
+                                        if !ui.get_is_editing_launch_args() {
+                                            let joined_args = cfg.launch_args.join(" ");
+                                            if ui.get_launch_args_text() != joined_args.as_str() {
+                                                ui.set_launch_args_text(joined_args.into());
+                                            }
+                                        }
                                         if ui.get_cpu_tweak_active() != cfg.cs2_affinity {
                                             ui.set_cpu_tweak_active(cfg.cs2_affinity);
                                         }
@@ -441,6 +477,8 @@ fn main() -> Result<(), slint::PlatformError> {
                     let updated_presets = scan_presets();
                     ui.set_presets(slint::ModelRc::new(slint::VecModel::from(updated_presets)));
                     ui.set_active_preset("AutoDetect".into());
+                    ui.set_launch_args_text(config.launch_args.join(" ").into());
+                    ui.set_is_editing_launch_args(false);
 
                     ui.set_cpu_tweak_active(config.cs2_affinity);
                     ui.set_timer_tweak_active(config.apply_timer_resolution);
@@ -492,6 +530,8 @@ fn main() -> Result<(), slint::PlatformError> {
 
             match counterrush_core::config::CustomOptimizationConfig::load_from_file(&target_path) {
                 Ok(cfg) => {
+                    ui.set_launch_args_text(cfg.launch_args.join(" ").into());
+                    ui.set_is_editing_launch_args(false);
                     ui.set_cpu_tweak_active(cfg.cs2_affinity);
                     ui.set_timer_tweak_active(cfg.apply_timer_resolution);
                     ui.set_priority_tweak_active(cfg.cs2_priority);
@@ -563,6 +603,8 @@ fn main() -> Result<(), slint::PlatformError> {
                     ui.set_presets(slint::ModelRc::new(slint::VecModel::from(updated_presets)));
                     ui.set_active_preset(clean_name.as_str().into());
 
+                    ui.set_launch_args_text(new_config.launch_args.join(" ").into());
+                    ui.set_is_editing_launch_args(false);
                     ui.set_cpu_tweak_active(new_config.cs2_affinity);
                     ui.set_timer_tweak_active(new_config.apply_timer_resolution);
                     ui.set_priority_tweak_active(new_config.cs2_priority);
@@ -583,6 +625,46 @@ fn main() -> Result<(), slint::PlatformError> {
                 }
                 Err(e) => {
                     ui.set_create_modal_error(format!("Falha ao salvar arquivo: {e}").into());
+                }
+            }
+        }
+    });
+
+    // Callback para salvar parâmetros de inicialização editados no arquivo de perfil selecionado
+    let window_handle = main_window.as_weak();
+    let save_config_ref = active_config_path.clone();
+    main_window.on_save_launch_args_clicked(move |args_str| {
+        if let Some(ui) = window_handle.upgrade() {
+            let target_path = if let Ok(guard) = save_config_ref.read() {
+                guard.clone()
+            } else {
+                return;
+            };
+
+            if target_path.as_os_str().is_empty() {
+                ui.set_status_message("Crie ou selecione um perfil para salvar alterações.".into());
+                return;
+            }
+
+            let mut config = counterrush_core::config::CustomOptimizationConfig::load_from_file(&target_path)
+                .unwrap_or_default();
+
+            let new_args: Vec<String> = args_str
+                .as_str()
+                .split_whitespace()
+                .map(|s| s.to_string())
+                .collect();
+
+            config.launch_args = new_args;
+
+            match config.save_to_file(&target_path) {
+                Ok(()) => {
+                    let file_stem = target_path.file_stem().and_then(|s| s.to_str()).unwrap_or("perfil");
+                    ui.set_status_message(format!("Parâmetros de inicialização salvos no perfil '{file_stem}'.").into());
+                    ui.set_launch_args_text(config.launch_args.join(" ").into());
+                }
+                Err(err) => {
+                    ui.set_status_message(format!("Falha ao salvar parâmetros: {err}").into());
                 }
             }
         }

@@ -44,6 +44,8 @@ export component MainWindow inherits Window {
     in-out property <[PresetModel]> presets: [];
     in-out property <bool> show-create-modal: false;
     in-out property <string> create-modal-error: "";
+    in-out property <string> launch-args-text: "";
+    in-out property <bool> is-editing-launch-args: false;
 
     // Estado reativo geral para o botão mestre
     property <bool> is-all-tweaks-active: 
@@ -69,6 +71,7 @@ export component MainWindow inherits Window {
     callback auto-optimize-clicked();
     callback preset-selected(string);
     callback create-profile-confirmed(NewProfileData);
+    callback save-launch-args-clicked(string);
 
     HorizontalLayout {
         // 1. Barra Lateral Tática Sólida (Sem Bordas)
@@ -748,6 +751,7 @@ export component MainWindow inherits Window {
                         button-width: root.presets.length > 2 ? 250px : 350px;
                         selected => {
                             root.active-preset = preset.name;
+                            root.is-editing-launch-args = false;
                             root.status-message = "Perfil ativo: " + preset.name;
                             root.preset-selected(preset.name);
                         }
@@ -758,6 +762,127 @@ export component MainWindow inherits Window {
                         clicked => {
                             root.create-modal-error = "";
                             root.show-create-modal = true;
+                        }
+                    }
+                }
+
+                // Campo de Parâmetros de Inicialização e Botão de Edição/Salvamento
+                if root.active-preset != "" : HorizontalLayout {
+                    alignment: center;
+                    spacing: 10px;
+
+                    Rectangle {
+                        width: 722px;
+                        height: 44px;
+                        background: root.is-editing-launch-args ? CS2Theme.bg-surface : CS2Theme.bg-card;
+                        border-radius: CS2Theme.radius-sm;
+                        border-width: root.is-editing-launch-args ? (launch-input.has-focus ? 2px : 1px) : 1px;
+                        border-color: root.is-editing-launch-args 
+                            ? (launch-input.has-focus ? CS2Theme.accent-orange : CS2Theme.border-hover) 
+                            : CS2Theme.border;
+                        animate background { duration: 120ms; }
+                        animate border-color { duration: 120ms; }
+
+                        HorizontalLayout {
+                            padding-left: 14px;
+                            padding-right: 14px;
+                            spacing: 10px;
+
+                            Rectangle {
+                                width: 88px;
+                                height: 22px;
+                                border-radius: CS2Theme.radius-xs;
+                                background: root.is-editing-launch-args 
+                                    ? CS2Theme.accent-orange-soft 
+                                    : CS2Theme.bg-surface;
+                                border-width: 1px;
+                                border-color: root.is-editing-launch-args 
+                                    ? CS2Theme.accent-orange 
+                                    : CS2Theme.border;
+                                y: (parent.height - self.height) / 2;
+                                animate background { duration: 120ms; }
+                                animate border-color { duration: 120ms; }
+
+                                Text {
+                                    text: "PARÂMETROS";
+                                    font-size: 8px;
+                                    font-weight: 900;
+                                    letter-spacing: 0.6px;
+                                    color: root.is-editing-launch-args ? CS2Theme.accent-orange-bright : CS2Theme.text-dim;
+                                    horizontal-alignment: center;
+                                    vertical-alignment: center;
+                                }
+                            }
+
+                            launch-input := TextInput {
+                                text <=> root.launch-args-text;
+                                read-only: !root.is-editing-launch-args;
+                                color: root.is-editing-launch-args ? CS2Theme.text-primary : CS2Theme.text-muted;
+                                font-size: 11px;
+                                font-weight: 600;
+                                single-line: true;
+                                vertical-alignment: center;
+                                accepted => {
+                                    if root.is-editing-launch-args {
+                                        root.is-editing-launch-args = false;
+                                        root.status-message = "Salvando parâmetros no perfil '" + root.active-preset + "'...";
+                                        root.save-launch-args-clicked(root.launch-args-text);
+                                    }
+                                }
+                            }
+                        }
+
+                        if root.launch-args-text == "" : Text {
+                            x: 114px;
+                            y: (parent.height - self.height) / 2;
+                            text: root.is-editing-launch-args ? "Ex: -novid -high +fps_max 0" : "Nenhum parâmetro de inicialização configurado";
+                            color: CS2Theme.text-dim;
+                            font-size: 11px;
+                            font-weight: 500;
+                            vertical-alignment: center;
+                        }
+                    }
+
+                    Rectangle {
+                        width: 44px;
+                        height: 44px;
+                        background: edit-touch.has-hover ? CS2Theme.bg-card-hover : CS2Theme.bg-card;
+                        border-radius: CS2Theme.radius-sm;
+                        border-width: edit-touch.has-hover ? 2px : 1px;
+                        border-color: root.is-editing-launch-args
+                            ? (edit-touch.has-hover ? CS2Theme.accent-orange-bright : CS2Theme.accent-orange)
+                            : (edit-touch.has-hover ? CS2Theme.accent-orange : CS2Theme.border);
+
+                        animate background { duration: 120ms; }
+                        animate border-color { duration: 120ms; }
+
+                        Image {
+                            source: root.is-editing-launch-args 
+                                ? @image-url("assets/icons/save.svg") 
+                                : @image-url("assets/icons/pencil.svg");
+                            width: 16px;
+                            height: 16px;
+                            colorize: edit-touch.has-hover 
+                                ? CS2Theme.accent-orange-bright 
+                                : (root.is-editing-launch-args ? CS2Theme.accent-orange-bright : CS2Theme.accent-orange);
+                            x: (parent.width - self.width) / 2;
+                            y: (parent.height - self.height) / 2;
+                            animate colorize { duration: 120ms; }
+                        }
+
+                        edit-touch := TouchArea {
+                            mouse-cursor: pointer;
+                            clicked => {
+                                if !root.is-editing-launch-args {
+                                    root.is-editing-launch-args = true;
+                                    root.status-message = "Edição de parâmetros desbloqueada para o perfil '" + root.active-preset + "'.";
+                                    launch-input.focus();
+                                } else {
+                                    root.is-editing-launch-args = false;
+                                    root.status-message = "Salvando parâmetros no perfil '" + root.active-preset + "'...";
+                                    root.save-launch-args-clicked(root.launch-args-text);
+                                }
+                            }
                         }
                     }
                 }
