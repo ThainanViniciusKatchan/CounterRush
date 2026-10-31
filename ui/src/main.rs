@@ -427,48 +427,54 @@ fn main() -> Result<(), slint::PlatformError> {
     // Callback para o botão "Otimizar Automaticamente" na aba Otimizações
     let window_handle = main_window.as_weak();
     let auto_opt_ref = active_config_path.clone();
-    let fallback_path_auto = resolved_path.clone();
     main_window.on_auto_optimize_clicked(move || {
         if let Some(ui) = window_handle.upgrade() {
-            ui.set_status_message("Aplicando otimização automática de alta performance...".into());
+            ui.set_status_message("Detectando hardware e calibrando otimizações...".into());
 
-            let target_path = auto_opt_ref.read().map(|p| p.clone()).unwrap_or_else(|_| fallback_path_auto.clone());
-            if !target_path.as_os_str().is_empty() {
-                let mut config = counterrush_core::config::CustomOptimizationConfig::load_from_file(&target_path)
-                    .unwrap_or_default();
+            let core = counterrush_core::OptimizerCore::default();
+            match core.save_autodetect_config(None) {
+                Ok((path, config, report)) => {
+                    if let Ok(mut current) = auto_opt_ref.write() {
+                        *current = path.clone();
+                    }
 
-                config.cs2_affinity = true;
-                config.apply_timer_resolution = true;
-                config.cs2_priority = true;
-                config.empty_standby_list = true;
-                config.disable_gpu_acceleration = true;
-                config.apply_dpi_optimization = true;
-                config.disable_memory_compression = true;
-                config.apply_mmcss = true;
-                config.disable_hpet = true;
-                config.disable_game_bar = true;
-                config.enable_msi = true;
-                config.disable_power_saving = true;
-                config.apply_render_queue = true;
+                    let updated_presets = scan_presets();
+                    ui.set_presets(slint::ModelRc::new(slint::VecModel::from(updated_presets)));
+                    ui.set_active_preset("AutoDetect".into());
 
-                let _ = config.save_to_file(&target_path);
+                    ui.set_cpu_tweak_active(config.cs2_affinity);
+                    ui.set_timer_tweak_active(config.apply_timer_resolution);
+                    ui.set_priority_tweak_active(config.cs2_priority);
+                    ui.set_ram_tweak_active(config.empty_standby_list);
+                    ui.set_gpu_accel_tweak_active(config.disable_gpu_acceleration);
+                    ui.set_dpi_tweak_active(config.apply_dpi_optimization);
+                    ui.set_mem_compression_tweak_active(config.disable_memory_compression);
+                    ui.set_mmcss_tweak_active(config.apply_mmcss);
+                    ui.set_hpet_tweak_active(config.disable_hpet);
+                    ui.set_game_bar_tweak_active(config.disable_game_bar);
+                    ui.set_msi_tweak_active(config.enable_msi);
+                    ui.set_power_saving_tweak_active(config.disable_power_saving);
+                    ui.set_render_queue_tweak_active(config.apply_render_queue);
+
+                    let msg = if report.blocked_tweaks.is_empty() {
+                        format!(
+                            "Hardware detectado ({:?} • {}). Perfil AutoDetect gerado e aplicado!",
+                            report.category, report.hardware.gpu.model
+                        )
+                    } else {
+                        format!(
+                            "Hardware detectado ({:?} • {}). Perfil AutoDetect gerado ({} ajustes calibrados para seu PC).",
+                            report.category,
+                            report.hardware.gpu.model,
+                            report.blocked_tweaks.len()
+                        )
+                    };
+                    ui.set_status_message(msg.into());
+                }
+                Err(err) => {
+                    ui.set_status_message(format!("Falha ao detectar hardware automaticamente: {err}").into());
+                }
             }
-
-            ui.set_cpu_tweak_active(true);
-            ui.set_timer_tweak_active(true);
-            ui.set_priority_tweak_active(true);
-            ui.set_ram_tweak_active(true);
-            ui.set_gpu_accel_tweak_active(true);
-            ui.set_dpi_tweak_active(true);
-            ui.set_mem_compression_tweak_active(true);
-            ui.set_mmcss_tweak_active(true);
-            ui.set_hpet_tweak_active(true);
-            ui.set_game_bar_tweak_active(true);
-            ui.set_msi_tweak_active(true);
-            ui.set_power_saving_tweak_active(true);
-            ui.set_render_queue_tweak_active(true);
-
-            ui.set_status_message("Otimização automática aplicada com sucesso! Todos os módulos recomendados ativos.".into());
         }
     });
 

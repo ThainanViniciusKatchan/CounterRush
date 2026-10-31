@@ -1204,4 +1204,65 @@ mod tests {
         assert_eq!(configs_after.len(), 1);
         assert_eq!(configs_after[0], local_profile);
     }
+
+    #[test]
+    fn test_autodetect_evaluation_respects_hardware_limits() {
+        let core = OptimizerCore::new();
+
+        // Cenário 1: Hardware modesto/antigo (CPU 4 núcleos, 8GB RAM, GPU Intel Integrada)
+        let hw_modesto = windows_api::HardwareInfo {
+            cpu: windows_api::CpuInfo {
+                model: "Intel Core i5-4460".to_string(),
+                physical_cores: 4,
+                logical_cores: 4,
+                frequency_mhz: 3200,
+            },
+            gpu: windows_api::GpuInfo {
+                model: "Intel HD Graphics 4600".to_string(),
+                vram_gb: 1.0,
+            },
+            ram: windows_api::RamInfo {
+                total_gb: 8.0,
+                speed_mhz: Some(1600),
+            },
+        };
+
+        let (cfg_modesto, report_modesto) = core
+            .generate_autodetect_config_for_hardware(hw_modesto, PcCategory::Economico)
+            .expect("Falha ao gerar autodetect");
+
+        assert!(!cfg_modesto.cs2_affinity, "CPU com 4 núcleos deve desativar cs2_affinity");
+        assert!(!cfg_modesto.disable_memory_compression, "RAM <= 16GB deve manter compactação ativa");
+        assert!(!cfg_modesto.apply_render_queue, "GPU integrada não deve ativar fila de renderização");
+        assert!(cfg_modesto.disable_gpu_acceleration, "Perfil econômico deve desativar aceleração de GPU");
+        assert!(!report_modesto.blocked_tweaks.is_empty(), "Deve listar tweaks bloqueados");
+
+        // Cenário 2: Hardware potente (CPU 8 núcleos, 32GB RAM, GPU NVIDIA RTX 4070)
+        let hw_potente = windows_api::HardwareInfo {
+            cpu: windows_api::CpuInfo {
+                model: "AMD Ryzen 7 7800X3D".to_string(),
+                physical_cores: 8,
+                logical_cores: 16,
+                frequency_mhz: 4200,
+            },
+            gpu: windows_api::GpuInfo {
+                model: "NVIDIA GeForce RTX 4070".to_string(),
+                vram_gb: 12.0,
+            },
+            ram: windows_api::RamInfo {
+                total_gb: 32.0,
+                speed_mhz: Some(6000),
+            },
+        };
+
+        let (cfg_potente, report_potente) = core
+            .generate_autodetect_config_for_hardware(hw_potente, PcCategory::Potente)
+            .expect("Falha ao gerar autodetect");
+
+        assert!(cfg_potente.cs2_affinity, "CPU com 8 núcleos deve ativar cs2_affinity");
+        assert!(cfg_potente.disable_memory_compression, "RAM > 16GB deve desativar compactação");
+        assert!(cfg_potente.apply_render_queue, "GPU NVIDIA deve ativar fila de renderização");
+        assert!(!cfg_potente.disable_gpu_acceleration, "Perfil potente mantém aceleração de GPU secundária");
+        assert!(report_potente.blocked_tweaks.is_empty(), "Hardware potente não deve ter tweaks bloqueados");
+    }
 }
