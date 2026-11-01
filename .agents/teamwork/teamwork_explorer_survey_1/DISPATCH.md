@@ -1,24 +1,23 @@
-## 2026-10-30T19:43:33Z
+## 2026-11-01T15:05:08Z
+Você é o Explorer 1 da equipe CounterRush.
+Sua missão é realizar a exploração técnica read-only da base de código para atender aos requisitos da solicitação do usuário.
 
-Você é teamwork_explorer_survey_1, atuando como Backend Config Explorer.
-Seu diretório de trabalho é: g:\Outros computadores\Meu laptop\Desktop\CounterRush\.agents\teamwork\teamwork_explorer_survey_1
-Seu orquestrador pai é: 57a334a3-ffa9-4780-b779-a82434f687fa
-
-LEITURA OBRIGATÓRIA: Leia o arquivo de requisitos originais em:
+Arquivo de requisitos originais:
 g:\Outros computadores\Meu laptop\Desktop\CounterRush\.agents\teamwork\ORIGINAL_REQUEST.md
+Leia este arquivo na íntegra antes de iniciar.
 
-OBJETIVO:
-Investigue o backend e a arquitetura de configuração do CounterRush com foco nos requisitos R1 e R3:
-1. Modelos de configuração e persistência: Onde CustomOptimizationConfig está definido? Como os perfis de otimização (.json) são serializados e deserializados? Quais campos e flags de otimização existem?
-2. Diretório e caminhos: Como o diretório config/optimzations (ou optimizations) é referenciado e manipulado no código? O diretório é criado automaticamente?
-3. Estado inicial na primeira execução (R1): Como a aplicação inicializa as otimizações e o perfil ativo quando a pasta de otimizações está vazia ou não existe? Onde estão os valores default atuais e o que precisa ser ajustado para garantir que todas as otimizações iniciem desativadas (false) e nenhum perfil seja considerado ativo por padrão?
-4. Ativação e seleção de perfil: Como o perfil ativo é mantido e como alternar entre perfis reflete no estado do app?
-5. Fluxo de criação de novo perfil (R3): Como implementar o salvamento do novo arquivo .json com nome informado, launch_args e seleção de otimizações ativadas, e como selecioná-lo imediatamente como perfil ativo.
+Seu diretório de trabalho é:
+g:\Outros computadores\Meu laptop\Desktop\CounterRush\.agents\teamwork\teamwork_explorer_survey_1\
+Escreva seus arquivos de progresso (progress.md), análise (analysis.md) e entrega (handoff.md) neste diretório.
 
-LIMITES:
-Você é um agente READ-ONLY. NÃO crie, modifique ou exclua nenhum arquivo de código-fonte.
+FOCO ESPECÍFICO DO EXPLORER 1:
+1. Mapear a arquitetura da UI da aba de Otimizações (arquivos, componentes, views, widgets/telas).
+2. Localizar onde a lista/seleção de arquivos .json de configuração é renderizada e como é verificado se existem ou não configurações salvas.
+3. Localizar onde atualmente fica o botão inferior "Otimizar Automaticamente" que deve ser removido (R2).
+4. Localizar o botão de adicionar otimização existente e o modal de criação que ele abre (R1: transformar no botão com `+` e texto "Criar Otimização").
+5. Detalhar como implementar a exibição exclusiva dos 2 botões ("Otimizar Automaticamente" e "+ Criar Otimização") quando não houver arquivos .json.
 
-ENTREGA:
-Escreva seu relatório estruturado completo com evidências e caminhos de arquivo em:
-g:\Outros computadores\Meu laptop\Desktop\CounterRush\.agents\teamwork\teamwork_explorer_survey_1\handoff.md
-Ao concluir, envie uma mensagem para o orquestrador (57a334a3-ffa9-4780-b779-a82434f687fa) informando que concluiu e resumindo suas descobertas.
+REGRAS:
+- Apenas leitura (read-only), NUNCA altere arquivos de código.
+- Todas as mensagens e relatórios devem ser em PORTUGUÊS-BR.
+- Ao concluir, escreva handoff.md e envie uma mensagem informando a conclusão para o orchestrator (ID: a2e09f4d-39a0-4d52-880b-d65100808272).

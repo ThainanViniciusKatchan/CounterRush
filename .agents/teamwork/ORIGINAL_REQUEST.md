@@ -1,36 +1,19 @@
 # Original User Request
 
-## Initial Request — 2026-10-31T19:56:04Z
+## Parameters
 
-This is a single self-contained fix; keep it small and focused. Ajustar a função de auto-detecção responsável pela criação do arquivo AutoDetect.json no CounterRush para que utilize os verificadores das otimizações existentes e gere unicamente esse arquivo com os valores booleanos correspondentes.
+[skip-interview]
+How this run was launched; not part of the task.
 
-Integrity mode: development
+## Initial Request — 2026-11-01T17:33:16Z
 
-## Requirements
+Adicione a possíbilidade de apagar perfis de otimização diretamente na interface na aba de otimizações.
 
-### R1. Varredura de hardware e checagem de otimizações
-A função de auto-detecção deve continuar realizando a varredura no hardware para identificar os componentes do sistema e deve invocar todos os verificadores existentes nas otimizações para identificar quais otimizações já estão aplicadas e quais ainda não estão.
+Como deve ser:
+- Um novo icone de lixeira deve ser adicionado a cada perfil de otimização existente.
+- Quando o usuário clicar nele, aquele perfil deve ser excluído.
+- Deve existir uma confirmação se o usuário realmente deseja excluir o perfil.
+- Essa mensagem de confirmação deve ser um pequeno modal com o texto "Deseja realmente excluir o perfil {Nome do perfil}" com dois botões "Cancelar", "Excluir".
+- Caso o perfil excluido seja o único existente, a aba deve voltar para o padrão de quando não existe perfil.
 
-### R2. Geração exclusiva do arquivo AutoDetect.json
-A função deve gerar unicamente o arquivo AutoDetect.json, preenchendo as entradas de otimizações com valores booleanos (true e false) conforme o retorno da respectiva verificação. O arquivo custom_optimization.json não deve ser criado em nenhuma circunstância.
-
-### R3. Valores fixos para otimizações de runtime
-As seguintes otimizações, que atuam somente quando o jogo está rodando, devem ser registradas obrigatoriamente com o valor booleano true no AutoDetect.json:
-- Afinidade
-- Timer 0.5ms
-- Limpeza da Standby List
-
-### R4. Padrões do projeto
-O código modificado deve seguir os padrões do repositório (Clean Architecture, princípios SOLID) e respeitar as diretrizes de `.agent/rules/relus.md`, incluindo a apresentação prévia de plano de implementação.
-
-## Acceptance Criteria
-
-### Geração e Validação do AutoDetect.json
-- [ ] A função de auto-detecção executa a varredura de hardware e consulta os verificadores de cada otimização disponível.
-- [ ] O arquivo AutoDetect.json é gerado com valores booleanos correspondentes ao estado real retornado pelos verificadores.
-- [ ] As entradas de Afinidade, Timer 0.5ms e Limpeza da Standby List possuem valor true no AutoDetect.json gerado.
-- [ ] A execução da função resulta exclusivamente na criação de AutoDetect.json, sem criar o arquivo custom_optimization.json.
-
-### Verificação Automatizada
-- [ ] Um teste automatizado executa a rotina de auto-detecção e verifica programaticamente que AutoDetect.json é gerado com os valores booleanos esperados e campos fixos em true.
-- [ ] O teste automatizado confirma programaticamente que o arquivo custom_optimization.json não foi gerado.
+Os agentes podem tomar a decissão de como será o código e aparência do botão e não existem restrições para conclusão da tarefa.

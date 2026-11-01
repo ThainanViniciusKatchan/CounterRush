@@ -670,5 +670,78 @@ fn main() -> Result<(), slint::PlatformError> {
         }
     });
 
+    // Callback para exclusão de perfil de otimização (.json)
+    let window_handle = main_window.as_weak();
+    let delete_config_ref = active_config_path.clone();
+    main_window.on_delete_profile_confirmed(move |target_name| {
+        if let Some(ui) = window_handle.upgrade() {
+            let name_str = target_name.as_str();
+            match counterrush_core::delete_optimization_profile(name_str) {
+                Ok(_) => {
+                    let updated_presets = scan_presets();
+                    ui.set_presets(slint::ModelRc::new(slint::VecModel::from(updated_presets.clone())));
+
+                    if updated_presets.is_empty() {
+                        ui.set_active_preset("".into());
+                        ui.set_launch_args_text("".into());
+                        ui.set_is_editing_launch_args(false);
+                        ui.set_cpu_tweak_active(false);
+                        ui.set_timer_tweak_active(false);
+                        ui.set_priority_tweak_active(false);
+                        ui.set_ram_tweak_active(false);
+                        ui.set_gpu_accel_tweak_active(false);
+                        ui.set_dpi_tweak_active(false);
+                        ui.set_mem_compression_tweak_active(false);
+                        ui.set_mmcss_tweak_active(false);
+                        ui.set_hpet_tweak_active(false);
+                        ui.set_game_bar_tweak_active(false);
+                        ui.set_msi_tweak_active(false);
+                        ui.set_power_saving_tweak_active(false);
+                        ui.set_render_queue_tweak_active(false);
+
+                        if let Ok(mut cur) = delete_config_ref.write() {
+                            *cur = std::path::PathBuf::new();
+                        }
+                        ui.set_status_message(format!("Perfil '{name_str}' excluído com sucesso. Nenhum perfil restante.").into());
+                    } else {
+                        let current_active = ui.get_active_preset().to_string();
+                        if current_active == name_str {
+                            let first_preset_name = &updated_presets[0].name;
+                            let target = counterrush_core::resolve_optimization_file_path(first_preset_name.as_str());
+                            if let Ok(mut cur) = delete_config_ref.write() {
+                                *cur = target.clone();
+                            }
+                            ui.set_active_preset(first_preset_name.clone());
+                            let cfg = counterrush_core::config::CustomOptimizationConfig::load_from_file(&target)
+                                .unwrap_or_default();
+                            ui.set_launch_args_text(cfg.launch_args.join(" ").into());
+                            ui.set_is_editing_launch_args(false);
+                            ui.set_cpu_tweak_active(cfg.cs2_affinity);
+                            ui.set_timer_tweak_active(cfg.apply_timer_resolution);
+                            ui.set_priority_tweak_active(cfg.cs2_priority);
+                            ui.set_ram_tweak_active(cfg.empty_standby_list);
+                            ui.set_gpu_accel_tweak_active(cfg.disable_gpu_acceleration);
+                            ui.set_dpi_tweak_active(cfg.apply_dpi_optimization);
+                            ui.set_mem_compression_tweak_active(cfg.disable_memory_compression);
+                            ui.set_mmcss_tweak_active(cfg.apply_mmcss);
+                            ui.set_hpet_tweak_active(cfg.disable_hpet);
+                            ui.set_game_bar_tweak_active(cfg.disable_game_bar);
+                            ui.set_msi_tweak_active(cfg.enable_msi);
+                            ui.set_power_saving_tweak_active(cfg.disable_power_saving);
+                            ui.set_render_queue_tweak_active(cfg.apply_render_queue);
+
+                            ui.set_status_message(format!("Perfil '{name_str}' excluído. Perfil ativo alternado para '{}'.", first_preset_name.as_str()).into());
+                        } else {
+                            ui.set_status_message(format!("Perfil '{name_str}' excluído com sucesso.").into());
+                        }
+                    }
+                }
+                Err(err) => {
+                    ui.set_status_message(format!("Erro ao excluir perfil '{name_str}': {err}").into());
+                }
+            }
+        }
+    });
+
     main_window.run()
 }

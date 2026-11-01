@@ -1,14 +1,15 @@
-# Progresso da Investigação (teamwork_explorer_survey_2)
+# Progress Log
 
-- **Última atualização**: 2026-10-30T19:51:00Z
-- **Status atual**: Investigação concluída com sucesso. Relatório estruturado gerado em `handoff.md`.
+Last visited: 2026-11-01T15:11:00Z
 
-## Checklist
-- [x] Criação de DISPATCH.md e BRIEFING.md
-- [x] Leitura de ORIGINAL_REQUEST.md
-- [x] Mapeamento dos arquivos Slint e localização da aba de Otimizações
-- [x] Análise de como os perfis são renderizados e alimentados pelo Rust
-- [x] Análise de design e posicionamento do botão '+' (R2)
-- [x] Análise da criação do modal/diálogo para novo perfil (R3)
-- [x] Elaboração do handoff.md completo
-- [x] Envio de mensagem ao orquestrador
+## Status
+Investigação técnica read-only aprofundada concluída com sucesso. Iniciando redação de analysis.md e handoff.md.
+
+## Etapas
+- [x] Leitura de ORIGINAL_REQUEST.md e configuração inicial (BRIEFING.md, DISPATCH.md)
+- [x] Explorar estrutura do projeto e identificar framework/tecnologia (Slint 1.8 + Rust)
+- [x] Mapear armazenamento e gerenciamento de arquivos `.json` de otimização (`config/optimzations`, `CustomOptimizationConfig`, `scan_presets`)
+- [x] Localizar lógica de "Otimizar Automaticamente" e uso de hardware (`save_autodetect_config`, `classify_pc`, `windows_api::detect_hardware`)
+- [x] Analisar integração do botão no estado vazio e fluxo de atualização (refresh/callbacks) da UI (`auto-optimize-clicked`, `presets.length == 0`, sincronização reativa)
+- [ ] Redigir analysis.md e handoff.md
+- [ ] Notificar orchestrator via send_message

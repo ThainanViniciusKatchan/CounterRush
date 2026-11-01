@@ -1,45 +1,49 @@
-# BRIEFING — 2026-10-30T19:51:00Z
+# BRIEFING — 2026-11-01T15:11:30Z
 
 ## Mission
-Investigar a arquitetura da Slint UI e pontes Rust do CounterRush com foco nos requisitos R2 e R3 (botão '+' de criação e modal/diálogo de criação de perfil).
+Investigação read-only sobre gerenciamento de estado/persistência de arquivos .json, lógica de Otimizar Automaticamente e fluxo de refresh na aba de Otimizações do CounterRush.
 
 ## 🔒 My Identity
 - Archetype: explorer
-- Roles: UI Architecture Explorer
+- Roles: explorer, survey
 - Working directory: g:\Outros computadores\Meu laptop\Desktop\CounterRush\.agents\teamwork\teamwork_explorer_survey_2
-- Original parent: 57a334a3-ffa9-4780-b779-a82434f687fa
-- Milestone: Investigation of Slint UI Architecture for R2 and R3
+- Original parent: a2e09f4d-39a0-4d52-880b-d65100808272
+- Milestone: survey
 
 ## 🔒 Key Constraints
 - Read-only investigation — do NOT implement
-- Response language: Português-BR
-- Only alter metadata inside working directory (.agents/teamwork/teamwork_explorer_survey_2/)
-- Clean Architecture / SOLID principles compliance
-- Rigorous evidence chain
+- Todas as mensagens e relatórios em PORTUGUÊS-BR
+- Seguir regras do projeto (Clean Architecture, SOLID, etc.)
+- Apenas alterar arquivos no próprio diretório de trabalho (.agents/teamwork/teamwork_explorer_survey_2/)
 
 ## Current Parent
-- Conversation ID: 57a334a3-ffa9-4780-b779-a82434f687fa
-- Updated: 2026-10-30T19:51:00Z
+- Conversation ID: a2e09f4d-39a0-4d52-880b-d65100808272
+- Updated: not yet
 
 ## Investigation State
 - **Explored paths**:
-  - `ui/main.slint`, `ui/theme.slint`, `ui/components/sidebar.slint`, `ui/components/preset_button.slint`, `ui/components/tweak_switch.slint`, `ui/components/tactical_button.slint`, `ui/src/main.rs`, `ui/build.rs`
-  - `config/src/lib.rs`, `core/src/lib.rs`, `config/optimzations/`
+  - `Cargo.toml`, `config/Cargo.toml`, `core/Cargo.toml`, `ui/Cargo.toml`
+  - `config/src/lib.rs` (estruturas e persistência de `CustomOptimizationConfig`)
+  - `core/src/lib.rs` e `core/src/classifier.rs` (resolução de diretórios, detecção de hardware, geração de autodetect)
+  - `ui/src/main.rs` (gerenciamento de estado, callbacks e sincronização em tempo real)
+  - `ui/main.slint`, `ui/components/add_preset_button.slint`, `ui/components/preset_button.slint`, `ui/components/tactical_button.slint`
 - **Key findings**:
-  - Aba de Otimizações fica em `ui/main.slint:411-805` (`active-tab == 1`), com largura útil central de 794px.
-  - Perfis são renderizados em `HorizontalLayout { alignment: center; ... for preset in root.presets : PresetButton { ... } }`.
-  - Inserir o botão "+" imediatamente após o loop `for` dentro desse mesmo `HorizontalLayout` garante matematicamente que quando `root.presets.length == 0`, o botão "+" é o único filho e fica centralizado e visível; quando há perfis, o botão "+" fica posicionado imediatamente à direita do último perfil da lista.
-  - A janela/diálogo deve ser construída como Modal Overlay (`CreateProfileDialog`) dentro de `MainWindow`, preservando tema tático CS2, z-order e capturando cliques no backdrop.
-  - Formulário contém `TextInput` para nome do arquivo, `TextInput` para `launch_args` e grade em 3 colunas para os 13 módulos de otimização (`CompactTweakCheck`).
-  - Callback Slint `create-profile-confirmed(NewProfileData)` passa os dados ao Rust, que valida, cria o `.json` em `config/optimzations`, atualiza a lista de presets, ativa imediatamente o perfil e sincroniza os 13 switches da tela principal.
-- **Unexplored areas**: Nenhuma pendência referente ao escopo R2 e R3.
+  - Arquivos de configuração residem em `config/optimzations/*.json`.
+  - A lógica de otimização por hardware já está pronta em `core.save_autodetect_config(None)`.
+  - O callback `main_window.on_auto_optimize_clicked` já realiza todo o pipeline: gera `AutoDetect.json`, recarrega presets, ativa switches e atualiza a UI.
+  - O novo botão no estado vazio (`presets.length == 0`) pode simplesmente invocar `root.auto-optimize-clicked()`.
+  - O botão `AddPresetButton` precisa exibir `+` e o texto "Criar Otimização" quando `is-empty` for true.
+  - O reposicionamento do input de parâmetros de inicialização deve colocá-lo entre a grade de otimizações ativas e a seção de seleção de perfis.
+  - O botão inferior "OTIMIZAR AUTOMATICAMENTE" deve ser removido, deixando apenas a barra HUD.
+- **Unexplored areas**: Nenhuma pendência no escopo da investigação.
 
 ## Key Decisions Made
-- Recomendado criar dois novos componentes em `ui/components/`: `add_preset_button.slint` e `create_profile_dialog.slint`, minimizando o acoplamento e mantendo `main.slint` limpo.
-- Alinhamento da solução com o requisito R1: eliminar a injeção artificial de perfis falsos em `scan_presets()`.
+- Estruturar o `analysis.md` com detalhes técnicos de arquitetura, fluxo de dados e trechos de código exatos para o arquiteto/implementador.
+- Estruturar o `handoff.md` estritamente conforme o protocolo de 5 seções (Observation, Logic Chain, Caveats, Conclusion, Verification Method).
 
 ## Artifact Index
-- `DISPATCH.md` — Registro de despacho inicial.
-- `BRIEFING.md` — Memória persistente e estado da investigação.
-- `progress.md` — Heartbeat de progresso.
-- `handoff.md` — Relatório final estruturado de handoff da arquitetura UI (R2 e R3).
+- DISPATCH.md — Mensagem de despacho
+- BRIEFING.md — Memória de trabalho
+- progress.md — Heartbeat de progresso
+- analysis.md — Relatório técnico detalhado da análise
+- handoff.md — Relatório formal de handoff da exploração

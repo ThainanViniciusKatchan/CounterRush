@@ -1101,6 +1101,24 @@ pub fn validate_profile_name(name: &str) -> Result<String, String> {
     Ok(base_name.to_string())
 }
 
+pub fn delete_optimization_profile_in_dir<P: AsRef<Path>>(dir: P, name: &str) -> Result<(), CoreError> {
+    let clean_name = validate_profile_name(name)
+        .map_err(|err| std::io::Error::new(std::io::ErrorKind::InvalidInput, err))?;
+    let path = dir.as_ref().join(format!("{clean_name}.json"));
+    if !path.exists() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            format!("Perfil '{clean_name}' não foi encontrado para exclusão."),
+        ).into());
+    }
+    std::fs::remove_file(path)?;
+    Ok(())
+}
+
+pub fn delete_optimization_profile(name: &str) -> Result<(), CoreError> {
+    delete_optimization_profile_in_dir(resolve_optimizations_dir(), name)
+}
+
 pub fn resolve_custom_config_path(custom: Option<&Path>) -> PathBuf {
     let opt_dir = resolve_optimizations_dir();
 
@@ -1575,5 +1593,51 @@ mod tests {
         // Caso 6: String somente de espaços -> fallback para AutoDetect.json
         let whitespace_path = resolve_autodetect_config_path(Some(Path::new("   ")));
         assert!(whitespace_path.ends_with("AutoDetect.json"));
+    }
+
+    #[test]
+    fn test_delete_optimization_profile() {
+        let temp_dir = tempfile::tempdir().expect("Falha ao criar diretório temporário");
+
+        // Criação de perfil inicial para teste
+        let profile_name = "test_del_profile";
+        let target_file = temp_dir.path().join(format!("{profile_name}.json"));
+        let mut cfg = config::CustomOptimizationConfig::all_disabled();
+        cfg.cs2_priority = true;
+        cfg.save_to_file(&target_file).expect("Falha ao criar perfil de teste");
+        assert!(target_file.exists());
+
+        // Confirma que o perfil é listado
+        let configs = list_optimization_configs_in_dir(temp_dir.path());
+        assert_eq!(configs.len(), 1);
+
+        // Exclui com o nome sem extensão
+        let res = delete_optimization_profile_in_dir(temp_dir.path(), profile_name);
+        assert!(res.is_ok(), "Exclusão de perfil existente deve retornar Ok");
+        assert!(!target_file.exists(), "Arquivo deve ter sido removido do disco");
+
+        let configs_after = list_optimization_configs_in_dir(temp_dir.path());
+        assert!(configs_after.is_empty(), "Lista deve estar vazia após exclusão");
+
+        // Tentativa de excluir arquivo que não existe mais -> deve retornar erro
+        let res_not_found = delete_optimization_profile_in_dir(temp_dir.path(), profile_name);
+        assert!(res_not_found.is_err(), "Exclusão de perfil inexistente deve falhar");
+
+        // Teste de exclusão com nome que possui extensão .json explicitamente
+        let second_profile = "profile_with_ext";
+        let second_file = temp_dir.path().join(format!("{second_profile}.json"));
+        cfg.save_to_file(&second_file).expect("Falha ao criar segundo perfil");
+        assert!(second_file.exists());
+
+        let res_with_ext = delete_optimization_profile_in_dir(temp_dir.path(), "profile_with_ext.json");
+        assert!(res_with_ext.is_ok(), "Exclusão passando .json explicitamente deve funcionar");
+        assert!(!second_file.exists());
+
+        // Teste de proteção contra path traversal e nomes inválidos
+        let traversal_res = delete_optimization_profile_in_dir(temp_dir.path(), "../hack");
+        assert!(traversal_res.is_err(), "Nomes com path traversal devem ser rejeitados");
+
+        let empty_res = delete_optimization_profile_in_dir(temp_dir.path(), "   ");
+        assert!(empty_res.is_err(), "Nome vazio deve ser rejeitado");
     }
 }

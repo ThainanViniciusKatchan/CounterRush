@@ -1,324 +1,151 @@
-# Relatório de Investigação Backend & Arquitetura de Configuração (R1 & R3)
+# Handoff Report — Explorer 1: Mapeamento da UI da Aba de Otimizações
 
-**Agente:** `teamwork_explorer_survey_1` (Backend Config Explorer)  
-**Data:** 2026-10-30  
-**Escopo:** Requisitos R1 (Estado inicial desativado na primeira execução) e R3 (Criação e persistência de novos perfis .json de otimização).
-
----
-
-## 1. Observation (Observações Diretas)
-
-### 1.1. Modelo `CustomOptimizationConfig` e Persistência
-- **Localização:** `config/src/lib.rs`, linhas 20-105.
-- **Definição da Struct (`config/src/lib.rs`, linhas 20-37):**
-  ```rust
-  #[derive(Debug, Clone, Serialize, Deserialize)]
-  #[serde(default)]
-  pub struct CustomOptimizationConfig {
-      pub launch_args: Vec<String>,
-      pub empty_standby_list: bool,
-      pub cs2_priority: bool,
-      pub cs2_affinity: bool,
-      pub disable_gpu_acceleration: bool,
-      pub apply_dpi_optimization: bool,
-      pub disable_memory_compression: bool,
-      pub apply_timer_resolution: bool,
-      pub apply_mmcss: bool,
-      pub disable_hpet: bool,
-      pub disable_game_bar: bool,
-      pub enable_msi: bool,
-      pub disable_power_saving: bool,
-      pub apply_render_queue: bool,
-  }
-  ```
-  Existem exatamente **14 campos**: `launch_args: Vec<String>` e **13 flags booleanas de otimização**.
-- **Implementação do `Default` (`config/src/lib.rs`, linhas 39-58):**
-  ```rust
-  impl Default for CustomOptimizationConfig {
-      fn default() -> Self {
-          Self {
-              launch_args: Vec::new(),
-              empty_standby_list: true,
-              cs2_priority: true,
-              cs2_affinity: true,
-              disable_gpu_acceleration: false,
-              apply_dpi_optimization: true,
-              disable_memory_compression: false,
-              apply_timer_resolution: true,
-              apply_mmcss: true,
-              disable_hpet: false,
-              disable_game_bar: true,
-              enable_msi: false,
-              disable_power_saving: true,
-              apply_render_queue: true,
-          }
-      }
-  }
-  ```
-  Observa-se que 8 das 13 flags são `true` na implementação padrão (`default`).
-- **Serialização e Desserialização (`config/src/lib.rs`, linhas 68-90):**
-  - Desserialização (`load_from_file`): Lê com `std::fs::read_to_string(path)`, faz `trim_start_matches('\u{feff}').trim()` para suportar arquivos com BOM UTF-8, e desserializa via `serde_json::from_str(trimmed)?`. Se o arquivo estiver em branco, salva e retorna o `Default`.
-  - Serialização (`save_to_file`): Formata com `serde_json::to_string_pretty(self)?` e grava com `std::fs::write(path, json)?`. Garante automaticamente a criação de todos os diretórios pais com `std::fs::create_dir_all(parent)?` se `parent.exists()` for falso.
-
-### 1.2. Diretório e Resolução de Caminhos
-- **Localização:** `core/src/lib.rs`, linhas 825-957.
-- **Grafia do Diretório:** O projeto utiliza a convenção `config/optimzations` (com "z").
-- **Funções de Resolução de Caminho:**
-  - `resolve_optimizations_dir() -> PathBuf` (`core/src/lib.rs:825-874`): Testa sequencialmente caminhos relativos ao executável (`current_exe()`), diretório de trabalho atual, diretórios pais (`../config/optimzations`, `../../config/optimzations`), e tempo de compilação (`CARGO_MANIFEST_DIR`). Retorna `PathBuf::from("config/optimzations")` como padrão.
-  - `list_optimization_configs() -> Vec<PathBuf>` (`core/src/lib.rs:876-889`): Executa `std::fs::read_dir(&dir)`. Filtra entradas que sejam arquivos com extensão `"json"`. Retorna vetor ordenado (`files.sort()`). Não cria diretório se não existir (apenas retorna vetor vazio caso `read_dir` falhe).
-  - `resolve_optimization_file_path(name: &str) -> PathBuf` (`core/src/lib.rs:891-899`): Concatena `resolve_optimizations_dir()` ao nome com garantia de extensão `.json`.
-  - `resolve_custom_config_path(custom: Option<&Path>) -> PathBuf` (`core/src/lib.rs:901-935`): Fallback para `config/optimzations/custom_optimization.json`.
-
-### 1.3. Comportamento Atual no Início da Aplicação (Violação do R1)
-- **Localização:** `ui/src/main.rs`, linhas 5-73 e `ui/main.slint`, linhas 22-43.
-- **Injeção de Perfis Fictícios (`ui/src/main.rs:21-30`):**
-  ```rust
-  if list.is_empty() {
-      list.push(PresetModel {
-          name: "AutoDetect".into(),
-          tag: "HARDWARE ADAPTATIVO".into(),
-      });
-      list.push(PresetModel {
-          name: "custom_optimization".into(),
-          tag: "CUSTOMIZADO / MANUAL".into(),
-      });
-  }
-  ```
-  Se a pasta `config/optimzations` estiver vazia, `scan_presets()` injeta dois perfis inexistentes no disco.
-- **Criação Prematura de Arquivo no Disco (`ui/src/main.rs:43-52`):**
-  ```rust
-  let (resolved_path, config) = match core.load_or_create_custom_config(None) {
-      Ok(res) => res,
-      Err(e) => { ... }
-  };
-  ```
-  `core.load_or_create_custom_config(None)` chama `CustomOptimizationConfig::load_or_create`, o qual, ao detectar que `custom_optimization.json` não existe, imediatamente grava no disco um arquivo novo com os valores de `Default::default()`.
-- **Ativação Forçada de Perfil e Otimizações (`ui/src/main.rs:54-71`):**
-  ```rust
-  if let Some(filename) = resolved_path.file_name().and_then(|s| s.to_str()) {
-      let clean_name = filename.strip_suffix(".json").unwrap_or(filename);
-      main_window.set_active_preset(clean_name.into());
-  }
-  main_window.set_cpu_tweak_active(config.cs2_affinity);
-  // ... switches setados conforme a config default (muitos true)
-  ```
-- **Defaults na Interface Slint (`ui/main.slint:26-43`):**
-  Todos os switches booleanos na janela Slint iniciam com default `true`, `active-preset` inicia com `"custom_optimization"`, e a lista `presets` inicia com dois elementos pré-fixados.
-
-### 1.4. Ativação e Seleção de Perfil
-- **Estado Ativo no Rust:** Mantido por `active_config_path = Arc::new(RwLock::new(resolved_path))` (`ui/src/main.rs:73`).
-- **Callback de Seleção (`ui/src/main.rs:454-486`):**
-  ```rust
-  main_window.on_preset_selected(move |preset_name| {
-      let target_path = counterrush_core::resolve_optimization_file_path(preset_name.as_str());
-      if let Ok(mut current) = preset_config_ref.write() {
-          *current = target_path.clone();
-      }
-      if let Ok(cfg) = counterrush_core::config::CustomOptimizationConfig::load_from_file(&target_path) {
-          // atualiza todos os 13 switches da interface
-          ui.set_cpu_tweak_active(cfg.cs2_affinity);
-          ...
-      }
-  });
-  ```
-- **Sincronização em Tempo Real (`ui/src/main.rs:78-176`):**
-  Thread secundária que verifica modificações no arquivo do disco a cada 500ms e re-escaneia novos arquivos da pasta a cada 1.5s via `scan_presets()`.
+**Data:** 2026-11-01  
+**Autor:** Explorer 1 (`teamwork_explorer_survey_1`)  
+**Destinatário:** Orchestrator (`a2e09f4d-39a0-4d52-880b-d65100808272`) e Implementer  
+**Status:** Concluído com sucesso (Hard Handoff)  
+**Documento detalhado de referência:** `.agents/teamwork/teamwork_explorer_survey_1/analysis.md`
 
 ---
 
-## 2. Logic Chain (Linha de Raciocínio)
+## 1. Observation
 
-1. **Origem do Problema R1:**
-   - O requisito R1 estipula: quando iniciado pela primeira vez e nenhum arquivo `.json` existir no diretório de otimizações, todas as otimizações devem iniciar desligadas (`false`) e nenhum perfil deve ser considerado ativo por padrão.
-   - Atualmente, três fatores provocam a violação do R1:
-     1. `scan_presets()` injeta `AutoDetect` e `custom_optimization` na lista de presets mesmo sem arquivos físicos.
-     2. `main()` chama `core.load_or_create_custom_config(None)`, forçando a criação física de `custom_optimization.json` no disco com flags em `true`.
-     3. A interface Slint e a inicialização de `main()` ativam o perfil `"custom_optimization"` e ativam os switches como `true`.
-   - **Solução lógica para R1:**
-     - Em `scan_presets()`: remover a injeção condicional fictícia, retornando vetor vazio `Vec::new()`.
-     - Na inicialização em `main()`: verificar `initial_presets.is_empty()`. Se verdadeiro, **não** chamar `load_or_create_custom_config` para evitar escrita indevida no disco; definir `active-preset` como vazio (`""`); setar todas as 13 flags para `false` na UI; e manter `active_config_path` vazio ou apontando para None/arquivo não existente até uma ação explícita do usuário.
-     - Em `config/src/lib.rs`: fornecer um método `CustomOptimizationConfig::all_disabled()` com todas as 13 flags em `false` e `launch_args` vazio.
+Durante a investigação exploratória read-only na base de código do CounterRush, observou-se:
 
-2. **Fluxo do Requisito R3 (Criação e Persistência de Perfil):**
-   - O usuário precisa fornecer: `nome do perfil`, `launch_args` e a seleção de quais das 13 otimizações devem ser ativadas.
-   - A sanitização do nome deve remover espaços e caracteres ilegais para nomes de arquivo do Windows (`\ / : * ? " < > |`), garantindo a terminação `.json`.
-   - O caminho do arquivo deve ser resolvido através de `counterrush_core::resolve_optimization_file_path(&clean_name)`.
-   - Ao invocar `config.save_to_file(&target_path)`, o método já garante a criação da pasta `config/optimzations` se ela não existir (`create_dir_all`).
-   - Após salvar com sucesso:
-     1. Atualizar a lista de perfis na UI via `scan_presets()`.
-     2. Definir o novo arquivo como `active_config_path`.
-     3. Definir `active-preset` na UI com o nome do perfil recém-criado.
-     4. Atualizar os switches da tela principal conforme as flags do novo perfil.
-     5. Exibir mensagem de confirmação tática na barra de status.
+1. **Stack Tecnológica da Interface:**
+   - O projeto é um workspace Rust (versão 0.8.0), utilizando a biblioteca gráfica **Slint 1.8** (`ui/Cargo.toml:10`).
+   - O viewer suporta Hot-Reload interativo via script `preview.cmd`: `slint-viewer ui/main.slint -I ui --auto-reload`.
 
-3. **Arquitetura e Princípios SOLID:**
-   - Manter separação de responsabilidades: o crate `config` gerencia o modelo e a I/O do JSON; o crate `core` gerencia caminhos e regras de sistema; e o crate `ui` orquestra a interface e callbacks.
-   - Nenhuma dependência cruzada desnecessária.
+2. **Aba de Otimizações na View Principal (`ui/main.slint`):**
+   - A aba é ativada quando `root.active-tab == 1` e estende-se das linhas 418 até 942.
+   - O topo contém o cabeçalho "CENTRAL DE OTIMIZAÇÕES" (linhas 430-446) e a grade com 13 módulos `TweakSwitch` e 1 `MasterToggleSwitch` (linhas 452-706).
 
----
-
-## 3. Caveats (Ressalvas e Limitações)
-
-1. **Caracteres Inválidos em Nomes de Arquivo:**
-   No Windows, arquivos não podem conter caracteres como `< > : " / \ | ? *` nem terminar em ponto ou espaço. A rotina de criação deve validar e sanitizar essa entrada antes de tentar gravar.
-2. **Nome Duplicado:**
-   Caso o usuário crie um perfil com nome já existente, o sistema deve sobrescrever ou alertar o usuário. Recomenda-se informar na interface caso já exista.
-3. **Persistência de Switches sem Perfil Selecionado:**
-   No estado R1, quando nenhum perfil existe e o usuário clica em um switch individual, o backend atualmente tenta gravar no `target_path`. Deve-se tratar esse caso para não gerar erro ou criar um `custom_optimization.json` apenas quando explicitamente solicitado, ou emitir mensagem "Crie um perfil para salvar alterações".
-4. **Permissões de Administrador:**
-   Certos tweaks (como Standby List, MMCSS e MSI) requerem privilégios elevados em tempo de execução; a criação do JSON, no entanto, é estritamente em espaço de usuário e não requer elevação.
-
----
-
-## 4. Conclusion (Conclusão e Proposta de Implementação)
-
-### 4.1. Resumo dos Ajustes Necessários por Módulo
-
-| Módulo / Arquivo | Linhas | Alteração Necessária |
-| :--- | :--- | :--- |
-| `config/src/lib.rs` | 59-66 | Adicionar método `pub fn all_disabled() -> Self` (ou `new_disabled()`) com todas as 13 flags `false` e `launch_args` vazio. |
-| `config/src/lib.rs` | 106+ | Adicionar testes unitários automatizados cobrindo serialização/desserialização e estado desativado. |
-| `core/src/lib.rs` | 876-889 | Garantir que `list_optimization_configs` funcione perfeitamente com pasta inexistente (já retorna vazio sem erro). Adicionar testes unitários. |
-| `ui/src/main.rs` | 21-30 | Em `scan_presets()`: remover a adição dos presets fictícios `AutoDetect` e `custom_optimization`. Se não houver arquivos, retornar lista vazia `list`. |
-| `ui/src/main.rs` | 41-73 | Na inicialização: se `initial_presets.is_empty()`, **não** chamar `load_or_create_custom_config(None)`. Definir `active-preset` como `""` e todos os switches para `false`. |
-| `ui/src/main.rs` | 333-356 | No callback `on_tweak_toggled`: se nenhum perfil estiver ativo (`active_config_path` vazio), não falhar, ou inicializar sob demanda o arquivo `custom_optimization.json`. |
-| `ui/src/main.rs` | Novo callback | Implementar callback `on_create_preset(name, launch_args, options)` que sanitiza o nome, monta o `CustomOptimizationConfig`, chama `save_to_file`, atualiza presets, seleciona o perfil e sincroniza os switches da tela. |
-| `ui/main.slint` | 26-43 | Inicializar propriedades de tweaks com default `false`, `active-preset: ""` e `presets: []`. |
-| `ui/main.slint` | 734-751 | Inserir botão "+" (R2) posicionado após o último perfil ou como único botão quando a lista estiver vazia, e conectar ao diálogo de criação (R3). |
-
-### 4.2. Snippet Proposto para `config/src/lib.rs`:
-```rust
-impl CustomOptimizationConfig {
-    pub fn all_disabled() -> Self {
-        Self {
-            launch_args: Vec::new(),
-            empty_standby_list: false,
-            cs2_priority: false,
-            cs2_affinity: false,
-            disable_gpu_acceleration: false,
-            apply_dpi_optimization: false,
-            disable_memory_compression: false,
-            apply_timer_resolution: false,
-            apply_mmcss: false,
-            disable_hpet: false,
-            disable_game_bar: false,
-            enable_msi: false,
-            disable_power_saving: false,
-            apply_render_queue: false,
-        }
-    }
-}
-```
-
-### 4.3. Snippet Proposto para Criação de Perfil no Backend (`ui/src/main.rs`):
-```rust
-// Callback para criação de novo perfil (.json)
-let window_handle = main_window.as_weak();
-let create_config_ref = active_config_path.clone();
-main_window.on_create_preset_confirmed(move |name_input, launch_args_input, opts| {
-    if let Some(ui) = window_handle.upgrade() {
-        let clean_name = name_input.trim()
-            .replace(['\\', '/', ':', '*', '?', '"', '<', '>', '|'], "")
-            .trim_end_matches(".json")
-            .to_string();
-
-        if clean_name.is_empty() {
-            ui.set_status_message("Nome do perfil inválido ou vazio!".into());
-            return;
-        }
-
-        let launch_args: Vec<String> = launch_args_input
-            .split_whitespace()
-            .map(|s| s.to_string())
-            .collect();
-
-        let new_config = counterrush_core::config::CustomOptimizationConfig {
-            launch_args,
-            empty_standby_list: opts.empty_standby_list,
-            cs2_priority: opts.cs2_priority,
-            cs2_affinity: opts.cs2_affinity,
-            disable_gpu_acceleration: opts.disable_gpu_acceleration,
-            apply_dpi_optimization: opts.apply_dpi_optimization,
-            disable_memory_compression: opts.disable_memory_compression,
-            apply_timer_resolution: opts.apply_timer_resolution,
-            apply_mmcss: opts.apply_mmcss,
-            disable_hpet: opts.disable_hpet,
-            disable_game_bar: opts.disable_game_bar,
-            enable_msi: opts.enable_msi,
-            disable_power_saving: opts.disable_power_saving,
-            apply_render_queue: opts.apply_render_queue,
-        };
-
-        let target_path = counterrush_core::resolve_optimization_file_path(&clean_name);
-        match new_config.save_to_file(&target_path) {
-            Ok(_) => {
-                if let Ok(mut current) = create_config_ref.write() {
-                    *current = target_path.clone();
-                }
-
-                let updated_presets = scan_presets();
-                ui.set_presets(slint::ModelRc::new(slint::VecModel::from(updated_presets)));
-                ui.set_active_preset(clean_name.as_str().into());
-
-                // Sincroniza switches da UI
-                ui.set_cpu_tweak_active(new_config.cs2_affinity);
-                ui.set_timer_tweak_active(new_config.apply_timer_resolution);
-                ui.set_priority_tweak_active(new_config.cs2_priority);
-                ui.set_ram_tweak_active(new_config.empty_standby_list);
-                ui.set_gpu_accel_tweak_active(new_config.disable_gpu_acceleration);
-                ui.set_dpi_tweak_active(new_config.apply_dpi_optimization);
-                ui.set_mem_compression_tweak_active(new_config.disable_memory_compression);
-                ui.set_mmcss_tweak_active(new_config.apply_mmcss);
-                ui.set_hpet_tweak_active(new_config.disable_hpet);
-                ui.set_game_bar_tweak_active(new_config.disable_game_bar);
-                ui.set_msi_tweak_active(new_config.enable_msi);
-                ui.set_power_saving_tweak_active(new_config.disable_power_saving);
-                ui.set_render_queue_tweak_active(new_config.apply_render_queue);
-
-                ui.set_status_message(format!("Perfil '{clean_name}' criado e selecionado com sucesso!").into());
-            }
-            Err(e) => {
-                ui.set_status_message(format!("Erro ao salvar perfil: {e}").into());
-            }
-        }
-    }
-});
-```
-
----
-
-## 5. Verification Method (Método de Verificação Independente)
-
-1. **Verificação de Compilação e Sintaxe:**
-   ```powershell
-   cargo check --workspace
-   ```
-2. **Execução de Testes Automatizados (R4):**
-   ```powershell
-   cargo test -p config
-   cargo test -p core
-   ```
-3. **Teste Funcional de Inicialização sem Perfis (R1):**
-   - Mover temporariamente os arquivos de `config/optimzations` para um diretório de backup:
-     ```powershell
-     New-Item -ItemType Directory -Force -Path "config/backup_optimzations"
-     Move-Item -Path "config/optimzations/*.json" -Destination "config/backup_optimzations"
+3. **Botão Inferior a Ser Removido (Requisito R2):**
+   - Localizado em `ui/main.slint:891-918` dentro de `VerticalLayout`:
+     ```slint
+     // Seção Inferior: Botão OTIMIZAR AUTOMATICAMENTE Centralizado + Barra de Status HUD
+     VerticalLayout {
+         spacing: 6px;
+         alignment: center;
+         HorizontalLayout {
+             alignment: center;
+             padding-top: 6px;
+             padding-bottom: 2px;
+             TacticalButton {
+                 text: "OTIMIZAR AUTOMATICAMENTE";
+                 badge: "PERFIL RECOMENDADO • BAIXA LATÊNCIA";
+                 ...
+                 clicked => { root.auto-optimize-clicked(); }
+             }
+         }
+         // Barra de Status HUD Tática (linhas 920-941)
+     }
      ```
-   - Iniciar o aplicativo e checar visualmente se:
-     - A lista de perfis está vazia (apenas o botão "+" visível).
-     - Nenhum perfil está marcado como ativo (`active-preset == ""`).
-     - Todos os 13 switches iniciam na posição desligada (`false`).
-     - Nenhum arquivo foi criado indevidamente em `config/optimzations`.
-4. **Teste Funcional de Criação de Perfil (R3):**
-   - Clicar no botão "+", preencher o nome (ex: `Competitivo_Mirage`), parâmetros de inicialização (ex: `-console -novid +fps_max 400`), selecionar 3 otimizações e salvar.
-   - Validar se o arquivo `config/optimzations/Competitivo_Mirage.json` foi criado no disco com as opções corretas.
-   - Validar se o perfil se tornou ativo imediatamente e os switches refletem as opções marcadas.
-   - Restaurar os arquivos de backup:
-     ```powershell
-     Move-Item -Path "config/backup_optimzations/*.json" -Destination "config/optimzations"
-     Remove-Item -Path "config/backup_optimzations"
+   - O botão `TacticalButton` está posicionado imediatamente antes da Barra de Status HUD.
+
+4. **Input de Parâmetros de Inicialização (Requisito R3):**
+   - Localizado em `ui/main.slint:770-888` sob a condição `if root.active-preset != ""`.
+   - Atualmente renderizado **abaixo** dos botões de seleção de perfil (`PresetButton`s), contrariando a hierarquia solicitada por R3.
+
+5. **Listagem de Perfis e Botão de Adicionar (Requisitos R1 e R4):**
+   - Localizado em `ui/main.slint:741-767`:
+     ```slint
+     HorizontalLayout {
+         alignment: center;
+         spacing: root.presets.length > 2 ? 10px : 16px;
+         for preset in root.presets : PresetButton { ... }
+         AddPresetButton {
+             is-empty: root.presets.length == 0;
+             clicked => {
+                 root.create-modal-error = "";
+                 root.show-create-modal = true;
+             }
+         }
+     }
      ```
-5. **Condições de Invalidação:**
-   - Se `cargo test` falhar em qualquer módulo.
-   - Se a pasta `config/optimzations` continuar recebendo um arquivo `custom_optimization.json` automaticamente na inicialização sem arquivos.
-   - Se os switches iniciarem em `true` quando não existirem arquivos no disco.
+   - O componente `AddPresetButton` em `ui/components/add_preset_button.slint:33` exibe atualmente o texto `"NOVO PERFIL"` quando `is-empty: true`, com largura de 180px.
+   - O modal de criação `CreateProfileDialog` é renderizado como overlay em `ui/main.slint:1070-1079` quando `root.show-create-modal == true`.
+
+6. **Mecanismo de Carregamento e Estado Vazio no Backend (`ui/src/main.rs`):**
+   - `scan_presets()` (linhas 5-22) chama `counterrush_core::list_optimization_configs()` para listar arquivos `.json` em `config/optimzations/`.
+   - Na inicialização (linhas 32-50) e no watcher em tempo real (linhas 93-142), quando a lista de arquivos está vazia, o backend zera todos os 13 switches para `false`, define `active-preset` como `""` e `launch-args-text` como `""`.
+   - Em `ui/src/main.rs:384-387`, alternar switches quando não há perfil ativo exibe: `"Crie ou selecione um perfil para salvar alterações."`.
+
+---
+
+## 2. Logic Chain
+
+1. **Da Remoção do Botão Inferior (R2):**
+   - O botão inferior em `ui/main.slint:896-917` é redundante com o botão de auto-otimização a ser exibido no estado vazio.
+   - A sua exclusão remove código desnecessário e libera ~60px de espaço vertical na janela de altura fixa (620px), permitindo acomodar confortavelmente o input de parâmetros de inicialização reposicionado sem risco de overflow.
+   - A Barra de Status HUD imediatamente abaixo do botão (linhas 920-941) deve ser preservada pois fornece o feedback tático ao usuário em tempo real.
+
+2. **Do Reposicionamento do Input de Parâmetros (R3):**
+   - Conforme R3, o input de parâmetros deve ficar "localizado diretamente abaixo das otimizações ativas e antes da seleção de arquivos de otimização".
+   - As "otimizações ativas" são os 13 módulos de switches (linhas 452-706).
+   - Movendo o bloco de `if root.active-preset != ""` de linhas 770-888 para a linha 707 (logo após a Grade e antes do cabeçalho da seção de perfis), a hierarquia visual atende rigorosamente ao requisito.
+
+3. **Do Tratamento do Botão de Adicionar (R1):**
+   - O requisito exige que o botão de adicionar exiba o símbolo `+` e o texto "Criar Otimização".
+   - O componente `ui/components/add_preset_button.slint` já possui a estrutura com o caractere `+` (linha 23) e o texto condicional (linha 32). Bastará alterar a string `"NOVO PERFIL"` para `"Criar Otimização"` (ou `"CRIAR OTIMIZAÇÃO"`) e ajustar a propriedade de largura quando `is-empty: true` (de 180px para ~230px).
+   - Ao ser clicado, ele continuará abrindo o modal `CreateProfileDialog` já existente e integrado.
+
+4. **Da Exibição Exclusiva dos 2 Botões no Estado Vazio (R1 e R4):**
+   - A condição de estado vazio é identificada diretamente no Slint por `root.presets.length == 0`.
+   - Quando `root.presets.length == 0`:
+     - Não existem perfis `.json`, logo `root.active-preset == ""` e o input de parâmetros já se oculta naturalmente.
+     - A seção de seleção de perfis não deve renderizar botões de preset inexistentes.
+     - Em seu lugar, renderiza-se um container com espaçamento e alinhamento centralizado contendo exclusivamente:
+       1. Botão "Otimizar Automaticamente" (acionando `root.auto-optimize-clicked()`).
+       2. Botão "+ Criar Otimização" (`AddPresetButton` acionando a abertura do modal).
+     - Quando o usuário aciona qualquer um dos dois botões, um arquivo `.json` é gerado no disco (`AutoDetect.json` ou perfil customizado). Imediatamente `root.presets.length` torna-se `> 0`, fazendo a UI alternar de forma reativa e instantânea para o estado completo (R4).
+
+---
+
+## 3. Caveats
+
+1. **Abordagem de Exibição no Estado Vazio (Área de Ações vs. Aba Inteira):**
+   - **Abordagem A (Recomendada):** Mantém a grade de 13 switches no topo (em estado neutro/desativado) e exibe com exclusividade os 2 botões na área de perfis/ações. Vantagem: o usuário visualiza todo o potencial técnico do CounterRush antes mesmo de otimizar.
+   - **Abordagem B:** Oculta completamente a grade de switches quando `root.presets.length == 0`, centralizando apenas os 2 botões de ação e a barra de status HUD. Vantagem: cumpre no sentido mais estrito a frase "são exibidos apenas os dois botões".
+   - *Nota:* O plano de implementação deve explicitar ambas para validação e aprovação do usuário.
+2. **Largura e Dimensões Fixas da Janela:**
+   - A janela possui largura e altura fixas em 980x620px (`ui/main.slint:18-23`). Qualquer ajuste de layout deve obrigatoriamente respeitar essas dimensões para não cortar elementos ou forçar comportamento inadequado.
+
+---
+
+## 4. Conclusion
+
+A base de código do CounterRush é modular, bem tipada e altamente responsiva a alterações reativas no Slint.  
+Todos os 5 pontos focais foram mapeados com precisão:
+- O botão inferior a ser removido (R2) foi identificado e seu isolamento não quebra dependências.
+- O campo de input de parâmetros (R3) pode ser reposicionado diretamente entre a grade de switches e a seção de perfis.
+- O botão de adicionar e o modal de criação (R1) já possuem lógica completa de backend e necessitam apenas de ajuste textual e dimensional em Slint.
+- O chaveamento condicional reativo baseado em `root.presets.length == 0` permite alternar com elegância e consistência entre o estado vazio (2 botões exclusivos) e o estado com arquivos (R4).
+
+---
+
+## 5. Verification Method
+
+Para verificação independente pelo Implementer ou pelo usuário:
+
+1. **Checagem de Compilação do Crate UI:**
+   ```powershell
+   cargo check --manifest-path "g:\Outros computadores\Meu laptop\Desktop\CounterRush\Cargo.toml" -p counterrush-ui
+   ```
+2. **Visualização Interativa com Auto-Reload:**
+   ```cmd
+   g:\Outros computadores\Meu laptop\Desktop\CounterRush\preview.cmd
+   ```
+   *Condição de validação:* Alterações em arquivos `.slint` são refletidas instantaneamente na janela de preview sem necessidade de recompilação do binário Rust.
+3. **Cenário 1 — Estado Sem Arquivos .json (R1, R2):**
+   - Mover temporariamente arquivos de `config/optimzations/` para um diretório backup.
+   - Abrir o preview na aba 1 (Otimizações).
+   - Inspecionar visualmente:
+     - O botão inferior "OTIMIZAR AUTOMATICAMENTE" não existe no rodapé da janela.
+     - São exibidos com exclusividade os botões "Otimizar Automaticamente" e "+ Criar Otimização".
+4. **Cenário 2 — Ação de Otimização Automática e Criação:**
+   - Clicar em "Otimizar Automaticamente": o perfil `AutoDetect.json` é criado e a interface transiciona para o estado com perfil ativo.
+   - Clicar em "+ Criar Otimização": o modal `CreateProfileDialog` abre normalmente.
+5. **Cenário 3 — Estado com Arquivos Existentes e Input Reposicionado (R3, R4):**
+   - Restaurar os arquivos `.json` em `config/optimzations/`.
+   - Verificar se o campo de parâmetros de inicialização é renderizado **diretamente abaixo** das otimizações ativas (grade de switches) e **antes** da seleção de arquivos `.json`.

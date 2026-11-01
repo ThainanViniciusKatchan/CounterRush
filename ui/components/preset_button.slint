@@ -8,6 +8,7 @@ export component PresetButton inherits Rectangle {
     in property <color> active-bg: CS2Theme.accent-ct-soft;
     in property <length> button-width: 350px;
     callback selected();
+    callback delete();
 
     width: root.button-width;
     height: 44px;
@@ -22,6 +23,13 @@ export component PresetButton inherits Rectangle {
 
     animate background { duration: 120ms; }
     animate border-color { duration: 120ms; }
+
+    touch := TouchArea {
+        mouse-cursor: pointer;
+        clicked => {
+            root.selected();
+        }
+    }
 
     HorizontalLayout {
         padding-left: root.button-width < 300px ? 10px : 12px;
@@ -79,46 +87,75 @@ export component PresetButton inherits Rectangle {
             }
         }
 
-        // Pílula Lateral Direita de Estado HUD (ATIVO / USAR)
-        Rectangle {
-            width: root.is-active ? 62px : 56px;
-            height: 22px;
-            background: root.is-active ? root.active-bg : CS2Theme.bg-surface;
-            border-radius: CS2Theme.radius-xs;
-            border-width: 1px;
-            border-color: root.is-active ? root.accent-color : CS2Theme.border;
-            y: (parent.height - self.height) / 2;
-            animate background { duration: 120ms; }
-            animate border-color { duration: 120ms; }
+        // Bloco Direito: Pílula HUD + Botão Lixeira
+        HorizontalLayout {
+            spacing: 6px;
+            alignment: end;
 
-            HorizontalLayout {
-                spacing: 4px;
-                alignment: center;
+            // Pílula Lateral Direita de Estado HUD (ATIVO / USAR)
+            Rectangle {
+                width: root.is-active ? 62px : 56px;
+                height: 22px;
+                background: root.is-active ? root.active-bg : CS2Theme.bg-surface;
+                border-radius: CS2Theme.radius-xs;
+                border-width: 1px;
+                border-color: root.is-active ? root.accent-color : CS2Theme.border;
+                y: (parent.height - self.height) / 2;
+                animate background { duration: 120ms; }
+                animate border-color { duration: 120ms; }
 
-                Rectangle {
-                    width: 5px;
-                    height: 5px;
-                    border-radius: 2.5px;
-                    background: root.is-active ? root.accent-color : CS2Theme.text-dim;
-                    y: (parent.height - self.height) / 2;
-                }
+                HorizontalLayout {
+                    spacing: 4px;
+                    alignment: center;
 
-                Text {
-                    text: root.is-active ? "ATIVO" : "USAR";
-                    font-size: 8px;
-                    font-weight: 900;
-                    letter-spacing: 0.5px;
-                    color: root.is-active ? #ffffff : CS2Theme.text-dim;
-                    vertical-alignment: center;
+                    Rectangle {
+                        width: 5px;
+                        height: 5px;
+                        border-radius: 2.5px;
+                        background: root.is-active ? root.accent-color : CS2Theme.text-dim;
+                        y: (parent.height - self.height) / 2;
+                    }
+
+                    Text {
+                        text: root.is-active ? "ATIVO" : "USAR";
+                        font-size: 8px;
+                        font-weight: 900;
+                        letter-spacing: 0.5px;
+                        color: root.is-active ? #ffffff : CS2Theme.text-dim;
+                        vertical-alignment: center;
+                    }
                 }
             }
-        }
-    }
 
-    touch := TouchArea {
-        mouse-cursor: pointer;
-        clicked => {
-            root.selected();
+            // Botão Lixeira Tático
+            Rectangle {
+                width: 24px;
+                height: 22px;
+                y: (parent.height - self.height) / 2;
+                background: del-touch.has-hover ? rgba(239, 68, 68, 0.20) : transparent;
+                border-radius: CS2Theme.radius-xs;
+                border-width: 1px;
+                border-color: del-touch.has-hover ? CS2Theme.status-danger : (root.is-active ? root.accent-color.transparentize(60%) : CS2Theme.border);
+                animate background { duration: 120ms; }
+                animate border-color { duration: 120ms; }
+
+                Image {
+                    source: @image-url("../assets/icons/trash.svg");
+                    width: 12px;
+                    height: 12px;
+                    colorize: del-touch.has-hover ? CS2Theme.status-danger : CS2Theme.text-dim;
+                    x: (parent.width - self.width) / 2;
+                    y: (parent.height - self.height) / 2;
+                    animate colorize { duration: 120ms; }
+                }
+
+                del-touch := TouchArea {
+                    mouse-cursor: pointer;
+                    clicked => {
+                        root.delete();
+                    }
+                }
+            }
         }
     }
 }

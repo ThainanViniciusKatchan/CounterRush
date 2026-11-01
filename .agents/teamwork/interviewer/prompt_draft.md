@@ -1,32 +1,30 @@
-This is a single self-contained fix; keep it small and focused. Ajustar a função de auto-detecção responsável pela criação do arquivo AutoDetect.json no CounterRush para que utilize os verificadores das otimizações existentes e gere unicamente esse arquivo com os valores booleanos correspondentes.
+Atualizar a interface e o comportamento da aba de Otimizações do CounterRush, tratando o estado sem configurações com botões dedicados e reorganizando os elementos da tela.
 
 Integrity mode: development
 
 ## Requirements
 
-### R1. Varredura de hardware e checagem de otimizações
-A função de auto-detecção deve continuar realizando a varredura no hardware para identificar os componentes do sistema e deve invocar todos os verificadores existentes nas otimizações para identificar quais otimizações já estão aplicadas e quais ainda não estão.
+### R1. Estado da aba de Otimizações sem arquivos .json
+Quando não existir nenhum arquivo de configuração `.json` no projeto, a aba de Otimizações deve exibir exclusivamente dois botões de ação:
+- Um botão com o texto "Otimizar Automaticamente", que ao ser clicado cria uma nova configuração automática baseada no hardware do usuário.
+- O botão de adicionar pré-existente, agora com o símbolo `+` e o texto "Criar Otimização", que ao ser pressionado abre o modal de criação.
 
-### R2. Geração exclusiva do arquivo AutoDetect.json
-A função deve gerar unicamente o arquivo AutoDetect.json, preenchendo as entradas de otimizações com valores booleanos (true e false) conforme o retorno da respectiva verificação. O arquivo custom_optimization.json não deve ser criado em nenhuma circunstância.
+### R2. Remoção do botão inferior de otimização automática
+O botão "Otimizar Automaticamente" atualmente localizado na parte inferior da tela deve ser removido.
 
-### R3. Valores fixos para otimizações de runtime
-As seguintes otimizações, que atuam somente quando o jogo está rodando, devem ser registradas obrigatoriamente com o valor booleano true no AutoDetect.json:
-- Afinidade
-- Timer 0.5ms
-- Limpeza da Standby List
+### R3. Reposicionamento do input de parâmetros de inicialização
+O campo de entrada (input) para alterar os parâmetros de inicialização deve ser reposicionado para ficar localizado diretamente abaixo das otimizações ativas e antes da seleção de arquivos de otimização.
 
-### R4. Padrões do projeto
-O código modificado deve seguir os padrões do repositório (Clean Architecture, princípios SOLID) e respeitar as diretrizes de `.agent/rules/relus.md`, incluindo a apresentação prévia de plano de implementação.
+### R4. Estado com arquivos de configuração existentes
+Quando existirem arquivos de configuração `.json`, a equipe deve manter o fluxo de gerenciamento de configurações existente preservando a consistência visual com os novos controles.
 
 ## Acceptance Criteria
 
-### Geração e Validação do AutoDetect.json
-- [ ] A função de auto-detecção executa a varredura de hardware e consulta os verificadores de cada otimização disponível.
-- [ ] O arquivo AutoDetect.json é gerado com valores booleanos correspondentes ao estado real retornado pelos verificadores.
-- [ ] As entradas de Afinidade, Timer 0.5ms e Limpeza da Standby List possuem valor true no AutoDetect.json gerado.
-- [ ] A execução da função resulta exclusivamente na criação de AutoDetect.json, sem criar o arquivo custom_optimization.json.
-
-### Verificação Automatizada
-- [ ] Um teste automatizado executa a rotina de auto-detecção e verifica programaticamente que AutoDetect.json é gerado com os valores booleanos esperados e campos fixos em true.
-- [ ] O teste automatizado confirma programaticamente que o arquivo custom_optimization.json não foi gerado.
+### Interface e Funcionalidade
+- [ ] No estado sem arquivos de configuração `.json`, são exibidos apenas os dois botões: "Otimizar Automaticamente" e o botão de adicionar com o símbolo `+` e o texto "Criar Otimização".
+- [ ] O clique em "Otimizar Automaticamente" no estado vazio cria e aplica a configuração de acordo com o hardware do sistema.
+- [ ] O clique em "Criar Otimização +" abre o modal de criação de otimizações.
+- [ ] O botão inferior pré-existente "Otimizar Automaticamente" foi completamente removido da parte inferior da tela.
+- [ ] O campo de input para parâmetros de inicialização está renderizado logo abaixo das otimizações ativas e antes da seleção de arquivos de otimização.
+- [ ] Na presença de arquivos `.json`, a seleção e listagem de otimizações continuam operacionais.
+- [ ] O layout e comportamento são validados visualmente através da execução/Hot Reload da aplicação.
