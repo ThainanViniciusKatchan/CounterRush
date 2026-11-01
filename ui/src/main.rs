@@ -229,6 +229,19 @@ fn main() -> Result<(), slint::PlatformError> {
     let launch_config_ref = active_config_path.clone();
     let fallback_path = resolved_path.clone();
     main_window.on_launch_cs2_clicked(move || {
+        let ui = match window_handle.upgrade() {
+            Some(ui) => ui,
+            None => return,
+        };
+
+        // Salvaguarda defensiva: Se não houver perfis, bloqueia o lançamento e exibe o modal
+        if scan_presets().is_empty() {
+            ui.set_is_launching(false);
+            ui.set_show_no_profile_modal(true);
+            return;
+        }
+
+        ui.set_status_message("Otimizando sistema o CS2...".into());
         let (
             cpu_active,
             timer_active,
@@ -243,27 +256,21 @@ fn main() -> Result<(), slint::PlatformError> {
             msi_active,
             power_active,
             render_queue_active,
-        ) = match window_handle.upgrade() {
-            Some(ui) => {
-                ui.set_status_message("Otimizando sistema o CS2...".into());
-                (
-                    ui.get_cpu_tweak_active(),
-                    ui.get_timer_tweak_active(),
-                    ui.get_priority_tweak_active(),
-                    ui.get_ram_tweak_active(),
-                    ui.get_gpu_accel_tweak_active(),
-                    ui.get_dpi_tweak_active(),
-                    ui.get_mem_compression_tweak_active(),
-                    ui.get_mmcss_tweak_active(),
-                    ui.get_hpet_tweak_active(),
-                    ui.get_game_bar_tweak_active(),
-                    ui.get_msi_tweak_active(),
-                    ui.get_power_saving_tweak_active(),
-                    ui.get_render_queue_tweak_active(),
-                )
-            }
-            None => return,
-        };
+        ) = (
+            ui.get_cpu_tweak_active(),
+            ui.get_timer_tweak_active(),
+            ui.get_priority_tweak_active(),
+            ui.get_ram_tweak_active(),
+            ui.get_gpu_accel_tweak_active(),
+            ui.get_dpi_tweak_active(),
+            ui.get_mem_compression_tweak_active(),
+            ui.get_mmcss_tweak_active(),
+            ui.get_hpet_tweak_active(),
+            ui.get_game_bar_tweak_active(),
+            ui.get_msi_tweak_active(),
+            ui.get_power_saving_tweak_active(),
+            ui.get_render_queue_tweak_active(),
+        );
 
         let handle_for_thread = window_handle.clone();
         let target_cfg_path = launch_config_ref.read().map(|p| p.clone()).unwrap_or_else(|_| fallback_path.clone());

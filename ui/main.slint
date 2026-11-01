@@ -6,6 +6,7 @@ import { PresetButton } from "components/preset_button.slint";
 import { AddPresetButton } from "components/add_preset_button.slint";
 import { CreateProfileDialog, NewProfileData } from "components/create_profile_dialog.slint";
 import { DeleteProfileDialog } from "components/delete_profile_dialog.slint";
+import { NoProfileDialog } from "components/no_profile_dialog.slint";
 
 export struct PresetModel {
     name: string,
@@ -49,6 +50,7 @@ export component MainWindow inherits Window {
     in-out property <bool> is-editing-launch-args: false;
     in-out property <bool> show-delete-modal: false;
     in-out property <string> target-delete-profile: "";
+    in-out property <bool> show-no-profile-modal: false;
 
     // Estado reativo geral para o botão mestre
     property <bool> is-all-tweaks-active: 
@@ -386,9 +388,13 @@ export component MainWindow inherits Window {
                         text-color: #ffffff;
                         icon-src: @image-url("assets/icons/play.svg");
                         clicked => {
-                            root.is-launching = true;
-                            root.status-message = "Iniciando Counter-Strike 2 pela Steam com perfil otimizado...";
-                            root.launch-cs2-clicked();
+                            if root.presets.length == 0 {
+                                root.show-no-profile-modal = true;
+                            } else {
+                                root.is-launching = true;
+                                root.status-message = "Iniciando Counter-Strike 2 pela Steam com perfil otimizado...";
+                                root.launch-cs2-clicked();
+                            }
                         }
                     }
                 }
@@ -1105,6 +1111,18 @@ export component MainWindow inherits Window {
             root.show-delete-modal = false;
             root.delete-profile-confirmed(root.target-delete-profile);
             root.target-delete-profile = "";
+        }
+    }
+
+    // Modal Overlay de Aviso de Ausência de Perfil ao Jogar CS2
+    if root.show-no-profile-modal : NoProfileDialog {
+        close => {
+            root.show-no-profile-modal = false;
+        }
+        create-profile => {
+            root.show-no-profile-modal = false;
+            root.active-tab = 1;
+            root.status-message = "Ajustes Avançados de Hardware";
         }
     }
 }

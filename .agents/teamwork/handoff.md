@@ -1,39 +1,37 @@
-# Relatório de Handoff — Sentinel
+# Handoff Report — Sentinel (Milestone 2)
 
 ## 1. Observation
-- O usuário solicitou a adição da funcionalidade de apagar perfis de otimização diretamente na interface na aba de otimizações, incluindo:
-  - Um novo ícone de lixeira em cada perfil existente.
-  - Exclusão do perfil ao clicar no ícone.
-  - Modal de confirmação com o texto `"Deseja realmente excluir o perfil {Nome do perfil}"` e botões `"Cancelar"` e `"Excluir"`.
-  - Reversão da aba para o padrão neutro de quando não existe perfil caso o perfil excluído seja o único existente.
-- A rota Geral (`teamwork_orchestrator`) foi acionada.
-- O orquestrador estruturou o projeto, coordenou a fase de survey com 3 exploradores, elaborou o `PROJECT.md` e despachou o worker `teamwork_worker_del_m1_1`.
-- A implementação produziu:
-  - `ui/assets/icons/trash.svg`: Ícone vetorial Lucide Feather.
-  - `ui/components/delete_profile_dialog.slint`: Modal de confirmação compacto com backdrop bloqueador de cliques acidentais.
-  - `ui/components/preset_button.slint`: Botão de lixeira com `del-touch` isolado na pilha Z.
-  - `core/src/lib.rs`: Funções `delete_optimization_profile_in_dir` e `delete_optimization_profile` com validação de path traversal e caracteres inválidos, e remoção física via `std::fs::remove_file`.
-  - `ui/src/main.rs`: Handler Slint `on_delete_profile_confirmed` com transição inteligente (seleciona próximo perfil se ativo for deletado, ou zera todos os 13 switches e limpa `active_preset`/`launch_args` se for o último).
-- O processo adversarial incluiu 2 Reviewers (Rust e Slint), 2 Challengers (testes de estresse e casos de borda) e 1 Auditor Forense interno, todos aprovando com unanimidade.
-- O Auditor Independente de Vitória (`teamwork_victory_auditor`) executou auditoria cega em 3 fases e emitiu o veredito oficial: **VICTORY CONFIRMED**.
+- O usuário solicitou um novo comportamento para o botão "Jogar CS2" na aba Painel quando não existirem perfis/configurações de otimização:
+  - Exibir um modal com o texto exato: `"Nenhum Perfil de Otimização encontrado, Deseja criar um?"`.
+  - Dois botões: `"Criar Perfil"` e `"Sair"`.
+  - O botão `"Criar Perfil"` redireciona o usuário para a aba de otimizações.
+  - O botão `"Sair"` fecha o modal.
+- A solicitação foi roteada para a rota General (`teamwork_orchestrator`) no ciclo 2B do Project Pattern.
+- O time de agentes implementou o componente `ui/components/no_profile_dialog.slint`, integrou a verificação e a reatividade em `ui/main.slint`, e adicionou salvaguarda defensiva em `ui/src/main.rs`.
+- A auditoria independente realizada por `teamwork_victory_auditor` validou:
+  - Fase A (Linha do Tempo): PASS (proveniência e sequência cronológica autêntica).
+  - Fase B (Integridade Forense): PASS (zero stubs, mocks ou facades).
+  - Fase C (Testes Independentes): PASS (`cargo check` 0 erros/avisos, `cargo test` 14/14 aprovados, testes adversariais de concorrência e estado vazio 16/16 aprovados).
+  - Veredito final: **VICTORY CONFIRMED**.
 
 ## 2. Logic Chain
-1. A solicitação envolvia modificações em múltiplas camadas (UI declarativa em Slint, bridge em Rust e crate core de lógica de arquivos), sem sinal explícito de pequenez ("SWE Light"), justificando a rota Geral.
-2. A separação estrita da área de toque da lixeira no componente `preset_button.slint` preveniu o clique duplo ou seleção indesejada do card ao tentar excluí-lo.
-3. O modal modaliza toda a janela de 980x620px com backdrop semitransparente bloqueador de eventos para evitar qualquer interação externa antes da decisão do usuário.
-4. O tratamento de estado em `ui/src/main.rs` cumpre rigorosamente o requisito de voltar ao estado padrão vazio (`presets.length == 0`) com switches desligados e campos desativados.
-5. A auditoria independente confirmou a ausência de stubs/mocks e 100% de passagem nos testes (`cargo check --workspace`, `cargo test --workspace`, suíte adversarial com 113 testes e validação com `slint-viewer`).
+1. A interceptação de primeiro nível ocorre na UI (`ui/main.slint`): ao clicar em "JOGAR CS2", verifica-se `presets.length == 0`.
+2. Se verdadeiro, o modal `NoProfileDialog` é exibido imediatamente via `show-no-profile-modal = true`, sem disparar flags de carregamento ou chamada externa à Steam.
+3. Se falso, o fluxo normal de lançamento é executado.
+4. O callback `create-profile` desativa o modal e altera `active-tab = 1`, levando o usuário diretamente para a central de otimizações. O callback `close` desativa o modal mantendo a aba atual.
+5. Em `ui/src/main.rs`, `on_launch_cs2_clicked` implementa barreira defensiva adicional, impedindo a criação indevida de arquivos em disco se a lista de perfis estiver vazia.
+6. A conformidade estrita foi comprovada sem efeitos colaterais ou alterações desnecessárias.
 
 ## 3. Caveats
-- Se o usuário excluir arquivos `.json` manualmente fora da aplicação durante a execução, uma reinicialização ou criação/exclusão de perfil via UI atualizará a lista por meio do `scan_presets()`.
-- O modal utiliza o tema padrão `CS2Theme` do projeto para coerência visual.
+- Nenhuma ressalva pendente. O código está perfeitamente integrado e aprovado sem alertas de compilação.
 
 ## 4. Conclusion
-A tarefa foi concluída com excelência e validada de forma independente. Todos os requisitos funcionais, estéticos e de segurança foram rigorosamente satisfeitos.
+O Milestone 2 foi concluído com sucesso e certificado com VICTORY CONFIRMED pela auditoria independente.
 
 ## 5. Verification Method
-- `cargo check --workspace`: Exit code 0 (sem erros, sem avisos).
-- `cargo test --workspace`: 14/14 testes aprovados.
-- `cargo run -p core --example test_adversarial_delete`: 113/113 testes de segurança/estresse aprovados.
-- `slint-viewer --check`: Componentes Slint sintática e visualmente válidos.
-- Auditoria de Vitória: **VICTORY CONFIRMED**.
+```powershell
+Set-Location -LiteralPath "g:\Outros computadores\Meu laptop\Desktop\CounterRush"
+cargo check --workspace
+cargo test --workspace
+cargo run --example test_adversarial_m2_play -p core
+```
