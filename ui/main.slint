@@ -121,18 +121,12 @@ export component MainWindow inherits Window {
                 HorizontalLayout {
                     alignment: space-between;
                     Text {
-                        text: "AJUSTES DE HARDWARE & LATÊNCIA";
+                        text: "AJUSTES DE RÁPIDOS";
                         font-size: 11px;
                         font-weight: 800;
                         letter-spacing: 0.5px;
                         color: CS2Theme.text-muted;
-                    }
-                    Text {
-                        text: ((root.cpu-tweak-active ? 1 : 0) + (root.timer-tweak-active ? 1 : 0) + (root.priority-tweak-active ? 1 : 0) + (root.ram-tweak-active ? 1 : 0)) + " Módulos Ativos";
-                        font-size: 10px;
-                        font-weight: 800;
-                        color: CS2Theme.status-success-bright;
-                    }
+                          }
                 }
 
                 HorizontalLayout {
@@ -216,6 +210,13 @@ export component MainWindow inherits Window {
                             color: CS2Theme.text-muted;
                             wrap: word-wrap;
                         }
+                        Text {
+                            text: "EM BREVE";
+                            font-size: 20px;
+                            font-weight: 900;
+                            color: CS2Theme.text-muted;
+                            wrap: word-wrap;
+                        }
                     }
 
                     // Botão com Cor Sólida Ouro
@@ -275,6 +276,13 @@ export component MainWindow inherits Window {
                             color: CS2Theme.text-muted;
                             wrap: word-wrap;
                         }
+                        Text {
+                            text: "EM BREVE";
+                            font-size: 20px;
+                            font-weight: 900;
+                            color: CS2Theme.text-muted;
+                            wrap: word-wrap;
+                        }
                     }
 
                     // Botão com Cor Sólida Ciano
@@ -331,6 +339,13 @@ export component MainWindow inherits Window {
                         Text {
                             text: "Mapas essenciais da Oficina Steam para treino de mira e teste de frametime.";
                             font-size: 10px;
+                            color: CS2Theme.text-muted;
+                            wrap: word-wrap;
+                        }
+                        Text {
+                            text: "EM BREVE";
+                            font-size: 20px;
+                            font-weight: 900;
                             color: CS2Theme.text-muted;
                             wrap: word-wrap;
                         }
@@ -445,13 +460,6 @@ export component MainWindow inherits Window {
                     font-weight: 900;
                     letter-spacing: 0.6px;
                     color: CS2Theme.text-primary;
-                }
-                Text {
-                    text: "13 Módulos de Baixa Latência";
-                    font-size: 11px;
-                    font-weight: 800;
-                    color: CS2Theme.status-success-bright;
-                    vertical-alignment: center;
                 }
             }
 
@@ -1051,18 +1059,13 @@ export component MainWindow inherits Window {
                     alignment: center;
 
                     Text {
-                        text: "Tabela de Classificação Global & Regional";
-                        font-size: 13px;
-                        font-weight: 700;
-                        color: CS2Theme.text-primary;
-                        horizontal-alignment: center;
-                    }
-                    Text {
-                        text: "CS Rating oficial do Modo Premier e histórico de partidas competitivas.";
-                        font-size: 11px;
-                        color: CS2Theme.text-muted;
-                        horizontal-alignment: center;
-                    }
+                            text: "EM BREVE";
+                            font-size: 50px;
+                            font-weight: 900;
+                            color: CS2Theme.text-muted;
+                            wrap: word-wrap;
+                            horizontal-alignment: center;
+                        }
                 }
             }
 
