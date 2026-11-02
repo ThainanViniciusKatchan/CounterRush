@@ -2,7 +2,7 @@ import { CS2Theme } from "../theme.slint";
 
 export component PresetButton inherits Rectangle {
     in property <string> file-name: "custom_optimization";
-    in property <string> tag: "PERFIL JSON";
+    in property <string> tag: @tr("PERFIL JSON");
     in property <bool> is-active: false;
     in property <color> accent-color: CS2Theme.accent-ct-blue;
     in property <color> active-bg: CS2Theme.accent-ct-soft;
@@ -117,7 +117,7 @@ export component PresetButton inherits Rectangle {
                     }
 
                     Text {
-                        text: root.is-active ? "ATIVO" : "USAR";
+                        text: root.is-active ? @tr("ATIVO") : @tr("USAR");
                         font-size: 8px;
                         font-weight: 900;
                         letter-spacing: 0.5px;

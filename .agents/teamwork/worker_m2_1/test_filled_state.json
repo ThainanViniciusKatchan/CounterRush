@@ -1,9 +1,0 @@
-{
-  "active-tab": 1,
-  "presets": [
-    { "name": "AutoDetect", "tag": "RECOMENDADO" },
-    { "name": "custom_optimization", "tag": "PERSONALIZADO" }
-  ],
-  "active-preset": "AutoDetect",
-  "launch-args-text": "-novid -high -threads 8"
-}

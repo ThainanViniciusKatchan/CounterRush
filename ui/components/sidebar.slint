@@ -82,28 +82,28 @@ export component Sidebar inherits Rectangle {
 
         // Navegação
         NavButton {
-            text: "Painel";
+            text: @tr("Painel");
             icon-src: @image-url("../assets/icons/home.svg");
             active: root.active-tab == 0;
             clicked => { root.active-tab = 0; root.tab-selected(0); }
         }
 
         NavButton {
-            text: "Otimizações";
+            text: @tr("Otimizações");
             icon-src: @image-url("../assets/icons/rocket.svg");
             active: root.active-tab == 1;
             clicked => { root.active-tab = 1; root.tab-selected(1); }
         }
 
         NavButton {
-            text: "Configurações";
+            text: @tr("Configurações");
             icon-src: @image-url("../assets/icons/settings.svg");
             active: root.active-tab == 2;
             clicked => { root.active-tab = 2; root.tab-selected(2); }
         }
 
         NavButton {
-            text: "Ranking CS";
+            text: @tr("Ranking CS");
             icon-src: @image-url("../assets/icons/crown.svg");
             active: root.active-tab == 3;
             clicked => { root.active-tab = 3; root.tab-selected(3); }
@@ -115,7 +115,7 @@ export component Sidebar inherits Rectangle {
         
 
         Text {
-            text: "CounterRush v0.8.0";
+            text: @tr("CounterRush v0.8.0");
             font-size: 8px;
             color: CS2Theme.text-dim;
         }

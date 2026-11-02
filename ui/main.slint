@@ -16,7 +16,7 @@ export struct PresetModel {
 export { NewProfileData }
 
 export component MainWindow inherits Window {
-    title: "CounterRush - CS2 Performance";
+    title: @tr("CounterRush - CS2 Performance");
     min-width: 980px;
     max-width: 980px;
     min-height: 620px;
@@ -27,7 +27,7 @@ export component MainWindow inherits Window {
 
     // Propriedades e estados reativos
     in-out property <int> active-tab: 0;
-    in-out property <string> status-message: "Pronto para iniciar o CS2 com taxa de polling de 0.5ms e afinidade de CPU otimizada.";
+    in-out property <string> status-message: @tr("Pronto para iniciar o CS2 com taxa de polling de 0.5ms e afinidade de CPU otimizada.");
     in-out property <bool> is-launching: false;
     in-out property <bool> cpu-tweak-active: false;
     in-out property <bool> timer-tweak-active: false;
@@ -85,13 +85,13 @@ export component MainWindow inherits Window {
             active-tab <=> root.active-tab;
             tab-selected(idx) => {
                 if idx == 0 {
-                    root.status-message = "Visualizando Painel Geral";
+                    root.status-message = @tr("Visualizando Painel Geral");
                 } else if idx == 1 {
-                    root.status-message = "Ajustes Avançados de Hardware";
+                    root.status-message = @tr("Ajustes Avançados de Hardware");
                 } else if idx == 2 {
-                    root.status-message = "Configurações Gerais";
+                    root.status-message = @tr("Configurações Gerais");
                 } else {
-                    root.status-message = "Tabela de Classificação Valve";
+                    root.status-message = @tr("Tabela de Classificação Valve");
                 }
             }
         }
@@ -107,7 +107,7 @@ export component MainWindow inherits Window {
 
             // Cabeçalho Minimalista Direto
             Text {
-                text: "PAINEL DE CONTROLE";
+                text: @tr("PAINEL DE CONTROLE");
                 font-size: 16px;
                 font-weight: 900;
                 letter-spacing: 0.6px;
@@ -121,7 +121,7 @@ export component MainWindow inherits Window {
                 HorizontalLayout {
                     alignment: space-between;
                     Text {
-                        text: "AJUSTES DE RÁPIDOS";
+                        text: @tr("AJUSTES DE RÁPIDOS");
                         font-size: 11px;
                         font-weight: 800;
                         letter-spacing: 0.5px;
@@ -133,49 +133,49 @@ export component MainWindow inherits Window {
                     spacing: 10px;
 
                     TweakSwitch {
-                        label: "Núcleo 0 Off";
-                        info: "Afinidade de CPU";
+                        label: @tr("Núcleo 0 Off");
+                        info: @tr("Afinidade de CPU");
                         accent-color: CS2Theme.accent-orange;
                         hover-color: #ff771a;
                         checked <=> root.cpu-tweak-active;
                         toggled(val) => {
-                            root.status-message = val ? "Afinidade: Núcleo 0 desativado para o CS2." : "Afinidade: Restaurada ao padrão.";
+                            root.status-message = val ? @tr("Afinidade: Núcleo 0 desativado para o CS2.") : @tr("Afinidade: Restaurada ao padrão.");
                             root.tweak-toggled("cpu_core_0", val);
                         }
                     }
 
                     TweakSwitch {
-                        label: "Timer 0.5ms";
-                        info: "Temporizador";
+                        label: @tr("Timer 0.5ms");
+                        info: @tr("Temporizador");
                         accent-color: CS2Theme.status-success;
                         hover-color: #059669;
                         checked <=> root.timer-tweak-active;
                         toggled(val) => {
-                            root.status-message = val ? "Timer: Definido para 0.5ms de alta precisão." : "Timer: Restaurado.";
+                            root.status-message = val ? @tr("Timer: Definido para 0.5ms de alta precisão.") : @tr("Timer: Restaurado.");
                             root.tweak-toggled("timer_resolution", val);
                         }
                     }
 
                     TweakSwitch {
-                        label: "Prioridade Alta";
-                        info: "Processo CS2";
+                        label: @tr("Prioridade Alta");
+                        info: @tr("Processo CS2");
                         accent-color: CS2Theme.accent-orange;
                         hover-color: #ff771a;
                         checked <=> root.priority-tweak-active;
                         toggled(val) => {
-                            root.status-message = val ? "Prioridade de processo definida para Alta." : "Prioridade de processo: Normal.";
+                            root.status-message = val ? @tr("Prioridade de processo definida para Alta.") : @tr("Prioridade de processo: Normal.");
                             root.tweak-toggled("process_priority", val);
                         }
                     }
 
                     TweakSwitch {
-                        label: "Limpar RAM";
-                        info: "Empty Standby";
+                        label: @tr("Limpar RAM");
+                        info: @tr("Empty Standby");
                         accent-color: CS2Theme.accent-ct-blue;
                         hover-color: #0284c7;
                         checked <=> root.ram-tweak-active;
                         toggled(val) => {
-                            root.status-message = val ? "Memória: Páginas em standby liberadas." : "Limpeza de RAM desativada.";
+                            root.status-message = val ? @tr("Memória: Páginas em standby liberadas.") : @tr("Limpeza de RAM desativada.");
                             root.tweak-toggled("empty_standby", val);
                         }
                     }
@@ -197,7 +197,7 @@ export component MainWindow inherits Window {
                     VerticalLayout {
                         spacing: 4px;
                         Text {
-                            text: "CONFIGS PRO";
+                            text: @tr("CONFIGS PRO");
                             font-size: 13px;
                             font-weight: 900;
                             color: CS2Theme.accent-t-amber;
@@ -205,13 +205,13 @@ export component MainWindow inherits Window {
                         }
 
                         Text {
-                            text: "Miras, resolução esticada (4:3) e sensibilidade dos principais profissionais.";
+                            text: @tr("Miras, resolução esticada (4:3) e sensibilidade dos principais profissionais.");
                             font-size: 10px;
                             color: CS2Theme.text-muted;
                             wrap: word-wrap;
                         }
                         Text {
-                            text: "EM BREVE";
+                            text: @tr("EM BREVE");
                             font-size: 20px;
                             font-weight: 900;
                             color: CS2Theme.text-muted;
@@ -230,7 +230,7 @@ export component MainWindow inherits Window {
                             alignment: center;
                             spacing: 6px;
                             Text {
-                                text: "BAIXAR .CFG PRO";
+                                text: @tr("BAIXAR .CFG PRO");
                                 font-size: 10px;
                                 font-weight: 900;
                                 letter-spacing: 0.5px;
@@ -241,7 +241,7 @@ export component MainWindow inherits Window {
 
                         touch1 := TouchArea {
                             clicked => {
-                                root.status-message = "Abrindo catálogo de configs profissionais...";
+                                root.status-message = @tr("Abrindo catálogo de configs profissionais...");
                                 root.card-action-clicked("pro_cfg");
                             }
                         }
@@ -263,7 +263,7 @@ export component MainWindow inherits Window {
                     VerticalLayout {
                         spacing: 4px;
                         Text {
-                            text: "BINDS TÁTICAS";
+                            text: @tr("BINDS TÁTICAS");
                             font-size: 13px;
                             font-weight: 900;
                             color: CS2Theme.accent-ct-cyan;
@@ -271,13 +271,13 @@ export component MainWindow inherits Window {
                         }
 
                         Text {
-                            text: "Atalhos rápidos para utilitários e jumpthrow permitidos em servidores oficiais.";
+                            text: @tr("Atalhos rápidos para utilitários e jumpthrow permitidos em servidores oficiais.");
                             font-size: 10px;
                             color: CS2Theme.text-muted;
                             wrap: word-wrap;
                         }
                         Text {
-                            text: "EM BREVE";
+                            text: @tr("EM BREVE");
                             font-size: 20px;
                             font-weight: 900;
                             color: CS2Theme.text-muted;
@@ -296,7 +296,7 @@ export component MainWindow inherits Window {
                             alignment: center;
                             spacing: 6px;
                             Text {
-                                text: "GERENCIAR BINDS";
+                                text: @tr("GERENCIAR BINDS");
                                 font-size: 10px;
                                 font-weight: 900;
                                 letter-spacing: 0.5px;
@@ -307,7 +307,7 @@ export component MainWindow inherits Window {
 
                         touch2 := TouchArea {
                             clicked => {
-                                root.status-message = "Abrindo gerador de atalhos e binds táticas...";
+                                root.status-message = @tr("Abrindo gerador de atalhos e binds táticas...");
                                 root.card-action-clicked("binds");
                             }
                         }
@@ -329,7 +329,7 @@ export component MainWindow inherits Window {
                     VerticalLayout {
                         spacing: 4px;
                         Text {
-                            text: "TREINO & MAPAS";
+                            text: @tr("TREINO & MAPAS");
                             font-size: 13px;
                             font-weight: 900;
                             color: CS2Theme.accent-orange-bright;
@@ -337,13 +337,13 @@ export component MainWindow inherits Window {
                         }
 
                         Text {
-                            text: "Mapas essenciais da Oficina Steam para treino de mira e teste de frametime.";
+                            text: @tr("Mapas essenciais da Oficina Steam para treino de mira e teste de frametime.");
                             font-size: 10px;
                             color: CS2Theme.text-muted;
                             wrap: word-wrap;
                         }
                         Text {
-                            text: "EM BREVE";
+                            text: @tr("EM BREVE");
                             font-size: 20px;
                             font-weight: 900;
                             color: CS2Theme.text-muted;
@@ -362,7 +362,7 @@ export component MainWindow inherits Window {
                             alignment: center;
                             spacing: 6px;
                             Text {
-                                text: "ACESSAR TREINO";
+                                text: @tr("ACESSAR TREINO");
                                 font-size: 10px;
                                 font-weight: 900;
                                 letter-spacing: 0.5px;
@@ -373,7 +373,7 @@ export component MainWindow inherits Window {
 
                         touch3 := TouchArea {
                             clicked => {
-                                root.status-message = "Abrindo oficina de mapas e teste de desempenho...";
+                                root.status-message = @tr("Abrindo oficina de mapas e teste de desempenho...");
                                 root.card-action-clicked("workshop_maps");
                             }
                         }
@@ -392,8 +392,8 @@ export component MainWindow inherits Window {
                     padding-bottom: 2px;
 
                     TacticalButton {
-                        text: root.is-launching ? "INICIANDO..." : "JOGAR CS2";
-                        badge: root.is-launching ? "APLICANDO TWEAKS & STEAM" : "INICIAR COM ALTA PERFORMANCE";
+                        text: root.is-launching ? @tr("INICIANDO...") : @tr("JOGAR CS2");
+                        badge: root.is-launching ? @tr("APLICANDO TWEAKS & STEAM") : @tr("INICIAR COM ALTA PERFORMANCE");
                         enabled: !root.is-launching;
                         background-color: CS2Theme.accent-orange;
                         hover-color: #ff771a;
@@ -407,7 +407,7 @@ export component MainWindow inherits Window {
                                 root.show-no-profile-modal = true;
                             } else {
                                 root.is-launching = true;
-                                root.status-message = "Iniciando Counter-Strike 2 pela Steam com perfil otimizado...";
+                                root.status-message = @tr("Iniciando Counter-Strike 2 pela Steam com perfil otimizado...");
                                 root.launch-cs2-clicked();
                             }
                         }
@@ -455,7 +455,7 @@ export component MainWindow inherits Window {
             HorizontalLayout {
                 alignment: space-between;
                 Text {
-                    text: "CENTRAL DE OTIMIZAÇÕES";
+                    text: @tr("CENTRAL DE OTIMIZAÇÕES");
                     font-size: 16px;
                     font-weight: 900;
                     letter-spacing: 0.6px;
@@ -474,14 +474,14 @@ export component MainWindow inherits Window {
                     TweakSwitch {
                         button-width: 188px;
                         tooltip-width: 220px;
-                        label: "Núcleo 0 Off";
-                        info: "Afinidade CPU";
-                        tooltip-text: "Afinidade de CPU: Desativa o Núcleo 0 para o CS2 mitigando interrupções do SO.";
+                        label: @tr("Núcleo 0 Off");
+                        info: @tr("Afinidade CPU");
+                        tooltip-text: @tr("Afinidade de CPU: Desativa o Núcleo 0 para o CS2 mitigando interrupções do SO.");
                         accent-color: CS2Theme.accent-orange;
                         hover-color: #ff771a;
                         checked <=> root.cpu-tweak-active;
                         toggled(val) => {
-                            root.status-message = val ? "Afinidade: Núcleo 0 desativado para o CS2." : "Afinidade: Restaurada ao padrão.";
+                            root.status-message = val ? @tr("Afinidade: Núcleo 0 desativado para o CS2.") : @tr("Afinidade: Restaurada ao padrão.");
                             root.tweak-toggled("cpu_core_0", val);
                         }
                     }
@@ -489,14 +489,14 @@ export component MainWindow inherits Window {
                     TweakSwitch {
                         button-width: 188px;
                         tooltip-width: 215px;
-                        label: "Timer 0.5ms";
-                        info: "Temporizador";
-                        tooltip-text: "Temporizador do Sistema: Define resolução de alta precisão de 0.5ms.";
+                        label: @tr("Timer 0.5ms");
+                        info: @tr("Temporizador");
+                        tooltip-text: @tr("Temporizador do Sistema: Define resolução de alta precisão de 0.5ms.");
                         accent-color: CS2Theme.status-success;
                         hover-color: #059669;
                         checked <=> root.timer-tweak-active;
                         toggled(val) => {
-                            root.status-message = val ? "Timer: Definido para 0.5ms de alta precisão." : "Timer: Restaurado ao padrão do Windows.";
+                            root.status-message = val ? @tr("Timer: Definido para 0.5ms de alta precisão.") : @tr("Timer: Restaurado ao padrão do Windows.");
                             root.tweak-toggled("timer_resolution", val);
                         }
                     }
@@ -504,14 +504,14 @@ export component MainWindow inherits Window {
                     TweakSwitch {
                         button-width: 188px;
                         tooltip-width: 220px;
-                        label: "Prioridade Alta";
-                        info: "Processo CS2";
-                        tooltip-text: "Prioridade de Processo: Eleva a prioridade do executável cs2.exe para Tempo Real.";
+                        label: @tr("Prioridade Alta");
+                        info: @tr("Processo CS2");
+                        tooltip-text: @tr("Prioridade de Processo: Eleva a prioridade do executável cs2.exe para Tempo Real.");
                         accent-color: CS2Theme.accent-orange;
                         hover-color: #ff771a;
                         checked <=> root.priority-tweak-active;
                         toggled(val) => {
-                            root.status-message = val ? "Prioridade de processo definida para Alta." : "Prioridade de processo: Normal.";
+                            root.status-message = val ? @tr("Prioridade de processo definida para Alta.") : @tr("Prioridade de processo: Normal.");
                             root.tweak-toggled("process_priority", val);
                         }
                     }
@@ -519,14 +519,14 @@ export component MainWindow inherits Window {
                     TweakSwitch {
                         button-width: 188px;
                         tooltip-width: 215px;
-                        label: "Limpar RAM";
-                        info: "Empty Standby";
-                        tooltip-text: "Empty Standby List: Libera páginas de cache em standby na memória RAM.";
+                        label: @tr("Limpar RAM");
+                        info: @tr("Empty Standby");
+                        tooltip-text: @tr("Empty Standby List: Libera páginas de cache em standby na memória RAM.");
                         accent-color: CS2Theme.accent-ct-blue;
                         hover-color: #0284c7;
                         checked <=> root.ram-tweak-active;
                         toggled(val) => {
-                            root.status-message = val ? "Memória: Páginas em standby liberadas." : "Limpeza de RAM desativada.";
+                            root.status-message = val ? @tr("Memória: Páginas em standby liberadas.") : @tr("Limpeza de RAM desativada.");
                             root.tweak-toggled("empty_standby", val);
                         }
                     }
@@ -539,14 +539,14 @@ export component MainWindow inherits Window {
                     TweakSwitch {
                         button-width: 188px;
                         tooltip-width: 225px;
-                        label: "GPU Apps Off";
-                        info: "VRAM & Apps";
-                        tooltip-text: "Aceleração GPU: Desativa aceleração de hardware em Discord, Steam e navegadores.";
+                        label: @tr("GPU Apps Off");
+                        info: @tr("VRAM & Apps");
+                        tooltip-text: @tr("Aceleração GPU: Desativa aceleração de hardware em Discord, Steam e navegadores.");
                         accent-color: CS2Theme.accent-orange;
                         hover-color: #ff771a;
                         checked <=> root.gpu-accel-tweak-active;
                         toggled(val) => {
-                            root.status-message = val ? "GPU em apps desativada (mais VRAM para CS2)." : "GPU em apps reativada.";
+                            root.status-message = val ? @tr("GPU em apps desativada (mais VRAM para CS2).") : @tr("GPU em apps reativada.");
                             root.tweak-toggled("gpu_acceleration", val);
                         }
                     }
@@ -554,14 +554,14 @@ export component MainWindow inherits Window {
                     TweakSwitch {
                         button-width: 188px;
                         tooltip-width: 220px;
-                        label: "Otimização DPI";
-                        info: "Tela Cheia CS2";
-                        tooltip-text: "Otimização DPI: Aplica flags de tela cheia exclusiva e reduz input lag no CS2.";
+                        label: @tr("Otimização DPI");
+                        info: @tr("Tela Cheia CS2");
+                        tooltip-text: @tr("Otimização DPI: Aplica flags de tela cheia exclusiva e reduz input lag no CS2.");
                         accent-color: CS2Theme.accent-ct-cyan;
                         hover-color: #0284c7;
                         checked <=> root.dpi-tweak-active;
                         toggled(val) => {
-                            root.status-message = val ? "DPI & Tela cheia: Flags de baixa latência aplicadas." : "DPI: Configuração de compatibilidade removida.";
+                            root.status-message = val ? @tr("DPI & Tela cheia: Flags de baixa latência aplicadas.") : @tr("DPI: Configuração de compatibilidade removida.");
                             root.tweak-toggled("dpi_optimization", val);
                         }
                     }
@@ -569,14 +569,14 @@ export component MainWindow inherits Window {
                     TweakSwitch {
                         button-width: 188px;
                         tooltip-width: 230px;
-                        label: "Compactar RAM";
-                        info: "MMAgent Off";
-                        tooltip-text: "Compactação de Memória: Desativa compressão de páginas do Windows (>16GB RAM).";
+                        label: @tr("Compactar RAM");
+                        info: @tr("MMAgent Off");
+                        tooltip-text: @tr("Compactação de Memória: Desativa compressão de páginas do Windows (>16GB RAM).");
                         accent-color: CS2Theme.accent-ct-blue;
                         hover-color: #0284c7;
                         checked <=> root.mem-compression-tweak-active;
                         toggled(val) => {
-                            root.status-message = val ? "Compactação de RAM desativada (menor latência de CPU)." : "Compactação de RAM reativada.";
+                            root.status-message = val ? @tr("Compactação de RAM desativada (menor latência de CPU).") : @tr("Compactação de RAM reativada.");
                             root.tweak-toggled("memory_compression", val);
                         }
                     }
@@ -584,14 +584,14 @@ export component MainWindow inherits Window {
                     TweakSwitch {
                         button-width: 188px;
                         tooltip-width: 235px;
-                        label: "Agendador MMCSS";
-                        info: "Agendador Win";
-                        tooltip-text: "MMCSS Games: Otimiza prioridade de rede, áudio e GPU para perfis de jogos.";
+                        label: @tr("Agendador MMCSS");
+                        info: @tr("Agendador Win");
+                        tooltip-text: @tr("MMCSS Games: Otimiza prioridade de rede, áudio e GPU para perfis de jogos.");
                         accent-color: CS2Theme.accent-t-gold;
                         hover-color: #b45309;
                         checked <=> root.mmcss-tweak-active;
                         toggled(val) => {
-                            root.status-message = val ? "MMCSS: Perfil de jogos otimizado no registro do Windows." : "MMCSS: Restaurado ao padrão do Windows.";
+                            root.status-message = val ? @tr("MMCSS: Perfil de jogos otimizado no registro do Windows.") : @tr("MMCSS: Restaurado ao padrão do Windows.");
                             root.tweak-toggled("mmcss", val);
                         }
                     }
@@ -604,14 +604,14 @@ export component MainWindow inherits Window {
                     TweakSwitch {
                         button-width: 188px;
                         tooltip-width: 225px;
-                        label: "HPET Off";
-                        info: "Timer BCD";
-                        tooltip-text: "Desativar HPET: Desativa o relógio de plataforma no BCD priorizando o TSC da CPU.";
+                        label: @tr("HPET Off");
+                        info: @tr("Timer BCD");
+                        tooltip-text: @tr("Desativar HPET: Desativa o relógio de plataforma no BCD priorizando o TSC da CPU.");
                         accent-color: CS2Theme.status-success;
                         hover-color: #059669;
                         checked <=> root.hpet-tweak-active;
                         toggled(val) => {
-                            root.status-message = val ? "HPET desativado no BCD (usando TSC da CPU)." : "HPET restaurado ao padrão de boot.";
+                            root.status-message = val ? @tr("HPET desativado no BCD (usando TSC da CPU).") : @tr("HPET restaurado ao padrão de boot.");
                             root.tweak-toggled("hpet", val);
                         }
                     }
@@ -619,14 +619,14 @@ export component MainWindow inherits Window {
                     TweakSwitch {
                         button-width: 188px;
                         tooltip-width: 225px;
-                        label: "Game Bar Off";
-                        info: "DVR & Overlay";
-                        tooltip-text: "Xbox Game Bar: Desativa sobreposições, modo Xbox e gravações de fundo GameDVR.";
+                        label: @tr("Game Bar Off");
+                        info: @tr("DVR & Overlay");
+                        tooltip-text: @tr("Xbox Game Bar: Desativa sobreposições, modo Xbox e gravações de fundo GameDVR.");
                         accent-color: CS2Theme.accent-orange;
                         hover-color: #ff771a;
                         checked <=> root.game-bar-tweak-active;
                         toggled(val) => {
-                            root.status-message = val ? "Xbox Game Bar, GameDVR e capturas desativados." : "Xbox Game Bar e capturas restaurados.";
+                            root.status-message = val ? @tr("Xbox Game Bar, GameDVR e capturas desativados.") : @tr("Xbox Game Bar e capturas restaurados.");
                             root.tweak-toggled("game_bar", val);
                         }
                     }
@@ -634,14 +634,14 @@ export component MainWindow inherits Window {
                     TweakSwitch {
                         button-width: 188px;
                         tooltip-width: 230px;
-                        label: "Modo MSI";
-                        info: "PCIe IRQ Mode";
-                        tooltip-text: "Modo MSI: Ativa interrupções baseadas em mensagens para GPU, Rede e portas USB.";
+                        label: @tr("Modo MSI");
+                        info: @tr("PCIe IRQ Mode");
+                        tooltip-text: @tr("Modo MSI: Ativa interrupções baseadas em mensagens para GPU, Rede e portas USB.");
                         accent-color: CS2Theme.accent-ct-cyan;
                         hover-color: #0284c7;
                         checked <=> root.msi-tweak-active;
                         toggled(val) => {
-                            root.status-message = val ? "Modo MSI ativado para GPU (Alta prioridade), Rede e USB." : "Modo MSI desativado (retornado para INTx).";
+                            root.status-message = val ? @tr("Modo MSI ativado para GPU (Alta prioridade), Rede e USB.") : @tr("Modo MSI desativado (retornado para INTx).");
                             root.tweak-toggled("msi", val);
                         }
                     }
@@ -649,14 +649,14 @@ export component MainWindow inherits Window {
                     TweakSwitch {
                         button-width: 188px;
                         tooltip-width: 230px;
-                        label: "Power Save Off";
-                        info: "PCIe & USB";
-                        tooltip-text: "Economia de Energia: Desativa PCIe ASPM e suspensão seletiva de portas USB.";
+                        label: @tr("Power Save Off");
+                        info: @tr("PCIe & USB");
+                        tooltip-text: @tr("Economia de Energia: Desativa PCIe ASPM e suspensão seletiva de portas USB.");
                         accent-color: CS2Theme.accent-t-gold;
                         hover-color: #b45309;
                         checked <=> root.power-saving-tweak-active;
                         toggled(val) => {
-                            root.status-message = val ? "Economia de energia desativada (PCIe ASPM e Suspensão USB)." : "Economia de energia restaurada ao padrão.";
+                            root.status-message = val ? @tr("Economia de energia desativada (PCIe ASPM e Suspensão USB).") : @tr("Economia de energia restaurada ao padrão.");
                             root.tweak-toggled("power_saving", val);
                         }
                     }
@@ -669,14 +669,14 @@ export component MainWindow inherits Window {
                     TweakSwitch {
                         button-width: 188px;
                         tooltip-width: 230px;
-                        label: "Render Queue";
-                        info: "Flip & Persist";
-                        tooltip-text: "Fila de Renderização: FlipQueue AMD = 1 e Persistence Mode em placas NVIDIA.";
+                        label: @tr("Render Queue");
+                        info: @tr("Flip & Persist");
+                        tooltip-text: @tr("Fila de Renderização: FlipQueue AMD = 1 e Persistence Mode em placas NVIDIA.");
                         accent-color: CS2Theme.status-success;
                         hover-color: #059669;
                         checked <=> root.render-queue-tweak-active;
                         toggled(val) => {
-                            root.status-message = val ? "Render Queue: FlipQueue AMD definido para 1 / NVIDIA PM ativo." : "Render Queue restaurada ao padrão de fábrica.";
+                            root.status-message = val ? @tr("Render Queue: FlipQueue AMD definido para 1 / NVIDIA PM ativo.") : @tr("Render Queue restaurada ao padrão de fábrica.");
                             root.tweak-toggled("render_queue", val);
                         }
                     }
@@ -699,7 +699,7 @@ export component MainWindow inherits Window {
                             root.msi-tweak-active = val;
                             root.power-saving-tweak-active = val;
                             root.render-queue-tweak-active = val;
-                            root.status-message = val ? "Todos os 13 módulos de otimização ativados." : "Todos os módulos desativados (Modo Padrão Windows).";
+                            root.status-message = val ? @tr("Todos os 13 módulos de otimização ativados.") : @tr("Todos os módulos desativados (Modo Padrão Windows).");
                             root.bulk-tweaks-action(val ? "activate_all" : "deactivate_all");
                         }
                     }
@@ -761,7 +761,7 @@ export component MainWindow inherits Window {
                             animate border-color { duration: 120ms; }
 
                             Text {
-                                text: "PARÂMETROS";
+                                text: @tr("PARÂMETROS");
                                 font-size: 8px;
                                 font-weight: 900;
                                 letter-spacing: 0.6px;
@@ -782,7 +782,7 @@ export component MainWindow inherits Window {
                             accepted => {
                                 if root.is-editing-launch-args {
                                     root.is-editing-launch-args = false;
-                                    root.status-message = "Salvando parâmetros no perfil '" + root.active-preset + "'...";
+                                    root.status-message = @tr("Salvando parâmetros no perfil '{}'...", root.active-preset);
                                     root.save-launch-args-clicked(root.launch-args-text);
                                 }
                             }
@@ -792,7 +792,7 @@ export component MainWindow inherits Window {
                     if root.launch-args-text == "" : Text {
                         x: 114px;
                         y: (parent.height - self.height) / 2;
-                        text: root.is-editing-launch-args ? "Ex: -novid -high +fps_max 0" : "Nenhum parâmetro de inicialização configurado";
+                        text: root.is-editing-launch-args ? @tr("Ex: -novid -high +fps_max 0") : @tr("Nenhum parâmetro de inicialização configurado");
                         color: CS2Theme.text-dim;
                         font-size: 11px;
                         font-weight: 500;
@@ -832,11 +832,11 @@ export component MainWindow inherits Window {
                         clicked => {
                             if !root.is-editing-launch-args {
                                 root.is-editing-launch-args = true;
-                                root.status-message = "Edição de parâmetros desbloqueada para o perfil '" + root.active-preset + "'.";
+                                root.status-message = @tr("Edição de parâmetros desbloqueada para o perfil '{}'.", root.active-preset);
                                 launch-input.focus();
                             } else {
                                 root.is-editing-launch-args = false;
-                                root.status-message = "Salvando parâmetros no perfil '" + root.active-preset + "'...";
+                                root.status-message = @tr("Salvando parâmetros no perfil '{}'...", root.active-preset);
                                 root.save-launch-args-clicked(root.launch-args-text);
                             }
                         }
@@ -850,8 +850,8 @@ export component MainWindow inherits Window {
                 spacing: 16px;
 
                 TacticalButton {
-                    text: "OTIMIZAR AUTOMATICAMENTE";
-                    badge: "PERFIL RECOMENDADO • BAIXA LATÊNCIA";
+                    text: @tr("OTIMIZAR AUTOMATICAMENTE");
+                    badge: @tr("PERFIL RECOMENDADO • BAIXA LATÊNCIA");
                     enabled: !root.is-launching;
                     background-color: CS2Theme.accent-orange;
                     hover-color: #ff771a;
@@ -892,7 +892,7 @@ export component MainWindow inherits Window {
                     }
 
                     Text {
-                        text: "PERFIS DE OTIMIZAÇÃO (CONFIG/OPTIMZATIONS)";
+                        text: @tr("PERFIS DE OTIMIZAÇÃO (CONFIG/OPTIMZATIONS)");
                         font-size: 10px;
                         font-weight: 800;
                         letter-spacing: 0.8px;
@@ -922,7 +922,7 @@ export component MainWindow inherits Window {
                         selected => {
                             root.active-preset = preset.name;
                             root.is-editing-launch-args = false;
-                            root.status-message = "Perfil ativo: " + preset.name;
+                            root.status-message = @tr("Perfil ativo: {}", preset.name);
                             root.preset-selected(preset.name);
                         }
                         delete => {
@@ -981,7 +981,7 @@ export component MainWindow inherits Window {
             alignment: space-between;
 
             Text {
-                text: "CONFIGURAÇÕES GERAIS";
+                text: @tr("CONFIGURAÇÕES GERAIS");
                 font-size: 16px;
                 font-weight: 900;
                 letter-spacing: 0.6px;
@@ -997,14 +997,14 @@ export component MainWindow inherits Window {
                     alignment: center;
 
                     Text {
-                        text: "Parâmetros de Inicialização e Diretórios";
+                        text: @tr("Parâmetros de Inicialização e Diretórios");
                         font-size: 13px;
                         font-weight: 700;
                         color: CS2Theme.text-primary;
                         horizontal-alignment: center;
                     }
                     Text {
-                        text: "Detecção automática da Steam e perfis de inicialização do Counter-Strike 2.";
+                        text: @tr("Detecção automática da Steam e perfis de inicialização do Counter-Strike 2.");
                         font-size: 11px;
                         color: CS2Theme.text-muted;
                         horizontal-alignment: center;
@@ -1043,7 +1043,7 @@ export component MainWindow inherits Window {
             alignment: space-between;
 
             Text {
-                text: "RANKING CS & TABELA VALVE";
+                text: @tr("RANKING CS & TABELA VALVE");
                 font-size: 16px;
                 font-weight: 900;
                 letter-spacing: 0.6px;
@@ -1059,7 +1059,7 @@ export component MainWindow inherits Window {
                     alignment: center;
 
                     Text {
-                            text: "EM BREVE";
+                            text: @tr("EM BREVE");
                             font-size: 50px;
                             font-weight: 900;
                             color: CS2Theme.text-muted;
@@ -1125,7 +1125,7 @@ export component MainWindow inherits Window {
         create-profile => {
             root.show-no-profile-modal = false;
             root.active-tab = 1;
-            root.status-message = "Ajustes Avançados de Hardware";
+            root.status-message = @tr("Ajustes Avançados de Hardware");
         }
     }
 }

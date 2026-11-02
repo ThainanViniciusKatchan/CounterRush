@@ -22,6 +22,19 @@ fn scan_presets() -> Vec<PresetModel> {
 }
 
 fn main() -> Result<(), slint::PlatformError> {
+    if std::env::var("LANG").is_err() && std::env::var("LC_ALL").is_err() {
+        std::env::set_var("LANG", "pt_BR.UTF-8");
+        std::env::set_var("LANGUAGE", "pt_BR");
+    }
+
+    let locale_dir = std::env::current_exe()
+        .ok()
+        .and_then(|p| p.parent().map(|d| d.join("locale")))
+        .filter(|p| p.exists())
+        .unwrap_or_else(|| std::path::PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/../locale")));
+
+    slint::init_translations!(locale_dir);
+
     let main_window = MainWindow::new()?;
 
     // Inicializa a lista de perfis de otimização na interface a partir do disco

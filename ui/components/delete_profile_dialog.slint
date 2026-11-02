@@ -48,7 +48,7 @@ export component DeleteProfileDialog inherits Rectangle {
                     }
 
                     Text {
-                        text: "EXCLUIR PERFIL";
+                        text: @tr("EXCLUIR PERFIL");
                         font-size: 13px;
                         font-weight: 900;
                         letter-spacing: 0.8px;
@@ -94,7 +94,7 @@ export component DeleteProfileDialog inherits Rectangle {
                 spacing: 4px;
 
                 Text {
-                    text: "Deseja realmente excluir o perfil " + root.profile-name + "?";
+                    text: @tr("Deseja realmente excluir o perfil {}?", root.profile-name);
                     font-size: 12px;
                     font-weight: 700;
                     color: CS2Theme.text-primary;
@@ -102,7 +102,7 @@ export component DeleteProfileDialog inherits Rectangle {
                 }
 
                 Text {
-                    text: "Esta ação não pode ser desfeita e removerá o arquivo do disco.";
+                    text: @tr("Esta ação não pode ser desfeita e removerá o arquivo do disco.");
                     font-size: 10px;
                     color: CS2Theme.text-dim;
                 }
@@ -123,7 +123,7 @@ export component DeleteProfileDialog inherits Rectangle {
                     border-color: cancel-touch.has-hover ? CS2Theme.border-hover : CS2Theme.border;
 
                     Text {
-                        text: "Cancelar";
+                        text: @tr("Cancelar");
                         font-size: 11px;
                         font-weight: 800;
                         letter-spacing: 0.5px;
@@ -150,7 +150,7 @@ export component DeleteProfileDialog inherits Rectangle {
                     border-color: #991b1b;
 
                     Text {
-                        text: "Excluir";
+                        text: @tr("Excluir");
                         font-size: 11px;
                         font-weight: 900;
                         letter-spacing: 0.5px;

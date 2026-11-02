@@ -131,14 +131,14 @@ export component CreateProfileDialog inherits Rectangle {
                 VerticalLayout {
                     spacing: 2px;
                     Text {
-                        text: "NOVO PERFIL DE OTIMIZAÇÃO";
+                        text: @tr("NOVO PERFIL DE OTIMIZAÇÃO");
                         font-size: 15px;
                         font-weight: 900;
                         letter-spacing: 0.8px;
                         color: CS2Theme.accent-orange;
                     }
                     Text {
-                        text: "Grave um perfil .json customizado e ative-o imediatamente no CounterRush";
+                        text: @tr("Grave um perfil .json customizado e ative-o imediatamente no CounterRush");
                         font-size: 10px;
                         color: CS2Theme.text-muted;
                     }
@@ -186,7 +186,7 @@ export component CreateProfileDialog inherits Rectangle {
                     horizontal-stretch: 1;
 
                     Text {
-                        text: "NOME DO PERFIL (.JSON)";
+                        text: @tr("NOME DO PERFIL (.JSON)");
                         font-size: 10px;
                         font-weight: 800;
                         letter-spacing: 0.5px;
@@ -215,7 +215,7 @@ export component CreateProfileDialog inherits Rectangle {
 
                         if root.profile-name == "" : Text {
                             x: 10px;
-                            text: "Ex: competitivo_ultra";
+                            text: @tr("Ex: competitivo_ultra");
                             color: CS2Theme.text-dim;
                             font-size: 11px;
                             vertical-alignment: center;
@@ -229,7 +229,7 @@ export component CreateProfileDialog inherits Rectangle {
                     horizontal-stretch: 1;
 
                     Text {
-                        text: "ARGUMENTOS STEAM (LAUNCH ARGS)";
+                        text: @tr("ARGUMENTOS STEAM (LAUNCH ARGS)");
                         font-size: 10px;
                         font-weight: 800;
                         letter-spacing: 0.5px;
@@ -258,7 +258,7 @@ export component CreateProfileDialog inherits Rectangle {
 
                         if root.launch-args == "" : Text {
                             x: 10px;
-                            text: "Ex: -novid -high +fps_max 0";
+                            text: @tr("Ex: -novid -high +fps_max 0");
                             color: CS2Theme.text-dim;
                             font-size: 11px;
                             vertical-alignment: center;
@@ -275,7 +275,7 @@ export component CreateProfileDialog inherits Rectangle {
                     alignment: space-between;
 
                     Text {
-                        text: "SELEÇÃO DOS 13 MÓDULOS DE OTIMIZAÇÃO";
+                        text: @tr("SELEÇÃO DOS 13 MÓDULOS DE OTIMIZAÇÃO");
                         font-size: 10px;
                         font-weight: 800;
                         letter-spacing: 0.6px;
@@ -296,7 +296,7 @@ export component CreateProfileDialog inherits Rectangle {
                             border-color: check-all-touch.has-hover ? CS2Theme.accent-orange : CS2Theme.border;
 
                             Text {
-                                text: "MARCAR TODOS";
+                                text: @tr("MARCAR TODOS");
                                 font-size: 9px;
                                 font-weight: 800;
                                 color: check-all-touch.has-hover ? CS2Theme.accent-orange : CS2Theme.text-dim;
@@ -333,7 +333,7 @@ export component CreateProfileDialog inherits Rectangle {
                             border-color: uncheck-all-touch.has-hover ? CS2Theme.accent-orange : CS2Theme.border;
 
                             Text {
-                                text: "DESMARCAR TODOS";
+                                text: @tr("DESMARCAR TODOS");
                                 font-size: 9px;
                                 font-weight: 800;
                                 color: uncheck-all-touch.has-hover ? CS2Theme.accent-orange : CS2Theme.text-dim;
@@ -373,31 +373,31 @@ export component CreateProfileDialog inherits Rectangle {
                         horizontal-stretch: 1;
 
                         ProfileTweakCheck {
-                            text: "Afinidade de CPU (Isolar Core 0)";
+                            text: @tr("Afinidade de CPU (Isolar Core 0)");
                             checked <=> root.cs2-affinity;
                         }
                         ProfileTweakCheck {
-                            text: "Resolução de Timer (0.5ms)";
+                            text: @tr("Resolução de Timer (0.5ms)");
                             checked <=> root.apply-timer-resolution;
                         }
                         ProfileTweakCheck {
-                            text: "Prioridade Alta CS2";
+                            text: @tr("Prioridade Alta CS2");
                             checked <=> root.cs2-priority;
                         }
                         ProfileTweakCheck {
-                            text: "Limpeza de RAM Standby";
+                            text: @tr("Limpeza de RAM Standby");
                             checked <=> root.empty-standby-list;
                         }
                         ProfileTweakCheck {
-                            text: "Desativar GPU Hardware Accel";
+                            text: @tr("Desativar GPU Hardware Accel");
                             checked <=> root.disable-gpu-acceleration;
                         }
                         ProfileTweakCheck {
-                            text: "Otimização de DPI / Escala";
+                            text: @tr("Otimização de DPI / Escala");
                             checked <=> root.apply-dpi-optimization;
                         }
                         ProfileTweakCheck {
-                            text: "Desativar Compactação Memória";
+                            text: @tr("Desativar Compactação Memória");
                             checked <=> root.disable-memory-compression;
                         }
                     }
@@ -408,27 +408,27 @@ export component CreateProfileDialog inherits Rectangle {
                         horizontal-stretch: 1;
 
                         ProfileTweakCheck {
-                            text: "Perfil MMCSS Games";
+                            text: @tr("Perfil MMCSS Games");
                             checked <=> root.apply-mmcss;
                         }
                         ProfileTweakCheck {
-                            text: "Desativar HPET (High Precision Timer)";
+                            text: @tr("Desativar HPET (High Precision Timer)");
                             checked <=> root.disable-hpet;
                         }
                         ProfileTweakCheck {
-                            text: "Desativar Windows Game Bar";
+                            text: @tr("Desativar Windows Game Bar");
                             checked <=> root.disable-game-bar;
                         }
                         ProfileTweakCheck {
-                            text: "Modo MSI para GPU / Áudio";
+                            text: @tr("Modo MSI para GPU / Áudio");
                             checked <=> root.enable-msi;
                         }
                         ProfileTweakCheck {
-                            text: "Desativar Economia de Energia";
+                            text: @tr("Desativar Economia de Energia");
                             checked <=> root.disable-power-saving;
                         }
                         ProfileTweakCheck {
-                            text: "Render Queue CS2 Ultra-Low";
+                            text: @tr("Render Queue CS2 Ultra-Low");
                             checked <=> root.apply-render-queue;
                         }
                     }
@@ -445,7 +445,7 @@ export component CreateProfileDialog inherits Rectangle {
                     alignment: start;
 
                     if root.error-message != "" : Text {
-                        text: "⚠ " + root.error-message;
+                        text: @tr("⚠ {}", root.error-message);
                         font-size: 11px;
                         font-weight: 700;
                         color: CS2Theme.status-danger;
@@ -468,7 +468,7 @@ export component CreateProfileDialog inherits Rectangle {
                         border-color: cancel-touch.has-hover ? CS2Theme.border-hover : CS2Theme.border;
 
                         Text {
-                            text: "CANCELAR";
+                            text: @tr("CANCELAR");
                             font-size: 11px;
                             font-weight: 800;
                             letter-spacing: 0.6px;
@@ -495,7 +495,7 @@ export component CreateProfileDialog inherits Rectangle {
                         border-color: #c2410c;
 
                         Text {
-                            text: "CRIAR E ATIVAR PERFIL";
+                            text: @tr("CRIAR E ATIVAR PERFIL");
                             font-size: 11px;
                             font-weight: 900;
                             letter-spacing: 0.8px;

@@ -1,9 +1,9 @@
 import { CS2Theme } from "../theme.slint";
 
 export component ActionCard inherits Rectangle {
-    in property <string> title: "Título do Card";
-    in property <string> description: "Descrição do recurso";
-    in property <string> badge: "RECURSO";
+    in property <string> title: @tr("Título do Card");
+    in property <string> description: @tr("Descrição do recurso");
+    in property <string> badge: @tr("RECURSO");
     in property <image> icon-src;
     in property <color> accent-color: CS2Theme.accent-orange;
     callback clicked();
@@ -104,7 +104,7 @@ export component ActionCard inherits Rectangle {
             spacing: 4px;
 
             Text {
-                text: touch.has-hover ? "ACESSAR" : "DETALHES";
+                text: touch.has-hover ? @tr("ACESSAR") : @tr("DETALHES");
                 font-size: 9px;
                 font-weight: 700;
                 letter-spacing: 0.4px;

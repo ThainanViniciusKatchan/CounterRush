@@ -7,7 +7,7 @@ authors.workspace      = true
 license.workspace      = true
 
 [dependencies]
-slint = "1.8"
+slint = { version = "1.8", features = ["gettext"] }
 counterrush_core = { package = "core", path = "../core" }
 
 [build-dependencies]

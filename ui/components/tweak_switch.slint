@@ -1,8 +1,8 @@
 import { CS2Theme } from "../theme.slint";
 
 export component TweakSwitch inherits Rectangle {
-    in property <string> label: "Otimização";
-    in property <string> info: "CPU Affinity";
+    in property <string> label: @tr("Otimização");
+    in property <string> info: @tr("CPU Affinity");
     in property <string> tooltip-text: "";
     in property <length> tooltip-width: 215px;
     in property <color> accent-color: CS2Theme.accent-orange;
@@ -70,7 +70,7 @@ export component TweakSwitch inherits Rectangle {
                 }
 
                 Text {
-                    text: root.checked ? "ON" : "OFF";
+                    text: root.checked ? @tr("ON") : @tr("OFF");
                     font-size: 8px;
                     font-weight: 900;
                     letter-spacing: 0.5px;
@@ -161,7 +161,7 @@ export component MasterToggleSwitch inherits Rectangle {
             horizontal-stretch: 1;
 
             Text {
-                text: root.all-active ? "Desativar Tudo" : "Ativar Tudo";
+                text: root.all-active ? @tr("Desativar Tudo") : @tr("Ativar Tudo");
                 font-size: 11px;
                 font-weight: 900;
                 overflow: elide;
@@ -169,7 +169,7 @@ export component MasterToggleSwitch inherits Rectangle {
             }
 
             Text {
-                text: root.all-active ? "13 Módulos On" : "Padrão Windows";
+                text: root.all-active ? @tr("13 Módulos On") : @tr("Padrão Windows");
                 font-size: 9px;
                 overflow: elide;
                 color: rgba(255, 255, 255, 0.9);
@@ -198,7 +198,7 @@ export component MasterToggleSwitch inherits Rectangle {
                 }
 
                 Text {
-                    text: root.all-active ? "ALL" : "OFF";
+                    text: root.all-active ? @tr("ALL") : @tr("OFF");
                     font-size: 8px;
                     font-weight: 900;
                     letter-spacing: 0.5px;
@@ -229,7 +229,7 @@ export component MasterToggleSwitch inherits Rectangle {
             alignment: center;
 
             Text {
-                text: root.all-active ? "Desativar Todas as Otimizações" : "Ativar Todas as Otimizações";
+                text: root.all-active ? @tr("Desativar Todas as Otimizações") : @tr("Ativar Todas as Otimizações");
                 font-size: 10px;
                 font-weight: 800;
                 color: root.all-active ? root.active-color : root.inactive-color;
@@ -237,7 +237,7 @@ export component MasterToggleSwitch inherits Rectangle {
             }
 
             Text {
-                text: root.all-active ? "Clique para desativar todas as 13 otimizações e restaurar o padrão de fábrica do Windows." : "Clique para ativar simultaneamente todos os 13 ajustes de alta performance e baixa latência.";
+                text: root.all-active ? @tr("Clique para desativar todas as 13 otimizações e restaurar o padrão de fábrica do Windows.") : @tr("Clique para ativar simultaneamente todos os 13 ajustes de alta performance e baixa latência.");
                 font-size: 9px;
                 font-weight: 600;
                 color: #f8fafc;
