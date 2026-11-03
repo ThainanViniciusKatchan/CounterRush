@@ -1,0 +1,542 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: counterrush-ui 0.8.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-11-01 23:30+0000\n"
+"PO-Revision-Date: 2026-11-02 21:00+0000\n"
+"Last-Translator: CounterRush Team\n"
+"Language-Team: Russian\n"
+"Language: ru\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
+
+msgid "CounterRush - CS2 Performance"
+msgstr "CounterRush - Производительность CS2"
+
+msgid "Pronto para iniciar o CS2 com taxa de polling de 0.5ms e afinidade de CPU otimizada."
+msgstr "Готов к запуску CS2 с частотой опроса 0.5мс и оптимизированным соответствием ЦП."
+
+msgid "Visualizando Painel Geral"
+msgstr "Просмотр главной панели"
+
+msgid "Ajustes Avançados de Hardware"
+msgstr "Расширенные настройки оборудования"
+
+msgid "Configurações Gerais"
+msgstr "Общие настройки"
+
+msgid "Tabela de Classificação Valve"
+msgstr "Таблица лидеров Valve"
+
+msgid "PAINEL DE CONTROLE"
+msgstr "ПАНЕЛЬ УПРАВЛЕНИЯ"
+
+msgid "AJUSTES DE RÁPIDOS"
+msgstr "БЫСТРЫЕ НАСТРОЙКИ"
+
+msgid "Núcleo 0 Off"
+msgstr "Ядро 0 Выкл"
+
+msgid "Afinidade de CPU"
+msgstr "Соответствие ЦП"
+
+msgid "Afinidade: Núcleo 0 desativado para o CS2."
+msgstr "Соответствие: Ядро 0 отключено для CS2."
+
+msgid "Afinidade: Restaurada ao padrão."
+msgstr "Соответствие: Восстановлено по умолчанию."
+
+msgid "Timer 0.5ms"
+msgstr "Таймер 0.5мс"
+
+msgid "Temporizador"
+msgstr "Таймер"
+
+msgid "Timer: Definido para 0.5ms de alta precisão."
+msgstr "Таймер: Установлено 0.5мс высокой точности."
+
+msgid "Timer: Restaurado."
+msgstr "Таймер: Восстановлен."
+
+msgid "Prioridade Alta"
+msgstr "Высокий приоритет"
+
+msgid "Processo CS2"
+msgstr "Процесс CS2"
+
+msgid "Prioridade de processo definida para Alta."
+msgstr "Приоритет процесса установлен на Высокий."
+
+msgid "Prioridade de processo: Normal."
+msgstr "Приоритет процесса: Обычный."
+
+msgid "Limpar RAM"
+msgstr "Очистить ОЗУ"
+
+msgid "Empty Standby"
+msgstr "Очистить Standby"
+
+msgid "Memória: Páginas em standby liberadas."
+msgstr "Память: Страницы кэша standby освобождены."
+
+msgid "Limpeza de RAM desativada."
+msgstr "Очистка ОЗУ отключена."
+
+msgid "CONFIGS PRO"
+msgstr "ПРО КОНФИГИ"
+
+msgid "Miras, resolução esticada (4:3) e sensibilidade dos principais profissionais."
+msgstr "Прицелы, растянутое разрешение (4:3) и чувствительность ведущих про-игроков."
+
+msgid "EM BREVE"
+msgstr "СКОРО"
+
+msgid "BAIXAR .CFG PRO"
+msgstr "СКАЧАТЬ ПРО .CFG"
+
+msgid "Abrindo catálogo de configs profissionais..."
+msgstr "Открытие каталога профессиональных конфигов..."
+
+msgid "BINDS TÁTICAS"
+msgstr "ТАКТИЧЕСКИЕ БИНДЫ"
+
+msgid "Atalhos rápidos para utilitários e jumpthrow permitidos em servidores oficiais."
+msgstr "Быстрые бинды гранат и jumpthrow, разрешенные на официальных серверах."
+
+msgid "GERENCIAR BINDS"
+msgstr "УПРАВЛЕНИЕ БИНДАМИ"
+
+msgid "Abrindo gerador de atalhos e binds táticas..."
+msgstr "Открытие генератора тактических биндов..."
+
+msgid "TREINO & MAPAS"
+msgstr "ТРЕНИРОВКА И КАРТЫ"
+
+msgid "Mapas essenciais da Oficina Steam para treino de mira e teste de frametime."
+msgstr "Основные карты из мастерской Steam для тренировки аима и проверки фреймтайма."
+
+msgid "ACESSAR TREINO"
+msgstr "ПЕРЕЙТИ К ТРЕНИРОВКЕ"
+
+msgid "Abrindo oficina de mapas e teste de desempenho..."
+msgstr "Открытие карт мастерской и теста производительности..."
+
+msgid "INICIANDO..."
+msgstr "ЗАПУСК..."
+
+msgid "JOGAR CS2"
+msgstr "ИГРАТЬ В CS2"
+
+msgid "APLICANDO TWEAKS & STEAM"
+msgstr "ПРИМЕНЕНИЕ ТВЕКОВ И STEAM"
+
+msgid "INICIAR COM ALTA PERFORMANCE"
+msgstr "ЗАПУСТИТЬ С ВЫСОКОЙ ПРОИЗВОДИТЕЛЬНОСТЬЮ"
+
+msgid "Iniciando Counter-Strike 2 pela Steam com perfil otimizado..."
+msgstr "Запуск Counter-Strike 2 через Steam с оптимизированным профилем..."
+
+msgid "CENTRAL DE OTIMIZAÇÕES"
+msgstr "ЦЕНТР ОПТИМИЗАЦИИ"
+
+msgid "Afinidade CPU"
+msgstr "Соответствие ЦП"
+
+msgid "Afinidade de CPU: Desativa o Núcleo 0 para o CS2 mitigando interrupções do SO."
+msgstr "Соответствие ЦП: Отключает Ядро 0 для CS2, снижая прерывания ОС."
+
+msgid "Temporizador do Sistema: Define resolução de alta precisão de 0.5ms."
+msgstr "Системный таймер: Устанавливает высокое разрешение 0.5мс."
+
+msgid "Timer: Restaurado ao padrão do Windows."
+msgstr "Таймер: Восстановлен по умолчанию Windows."
+
+msgid "Prioridade de Processo: Eleva a prioridade do executável cs2.exe para Tempo Real."
+msgstr "Приоритет процесса: Повышает приоритет cs2.exe до Реального времени."
+
+msgid "Empty Standby List: Libera páginas de cache em standby na memória RAM."
+msgstr "Empty Standby List: Очищает кэшированные страницы standby в ОЗУ."
+
+msgid "GPU Apps Off"
+msgstr "GPU в приложениях Выкл"
+
+msgid "VRAM & Apps"
+msgstr "VRAM и Приложения"
+
+msgid "Aceleração GPU: Desativa aceleração de hardware em Discord, Steam e navegadores."
+msgstr "Аппаратное ускорение: Отключает ускорение GPU в Discord, Steam и браузерах."
+
+msgid "GPU em apps desativada (mais VRAM para CS2)."
+msgstr "GPU в приложениях отключен (больше VRAM для CS2)."
+
+msgid "GPU em apps reativada."
+msgstr "GPU в приложениях включен обратно."
+
+msgid "Otimização DPI"
+msgstr "Оптимизация DPI"
+
+msgid "Tela Cheia CS2"
+msgstr "Полноэкранный режим CS2"
+
+msgid "Otimização DPI: Aplica flags de tela cheia exclusiva e reduz input lag no CS2."
+msgstr "Оптимизация DPI: Применяет флаги эксклюзивного экрана и снижает задержку ввода в CS2."
+
+msgid "DPI & Tela cheia: Flags de baixa latência aplicadas."
+msgstr "DPI и полный экран: Применены флаги низкой задержки."
+
+msgid "DPI: Configuração de compatibilidade removida."
+msgstr "DPI: Настройки совместимости удалены."
+
+msgid "Compactar RAM"
+msgstr "Сжатие памяти"
+
+msgid "MMAgent Off"
+msgstr "MMAgent Выкл"
+
+msgid "Compactação de Memória: Desativa compressão de páginas do Windows (>16GB RAM)."
+msgstr "Сжатие памяти: Отключает сжатие страниц Windows (>16ГБ ОЗУ)."
+
+msgid "Compactação de RAM desativada (menor latência de CPU)."
+msgstr "Сжатие ОЗУ отключено (меньше задержка ЦП)."
+
+msgid "Compactação de RAM reativada."
+msgstr "Сжатие ОЗУ включено обратно."
+
+msgid "Agendador MMCSS"
+msgstr "Планировщик MMCSS"
+
+msgid "Agendador Win"
+msgstr "Планировщик Win"
+
+msgid "MMCSS Games: Otimiza prioridade de rede, áudio e GPU para perfis de jogos."
+msgstr "MMCSS Games: Оптимизирует приоритет сети, звука и GPU для игровых профилей."
+
+msgid "MMCSS: Perfil de jogos otimizado no registro do Windows."
+msgstr "MMCSS: Игровой профиль оптимизирован в реестре Windows."
+
+msgid "MMCSS: Restaurado ao padrão do Windows."
+msgstr "MMCSS: Восстановлен по умолчанию Windows."
+
+msgid "HPET Off"
+msgstr "HPET Выкл"
+
+msgid "Timer BCD"
+msgstr "Таймер BCD"
+
+msgid "Desativar HPET: Desativa o relógio de plataforma no BCD priorizando o TSC da CPU."
+msgstr "Отключить HPET: Отключает платформенный таймер в BCD в пользу TSC процессора."
+
+msgid "HPET desativado no BCD (usando TSC da CPU)."
+msgstr "HPET отключен в BCD (используется TSC процессора)."
+
+msgid "HPET restaurado ao padrão de boot."
+msgstr "HPET восстановлен в настройках загрузки."
+
+msgid "Game Bar Off"
+msgstr "Game Bar Выкл"
+
+msgid "DVR & Overlay"
+msgstr "DVR и Оверлей"
+
+msgid "Xbox Game Bar: Desativa sobreposições, modo Xbox e gravações de fundo GameDVR."
+msgstr "Xbox Game Bar: Отключает оверлеи, режим Xbox и фоновую запись GameDVR."
+
+msgid "Xbox Game Bar, GameDVR e capturas desativados."
+msgstr "Xbox Game Bar, GameDVR и захват видео отключены."
+
+msgid "Xbox Game Bar e capturas restaurados."
+msgstr "Xbox Game Bar и захват видео восстановлены."
+
+msgid "Modo MSI"
+msgstr "Режим MSI"
+
+msgid "PCIe IRQ Mode"
+msgstr "Режим PCIe IRQ"
+
+msgid "Modo MSI: Ativa interrupções baseadas em mensagens para GPU, Rede e portas USB."
+msgstr "Режим MSI: Включает сигнальные прерывания сообщений для GPU, сети и портов USB."
+
+msgid "Modo MSI ativado para GPU (Alta prioridade), Rede e USB."
+msgstr "Режим MSI включен для GPU (высокий приоритет), сети и USB."
+
+msgid "Modo MSI desativado (retornado para INTx)."
+msgstr "Режим MSI отключен (возврат к INTx)."
+
+msgid "Power Save Off"
+msgstr "Энергосбережение Выкл"
+
+msgid "PCIe & USB"
+msgstr "PCIe и USB"
+
+msgid "Economia de Energia: Desativa PCIe ASPM e suspensão seletiva de portas USB."
+msgstr "Энергосбережение: Отключает PCIe ASPM и выборочную приостановку USB."
+
+msgid "Economia de energia desativada (PCIe ASPM e Suspensão USB)."
+msgstr "Энергосбережение отключено (PCIe ASPM и приостановка USB)."
+
+msgid "Economia de energia restaurada ao padrão."
+msgstr "Энергосбережение восстановлено по умолчанию."
+
+msgid "Render Queue"
+msgstr "Очередь рендеринга"
+
+msgid "Flip & Persist"
+msgstr "Flip & Persist"
+
+msgid "Fila de Renderização: FlipQueue AMD = 1 e Persistence Mode em placas NVIDIA."
+msgstr "Очередь рендеринга: FlipQueue AMD = 1 и Persistence Mode на картах NVIDIA."
+
+msgid "Render Queue: FlipQueue AMD definido para 1 / NVIDIA PM ativo."
+msgstr "Очередь рендеринга: AMD FlipQueue = 1 / NVIDIA PM активен."
+
+msgid "Render Queue restaurada ao padrão de fábrica."
+msgstr "Очередь рендеринга возвращена к заводским настройкам."
+
+msgid "Todos os 13 módulos de otimização ativados."
+msgstr "Все 13 модулей оптимизации включены."
+
+msgid "Todos os módulos desativados (Modo Padrão Windows)."
+msgstr "Все модули отключены (Режим по умолчанию Windows)."
+
+msgid "PARÂMETROS"
+msgstr "ПАРАМЕТРЫ"
+
+msgid "Salvando parâmetros no perfil '{}'..."
+msgstr "Сохранение параметров в профиле '{}'..."
+
+msgid "Ex: -novid -high +fps_max 0"
+msgstr "Пример: -novid -high +fps_max 0"
+
+msgid "Nenhum parâmetro de inicialização configurado"
+msgstr "Параметры запуска не настроены"
+
+msgid "Edição de parâmetros desbloqueada para o perfil '{}'."
+msgstr "Редактирование параметров разблокировано для профиля '{}'."
+
+msgid "OTIMIZAR AUTOMATICAMENTE"
+msgstr "АВТООПТИМИЗАЦИЯ"
+
+msgid "PERFIL RECOMENDADO • BAIXA LATÊNCIA"
+msgstr "РЕКОМЕНДУЕМЫЙ ПРОФИЛЬ • НИЗКАЯ ЗАДЕРЖКА"
+
+msgid "PERFIS DE OTIMIZAÇÃO (CONFIG/OPTIMZATIONS)"
+msgstr "ПРОФИЛИ ОПТИМИЗАЦИИ (CONFIG/OPTIMZATIONS)"
+
+msgid "Perfil ativo: {}"
+msgstr "Активный профиль: {}"
+
+msgid "CONFIGURAÇÕES GERAIS"
+msgstr "ОБЩИЕ НАСТРОЙКИ"
+
+msgid "Parâmetros de Inicialização e Diretórios"
+msgstr "Параметры запуска и директории"
+
+msgid "Detecção automática da Steam e perfis de inicialização do Counter-Strike 2."
+msgstr "Автоопределение Steam и профили запуска Counter-Strike 2."
+
+msgid "RANKING CS & TABELA VALVE"
+msgstr "РЕЙТИНГ CS И ТАБЛИЦА VALVE"
+
+msgid "Título do Card"
+msgstr "Заголовок карточки"
+
+msgid "Descrição do recurso"
+msgstr "Описание функции"
+
+msgid "RECURSO"
+msgstr "ФУНКЦИЯ"
+
+msgid "ACESSAR"
+msgstr "ОТКРЫТЬ"
+
+msgid "DETALHES"
+msgstr "ДЕТАЛИ"
+
+msgid "Criar Otimização"
+msgstr "Создать оптимизацию"
+
+msgid "NOVO PERFIL DE OTIMIZAÇÃO"
+msgstr "НОВЫЙ ПРОФИЛЬ ОПТИМИЗАЦИИ"
+
+msgid "Grave um perfil .json customizado e ative-o imediatamente no CounterRush"
+msgstr "Сохраните пользовательский профиль .json и активируйте его в CounterRush"
+
+msgid "NOME DO PERFIL (.JSON)"
+msgstr "ИМЯ ПРОФИЛЯ (.JSON)"
+
+msgid "Ex: competitivo_ultra"
+msgstr "Пример: competitive_ultra"
+
+msgid "ARGUMENTOS STEAM (LAUNCH ARGS)"
+msgstr "ПАРАМЕТРЫ ЗАПУСКА STEAM"
+
+msgid "SELEÇÃO DOS 13 MÓDULOS DE OTIMIZAÇÃO"
+msgstr "ВЫБОР 13 МОДУЛЕЙ ОПТИМИЗАЦИИ"
+
+msgid "MARCAR TODOS"
+msgstr "ВЫБРАТЬ ВСЕ"
+
+msgid "DESMARCAR TODOS"
+msgstr "СНЯТЬ ВСЕ"
+
+msgid "Afinidade de CPU (Isolar Core 0)"
+msgstr "Соответствие ЦП (Изолировать Core 0)"
+
+msgid "Resolução de Timer (0.5ms)"
+msgstr "Разрешение таймера (0.5мс)"
+
+msgid "Prioridade Alta CS2"
+msgstr "Высокий приоритет CS2"
+
+msgid "Limpeza de RAM Standby"
+msgstr "Очистка памяти Standby"
+
+msgid "Desativar GPU Hardware Accel"
+msgstr "Отключить аппаратное ускорение GPU"
+
+msgid "Otimização de DPI / Escala"
+msgstr "Оптимизация DPI и масштабирования"
+
+msgid "Desativar Compactação Memória"
+msgstr "Отключить сжатие памяти"
+
+msgid "Perfil MMCSS Games"
+msgstr "Профиль MMCSS Games"
+
+msgid "Desativar HPET (High Precision Timer)"
+msgstr "Отключить HPET (High Precision Timer)"
+
+msgid "Desativar Windows Game Bar"
+msgstr "Отключить Windows Game Bar"
+
+msgid "Modo MSI para GPU / Áudio"
+msgstr "Режим MSI для GPU / Звука"
+
+msgid "Desativar Economia de Energia"
+msgstr "Отключить энергосбережение"
+
+msgid "Render Queue CS2 Ultra-Low"
+msgstr "Очередь рендеринга CS2 Ultra-Low"
+
+msgid "⚠ {}"
+msgstr "⚠ {}"
+
+msgid "CANCELAR"
+msgstr "ОТМЕНА"
+
+msgid "CRIAR E ATIVAR PERFIL"
+msgstr "СОЗДАТЬ И АКТИВИРОВАТЬ ПРОФИЛЬ"
+
+msgid "EXCLUIR PERFIL"
+msgstr "УДАЛИТЬ ПРОФИЛЬ"
+
+msgid "Deseja realmente excluir o perfil {}?"
+msgstr "Вы действительно хотите удалить профиль {}?"
+
+msgid "Esta ação não pode ser desfeita e removerá o arquivo do disco."
+msgstr "Это действие необратимо и удалит файл с диска."
+
+msgid "Cancelar"
+msgstr "Отмена"
+
+msgid "Excluir"
+msgstr "Удалить"
+
+msgid "AVISO DE PERFIL"
+msgstr "ПРЕДУПРЕЖДЕНИЕ О ПРОФИЛЕ"
+
+msgid "Nenhum Perfil de Otimização encontrado, Deseja criar um?"
+msgstr "Профиль оптимизации не найден, хотите создать?"
+
+msgid "Configure ajustes de desempenho antes de inicializar o jogo com alta performance."
+msgstr "Настройте параметры производительности перед запуском игры."
+
+msgid "Sair"
+msgstr "Выход"
+
+msgid "Criar Perfil"
+msgstr "Создать профиль"
+
+msgid "PERFIL JSON"
+msgstr "JSON ПРОФИЛЬ"
+
+msgid "ATIVO"
+msgstr "АКТИВЕН"
+
+msgid "USAR"
+msgstr "ВЫБРАТЬ"
+
+msgid "Painel"
+msgstr "Панель"
+
+msgid "Otimizações"
+msgstr "Оптимизации"
+
+msgid "Configurações"
+msgstr "Настройки"
+
+msgid "Ranking CS"
+msgstr "Рейтинг CS"
+
+msgid "CounterRush v0.8.0"
+msgstr "CounterRush v0.8.0"
+
+msgid "COMPETITIVO • 0.5ms"
+msgstr "ТУРНИРНЫЙ • 0.5мс"
+
+msgid "Otimização"
+msgstr "Оптимизация"
+
+msgid "CPU Affinity"
+msgstr "CPU Affinity"
+
+msgid "ON"
+msgstr "ВКЛ"
+
+msgid "OFF"
+msgstr "ВЫКЛ"
+
+msgid "Desativar Tudo"
+msgstr "Отключить всё"
+
+msgid "Ativar Tudo"
+msgstr "Включить всё"
+
+msgid "13 Módulos On"
+msgstr "13 Модулей Вкл"
+
+msgid "Padrão Windows"
+msgstr "По умолчанию Windows"
+
+msgid "ALL"
+msgstr "ВСЕ"
+
+msgid "Desativar Todas as Otimizações"
+msgstr "Отключить все оптимизации"
+
+msgid "Ativar Todas as Otimizações"
+msgstr "Включить все оптимизации"
+
+msgid "Clique para desativar todas as 13 otimizações e restaurar o padrão de fábrica do Windows."
+msgstr "Нажмите, чтобы отключить все 13 оптимизаций и восстановить заводские настройки Windows."
+
+msgid "Clique para ativar simultaneamente todos os 13 ajustes de alta performance e baixa latência."
+msgstr "Нажмите, чтобы одновременно активировать все 13 настроек высокой производительности и низкой задержки."
+
+msgid "PERFIL DO USUÁRIO"
+msgstr "ПОЛЬЗОВАТЕЛЬСКИЙ ПРОФИЛЬ"
+
+msgid "HARDWARE ADAPTATIVO"
+msgstr "АДАПТИВНОЕ ОБОРУДОВАНИЕ"
+
+msgid "CUSTOMIZADO / MANUAL"
+msgstr "ПОЛЬЗОВАТЕЛЬСКИЙ / ВРУЧНУЮ"
+
+msgid "Otimizando sistema o CS2..."
+msgstr "Оптимизация системы для CS2..."
+
+msgid "Otimizando sistema para o CS2..."
+msgstr "Оптимизация системы для CS2..."
+

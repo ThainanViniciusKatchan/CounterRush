@@ -1,0 +1,542 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: counterrush-ui 0.8.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-11-01 23:30+0000\n"
+"PO-Revision-Date: 2026-11-02 21:00+0000\n"
+"Last-Translator: CounterRush Team\n"
+"Language-Team: English\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "CounterRush - CS2 Performance"
+msgstr "CounterRush - CS2 Performance"
+
+msgid "Pronto para iniciar o CS2 com taxa de polling de 0.5ms e afinidade de CPU otimizada."
+msgstr "Ready to launch CS2 with 0.5ms polling rate and optimized CPU affinity."
+
+msgid "Visualizando Painel Geral"
+msgstr "Viewing General Dashboard"
+
+msgid "Ajustes Avançados de Hardware"
+msgstr "Advanced Hardware Tweaks"
+
+msgid "Configurações Gerais"
+msgstr "General Settings"
+
+msgid "Tabela de Classificação Valve"
+msgstr "Valve Leaderboard"
+
+msgid "PAINEL DE CONTROLE"
+msgstr "CONTROL PANEL"
+
+msgid "AJUSTES DE RÁPIDOS"
+msgstr "QUICK TWEAKS"
+
+msgid "Núcleo 0 Off"
+msgstr "Core 0 Off"
+
+msgid "Afinidade de CPU"
+msgstr "CPU Affinity"
+
+msgid "Afinidade: Núcleo 0 desativado para o CS2."
+msgstr "Affinity: Core 0 disabled for CS2."
+
+msgid "Afinidade: Restaurada ao padrão."
+msgstr "Affinity: Restored to default."
+
+msgid "Timer 0.5ms"
+msgstr "Timer 0.5ms"
+
+msgid "Temporizador"
+msgstr "Timer Resolution"
+
+msgid "Timer: Definido para 0.5ms de alta precisão."
+msgstr "Timer: Set to high precision 0.5ms."
+
+msgid "Timer: Restaurado."
+msgstr "Timer: Restored."
+
+msgid "Prioridade Alta"
+msgstr "High Priority"
+
+msgid "Processo CS2"
+msgstr "CS2 Process"
+
+msgid "Prioridade de processo definida para Alta."
+msgstr "Process priority set to High."
+
+msgid "Prioridade de processo: Normal."
+msgstr "Process priority: Normal."
+
+msgid "Limpar RAM"
+msgstr "Clear RAM"
+
+msgid "Empty Standby"
+msgstr "Empty Standby"
+
+msgid "Memória: Páginas em standby liberadas."
+msgstr "Memory: Standby cache pages flushed."
+
+msgid "Limpeza de RAM desativada."
+msgstr "RAM clean disabled."
+
+msgid "CONFIGS PRO"
+msgstr "PRO CONFIGS"
+
+msgid "Miras, resolução esticada (4:3) e sensibilidade dos principais profissionais."
+msgstr "Crosshairs, stretched resolution (4:3) and sensitivity from top pros."
+
+msgid "EM BREVE"
+msgstr "COMING SOON"
+
+msgid "BAIXAR .CFG PRO"
+msgstr "DOWNLOAD PRO .CFG"
+
+msgid "Abrindo catálogo de configs profissionais..."
+msgstr "Opening pro configs catalog..."
+
+msgid "BINDS TÁTICAS"
+msgstr "TACTICAL BINDS"
+
+msgid "Atalhos rápidos para utilitários e jumpthrow permitidos em servidores oficiais."
+msgstr "Quick shortcuts for utility and jumpthrow allowed in official servers."
+
+msgid "GERENCIAR BINDS"
+msgstr "MANAGE BINDS"
+
+msgid "Abrindo gerador de atalhos e binds táticas..."
+msgstr "Opening shortcuts generator and tactical binds..."
+
+msgid "TREINO & MAPAS"
+msgstr "TRAINING & MAPS"
+
+msgid "Mapas essenciais da Oficina Steam para treino de mira e teste de frametime."
+msgstr "Essential Steam Workshop maps for aim training and frametime testing."
+
+msgid "ACESSAR TREINO"
+msgstr "ACCESS TRAINING"
+
+msgid "Abrindo oficina de mapas e teste de desempenho..."
+msgstr "Opening workshop maps and performance testing..."
+
+msgid "INICIANDO..."
+msgstr "LAUNCHING..."
+
+msgid "JOGAR CS2"
+msgstr "PLAY CS2"
+
+msgid "APLICANDO TWEAKS & STEAM"
+msgstr "APPLYING TWEAKS & STEAM"
+
+msgid "INICIAR COM ALTA PERFORMANCE"
+msgstr "LAUNCH WITH HIGH PERFORMANCE"
+
+msgid "Iniciando Counter-Strike 2 pela Steam com perfil otimizado..."
+msgstr "Launching Counter-Strike 2 via Steam with optimized profile..."
+
+msgid "CENTRAL DE OTIMIZAÇÕES"
+msgstr "OPTIMIZATIONS CENTER"
+
+msgid "Afinidade CPU"
+msgstr "CPU Affinity"
+
+msgid "Afinidade de CPU: Desativa o Núcleo 0 para o CS2 mitigando interrupções do SO."
+msgstr "CPU Affinity: Disables Core 0 for CS2 mitigating OS interrupts."
+
+msgid "Temporizador do Sistema: Define resolução de alta precisão de 0.5ms."
+msgstr "System Timer: Sets high precision resolution to 0.5ms."
+
+msgid "Timer: Restaurado ao padrão do Windows."
+msgstr "Timer: Restored to Windows default."
+
+msgid "Prioridade de Processo: Eleva a prioridade do executável cs2.exe para Tempo Real."
+msgstr "Process Priority: Sets cs2.exe executable priority to Realtime."
+
+msgid "Empty Standby List: Libera páginas de cache em standby na memória RAM."
+msgstr "Empty Standby List: Clears standby cache pages in RAM."
+
+msgid "GPU Apps Off"
+msgstr "GPU Apps Off"
+
+msgid "VRAM & Apps"
+msgstr "VRAM & Apps"
+
+msgid "Aceleração GPU: Desativa aceleração de hardware em Discord, Steam e navegadores."
+msgstr "GPU Acceleration: Disables hardware acceleration in Discord, Steam and browsers."
+
+msgid "GPU em apps desativada (mais VRAM para CS2)."
+msgstr "GPU in apps disabled (more VRAM for CS2)."
+
+msgid "GPU em apps reativada."
+msgstr "GPU in apps re-enabled."
+
+msgid "Otimização DPI"
+msgstr "DPI Optimization"
+
+msgid "Tela Cheia CS2"
+msgstr "Fullscreen CS2"
+
+msgid "Otimização DPI: Aplica flags de tela cheia exclusiva e reduz input lag no CS2."
+msgstr "DPI Optimization: Applies exclusive fullscreen flags and reduces CS2 input lag."
+
+msgid "DPI & Tela cheia: Flags de baixa latência aplicadas."
+msgstr "DPI & Fullscreen: Low latency flags applied."
+
+msgid "DPI: Configuração de compatibilidade removida."
+msgstr "DPI: Compatibility configuration removed."
+
+msgid "Compactar RAM"
+msgstr "Compress RAM"
+
+msgid "MMAgent Off"
+msgstr "MMAgent Off"
+
+msgid "Compactação de Memória: Desativa compressão de páginas do Windows (>16GB RAM)."
+msgstr "Memory Compression: Disables Windows page compression (>16GB RAM)."
+
+msgid "Compactação de RAM desativada (menor latência de CPU)."
+msgstr "RAM compression disabled (lower CPU latency)."
+
+msgid "Compactação de RAM reativada."
+msgstr "RAM compression re-enabled."
+
+msgid "Agendador MMCSS"
+msgstr "MMCSS Scheduler"
+
+msgid "Agendador Win"
+msgstr "Win Scheduler"
+
+msgid "MMCSS Games: Otimiza prioridade de rede, áudio e GPU para perfis de jogos."
+msgstr "MMCSS Games: Optimizes network, audio and GPU priority for gaming profiles."
+
+msgid "MMCSS: Perfil de jogos otimizado no registro do Windows."
+msgstr "MMCSS: Gaming profile optimized in Windows registry."
+
+msgid "MMCSS: Restaurado ao padrão do Windows."
+msgstr "MMCSS: Restored to Windows default."
+
+msgid "HPET Off"
+msgstr "HPET Off"
+
+msgid "Timer BCD"
+msgstr "BCD Timer"
+
+msgid "Desativar HPET: Desativa o relógio de plataforma no BCD priorizando o TSC da CPU."
+msgstr "Disable HPET: Disables platform clock in BCD prioritizing CPU TSC."
+
+msgid "HPET desativado no BCD (usando TSC da CPU)."
+msgstr "HPET disabled in BCD (using CPU TSC)."
+
+msgid "HPET restaurado ao padrão de boot."
+msgstr "HPET restored to boot default."
+
+msgid "Game Bar Off"
+msgstr "Game Bar Off"
+
+msgid "DVR & Overlay"
+msgstr "DVR & Overlay"
+
+msgid "Xbox Game Bar: Desativa sobreposições, modo Xbox e gravações de fundo GameDVR."
+msgstr "Xbox Game Bar: Disables overlays, Xbox mode and GameDVR background recording."
+
+msgid "Xbox Game Bar, GameDVR e capturas desativados."
+msgstr "Xbox Game Bar, GameDVR and captures disabled."
+
+msgid "Xbox Game Bar e capturas restaurados."
+msgstr "Xbox Game Bar and captures restored."
+
+msgid "Modo MSI"
+msgstr "MSI Mode"
+
+msgid "PCIe IRQ Mode"
+msgstr "PCIe IRQ Mode"
+
+msgid "Modo MSI: Ativa interrupções baseadas em mensagens para GPU, Rede e portas USB."
+msgstr "MSI Mode: Enables message signaled interrupts for GPU, Network and USB ports."
+
+msgid "Modo MSI ativado para GPU (Alta prioridade), Rede e USB."
+msgstr "MSI Mode enabled for GPU (High priority), Network and USB."
+
+msgid "Modo MSI desativado (retornado para INTx)."
+msgstr "MSI Mode disabled (returned to INTx)."
+
+msgid "Power Save Off"
+msgstr "Power Save Off"
+
+msgid "PCIe & USB"
+msgstr "PCIe & USB"
+
+msgid "Economia de Energia: Desativa PCIe ASPM e suspensão seletiva de portas USB."
+msgstr "Power Saving: Disables PCIe ASPM and USB selective suspend."
+
+msgid "Economia de energia desativada (PCIe ASPM e Suspensão USB)."
+msgstr "Power saving disabled (PCIe ASPM and USB Suspend)."
+
+msgid "Economia de energia restaurada ao padrão."
+msgstr "Power saving restored to default."
+
+msgid "Render Queue"
+msgstr "Render Queue"
+
+msgid "Flip & Persist"
+msgstr "Flip & Persist"
+
+msgid "Fila de Renderização: FlipQueue AMD = 1 e Persistence Mode em placas NVIDIA."
+msgstr "Render Queue: FlipQueue AMD = 1 and Persistence Mode on NVIDIA cards."
+
+msgid "Render Queue: FlipQueue AMD definido para 1 / NVIDIA PM ativo."
+msgstr "Render Queue: AMD FlipQueue set to 1 / NVIDIA PM active."
+
+msgid "Render Queue restaurada ao padrão de fábrica."
+msgstr "Render Queue restored to factory default."
+
+msgid "Todos os 13 módulos de otimização ativados."
+msgstr "All 13 optimization modules enabled."
+
+msgid "Todos os módulos desativados (Modo Padrão Windows)."
+msgstr "All modules disabled (Windows Default Mode)."
+
+msgid "PARÂMETROS"
+msgstr "PARAMETERS"
+
+msgid "Salvando parâmetros no perfil '{}'..."
+msgstr "Saving parameters in profile '{}'..."
+
+msgid "Ex: -novid -high +fps_max 0"
+msgstr "Ex: -novid -high +fps_max 0"
+
+msgid "Nenhum parâmetro de inicialização configurado"
+msgstr "No launch parameters configured"
+
+msgid "Edição de parâmetros desbloqueada para o perfil '{}'."
+msgstr "Parameter editing unlocked for profile '{}'."
+
+msgid "OTIMIZAR AUTOMATICAMENTE"
+msgstr "AUTO OPTIMIZE"
+
+msgid "PERFIL RECOMENDADO • BAIXA LATÊNCIA"
+msgstr "RECOMMENDED PROFILE • LOW LATENCY"
+
+msgid "PERFIS DE OTIMIZAÇÃO (CONFIG/OPTIMZATIONS)"
+msgstr "OPTIMIZATION PROFILES (CONFIG/OPTIMZATIONS)"
+
+msgid "Perfil ativo: {}"
+msgstr "Active profile: {}"
+
+msgid "CONFIGURAÇÕES GERAIS"
+msgstr "GENERAL SETTINGS"
+
+msgid "Parâmetros de Inicialização e Diretórios"
+msgstr "Launch Parameters and Directories"
+
+msgid "Detecção automática da Steam e perfis de inicialização do Counter-Strike 2."
+msgstr "Automatic Steam detection and Counter-Strike 2 launch profiles."
+
+msgid "RANKING CS & TABELA VALVE"
+msgstr "CS RANKING & VALVE LEADERBOARD"
+
+msgid "Título do Card"
+msgstr "Card Title"
+
+msgid "Descrição do recurso"
+msgstr "Feature description"
+
+msgid "RECURSO"
+msgstr "FEATURE"
+
+msgid "ACESSAR"
+msgstr "ACCESS"
+
+msgid "DETALHES"
+msgstr "DETAILS"
+
+msgid "Criar Otimização"
+msgstr "Create Optimization"
+
+msgid "NOVO PERFIL DE OTIMIZAÇÃO"
+msgstr "NEW OPTIMIZATION PROFILE"
+
+msgid "Grave um perfil .json customizado e ative-o imediatamente no CounterRush"
+msgstr "Save a custom .json profile and activate it immediately in CounterRush"
+
+msgid "NOME DO PERFIL (.JSON)"
+msgstr "PROFILE NAME (.JSON)"
+
+msgid "Ex: competitivo_ultra"
+msgstr "Ex: competitive_ultra"
+
+msgid "ARGUMENTOS STEAM (LAUNCH ARGS)"
+msgstr "STEAM ARGUMENTS (LAUNCH ARGS)"
+
+msgid "SELEÇÃO DOS 13 MÓDULOS DE OTIMIZAÇÃO"
+msgstr "SELECT 13 OPTIMIZATION MODULES"
+
+msgid "MARCAR TODOS"
+msgstr "CHECK ALL"
+
+msgid "DESMARCAR TODOS"
+msgstr "UNCHECK ALL"
+
+msgid "Afinidade de CPU (Isolar Core 0)"
+msgstr "CPU Affinity (Isolate Core 0)"
+
+msgid "Resolução de Timer (0.5ms)"
+msgstr "Timer Resolution (0.5ms)"
+
+msgid "Prioridade Alta CS2"
+msgstr "CS2 High Priority"
+
+msgid "Limpeza de RAM Standby"
+msgstr "Clear Standby RAM"
+
+msgid "Desativar GPU Hardware Accel"
+msgstr "Disable GPU Hardware Accel"
+
+msgid "Otimização de DPI / Escala"
+msgstr "DPI / Scaling Optimization"
+
+msgid "Desativar Compactação Memória"
+msgstr "Disable Memory Compression"
+
+msgid "Perfil MMCSS Games"
+msgstr "MMCSS Games Profile"
+
+msgid "Desativar HPET (High Precision Timer)"
+msgstr "Disable HPET (High Precision Timer)"
+
+msgid "Desativar Windows Game Bar"
+msgstr "Disable Windows Game Bar"
+
+msgid "Modo MSI para GPU / Áudio"
+msgstr "MSI Mode for GPU / Audio"
+
+msgid "Desativar Economia de Energia"
+msgstr "Disable Power Saving"
+
+msgid "Render Queue CS2 Ultra-Low"
+msgstr "Render Queue CS2 Ultra-Low"
+
+msgid "⚠ {}"
+msgstr "⚠ {}"
+
+msgid "CANCELAR"
+msgstr "CANCEL"
+
+msgid "CRIAR E ATIVAR PERFIL"
+msgstr "CREATE AND ACTIVATE PROFILE"
+
+msgid "EXCLUIR PERFIL"
+msgstr "DELETE PROFILE"
+
+msgid "Deseja realmente excluir o perfil {}?"
+msgstr "Do you really want to delete profile {}?"
+
+msgid "Esta ação não pode ser desfeita e removerá o arquivo do disco."
+msgstr "This action cannot be undone and will delete the file from disk."
+
+msgid "Cancelar"
+msgstr "Cancel"
+
+msgid "Excluir"
+msgstr "Delete"
+
+msgid "AVISO DE PERFIL"
+msgstr "PROFILE WARNING"
+
+msgid "Nenhum Perfil de Otimização encontrado, Deseja criar um?"
+msgstr "No Optimization Profile found, would you like to create one?"
+
+msgid "Configure ajustes de desempenho antes de inicializar o jogo com alta performance."
+msgstr "Configure performance tweaks before launching the game with high performance."
+
+msgid "Sair"
+msgstr "Exit"
+
+msgid "Criar Perfil"
+msgstr "Create Profile"
+
+msgid "PERFIL JSON"
+msgstr "JSON PROFILE"
+
+msgid "ATIVO"
+msgstr "ACTIVE"
+
+msgid "USAR"
+msgstr "USE"
+
+msgid "Painel"
+msgstr "Dashboard"
+
+msgid "Otimizações"
+msgstr "Optimizations"
+
+msgid "Configurações"
+msgstr "Settings"
+
+msgid "Ranking CS"
+msgstr "CS Ranking"
+
+msgid "CounterRush v0.8.0"
+msgstr "CounterRush v0.8.0"
+
+msgid "COMPETITIVO • 0.5ms"
+msgstr "COMPETITIVE • 0.5ms"
+
+msgid "Otimização"
+msgstr "Optimization"
+
+msgid "CPU Affinity"
+msgstr "CPU Affinity"
+
+msgid "ON"
+msgstr "ON"
+
+msgid "OFF"
+msgstr "OFF"
+
+msgid "Desativar Tudo"
+msgstr "Disable All"
+
+msgid "Ativar Tudo"
+msgstr "Enable All"
+
+msgid "13 Módulos On"
+msgstr "13 Modules On"
+
+msgid "Padrão Windows"
+msgstr "Windows Default"
+
+msgid "ALL"
+msgstr "ALL"
+
+msgid "Desativar Todas as Otimizações"
+msgstr "Disable All Optimizations"
+
+msgid "Ativar Todas as Otimizações"
+msgstr "Enable All Optimizations"
+
+msgid "Clique para desativar todas as 13 otimizações e restaurar o padrão de fábrica do Windows."
+msgstr "Click to disable all 13 optimizations and restore Windows factory default."
+
+msgid "Clique para ativar simultaneamente todos os 13 ajustes de alta performance e baixa latência."
+msgstr "Click to simultaneously enable all 13 high performance and low latency tweaks."
+
+msgid "PERFIL DO USUÁRIO"
+msgstr "USER PROFILE"
+
+msgid "HARDWARE ADAPTATIVO"
+msgstr "ADAPTIVE HARDWARE"
+
+msgid "CUSTOMIZADO / MANUAL"
+msgstr "CUSTOM / MANUAL"
+
+msgid "Otimizando sistema o CS2..."
+msgstr "Optimizing system for CS2..."
+
+msgid "Otimizando sistema para o CS2..."
+msgstr "Optimizing system for CS2..."
+
