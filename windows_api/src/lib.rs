@@ -30,3 +30,6 @@ pub use hardware::{detect_hardware, get_cpu_physical_cores, CpuInfo, GpuInfo, Ha
 
 pub mod memory;
 pub use memory::empty_standby_list;
+
+pub mod clipboard;
+pub use clipboard::set_clipboard_text;

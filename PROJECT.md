@@ -19,6 +19,12 @@
 | 8 | F8: Modal "NoProfileDialog" | Modal com texto exato "Nenhum Perfil de Otimização encontrado, Deseja criar um?" e botões "Criar Perfil" e "Sair" | M2 | ORIGINAL_REQUEST § Follow-up 2026-11-01T18:39:09Z |
 | 9 | F9: Navegação para a aba Otimizações | Botão "Criar Perfil" fecha o modal e redireciona para a aba Otimizações (`active-tab = 1`) | M2 | ORIGINAL_REQUEST § Follow-up 2026-11-01T18:39:09Z |
 | 10 | F10: Salvaguarda defensiva no Rust | Barreira em `on_launch_cs2_clicked` impedindo criação espúria de arquivos no disco quando não houver perfis | M2 | Relatórios Explorers 1 e 2 |
+| 11 | F11: Seletor Dinâmico de Idiomas | Listar e alternar dinamicamente entre os idiomas da pasta `locale` (`pt_BR`, `en`, `en_US`, `ru`, `ru_RU`) via `slint::select_bundled_translation` | M3 | ORIGINAL_REQUEST § R1 |
+| 12 | F12: Modal "Ainda em Desenvolvimento" | Componente `InDevelopmentDialog` tático CS2 com bloqueador de clique e botão "Entendido" | M3 | ORIGINAL_REQUEST § R6 |
+| 13 | F13: Toggles Bloqueados (Autostart e Steam) | Controles para inicialização com sistema e otimização Steam bloqueados com badge "EM BREVE", abrindo modal | M3 | ORIGINAL_REQUEST § R2, R3, R6 |
+| 14 | F14: Compartilhamento do Projeto | Botão de compartilhamento que copia texto/link para o clipboard nativo com feedback visual no HUD e botão | M3 | ORIGINAL_REQUEST § R4 |
+| 15 | F15: Links Externos (GitHub e Site) | Botões para abrir GitHub oficial e Website do projeto no navegador padrão via `ShellExecuteW` | M3 | ORIGINAL_REQUEST § R5 |
+| 16 | F16: Persistência de Configurações | Entidade `AppSettings` em `config` salvando e carregando preferências em `config/settings.json` | M3 | Regras de Arquitetura Limpa |
 
 ## Code Layout
 - `core/src/lib.rs`: Implementação de `delete_optimization_profile` e `delete_optimization_profile_in_dir`, testes unitários.
@@ -34,6 +40,7 @@
 |---|------|-------|-------------|--------|
 | 1 | M1: Implementação da Exclusão de Perfis de Otimização | Core Backend (`core/src/lib.rs`), UI Slint (`trash.svg`, `delete_profile_dialog.slint`, `preset_button.slint`, `main.slint`), Bridge Rust (`ui/src/main.rs`) e testes | none | DONE |
 | 2 | M2: Comportamento do botão "Jogar CS2" sem perfis | UI Slint (`no_profile_dialog.slint`, `main.slint`), Bridge Rust (`ui/src/main.rs`), testes e auditoria forense | M1 | DONE |
+| 3 | M3: Aba de Configurações (Settings) | UI Slint (`in_development_dialog.slint`, `main.slint`), i18n (`locale/`), persistência (`config/src/lib.rs`), core backend (`core/src/lib.rs`), Win32 clipboard (`windows_api`), bridge Rust (`ui/src/main.rs`) | none | DONE |
 
 ## Interface Contracts
 ### `ui/components/preset_button.slint` ↔ `ui/main.slint`
@@ -53,3 +60,17 @@
 - `callback delete-profile-confirmed(string)`: Envia o nome do perfil confirmado para exclusão no backend.
 - `ui.set_presets(ModelRc::new(VecModel::from(scan_presets())))`: Atualiza a lista reativa de perfis.
 - Em `on_launch_cs2_clicked`: Se `presets.is_empty()`, cancela o lançamento, reseta `is_launching = false` e abre `show-no-profile-modal = true`.
+
+### `ui/components/in_development_dialog.slint` ↔ `ui/main.slint`
+- `in property <string> feature-name`: Nome do recurso que foi clicado.
+- `callback close();`: Fecha o modal (`show-in-development-modal = false`).
+
+### `ui/main.slint` ↔ `ui/src/main.rs` (Configurações M3)
+- `in-out property <string> active-language: "pt_BR"`: Idioma selecionado ativo.
+- `in-out property <[LanguageItem]> available-languages`: Lista de idiomas para renderizar os botões/chips.
+- `callback language-selected(string)`: Notifica o Rust para chamar `slint::select_bundled_translation` e salvar em `settings.json`.
+- `callback share-project-clicked()`: Notifica o Rust para copiar texto/link do projeto para o clipboard nativo e atualizar a barra de status.
+- `callback open-external-url(string)`: Notifica o Rust para invocar `windows_api::launcher::shell_execute(url, None)`.
+- `in-out property <bool> show-in-development-modal: false`: Controla exibição do modal de aviso.
+- `in-out property <string> in-development-feature-name: ""`: Nome da funcionalidade em desenvolvimento exibida no modal.
+

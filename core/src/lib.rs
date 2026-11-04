@@ -22,6 +22,7 @@ pub enum CoreError {
 pub mod classifier;
 pub use classifier::{classify_pc, PcCategory};
 pub use config;
+pub use windows_api;
 
 #[derive(Debug, Clone, Default)]
 pub struct CustomLaunchReport {
@@ -1068,6 +1069,121 @@ pub fn resolve_optimization_file_path(name: &str) -> PathBuf {
     opt_dir.join(&filename)
 }
 
+pub fn resolve_app_settings_path() -> PathBuf {
+    if let Ok(exe_path) = std::env::current_exe() {
+        if let Some(exe_dir) = exe_path.parent() {
+            let candidate = exe_dir.join("config").join("settings.json");
+            if candidate.exists() {
+                return candidate;
+            }
+        }
+    }
+
+    let direct = PathBuf::from("config/settings.json");
+    if direct.exists() {
+        return direct;
+    }
+
+    if let Ok(exe_path) = std::env::current_exe() {
+        if let Some(exe_dir) = exe_path.parent() {
+            let config_dir = exe_dir.join("config");
+            if config_dir.is_dir() {
+                return config_dir.join("settings.json");
+            }
+        }
+    }
+
+    direct
+}
+
+pub fn resolve_locale_dir() -> PathBuf {
+    if let Ok(exe_path) = std::env::current_exe() {
+        if let Some(exe_dir) = exe_path.parent() {
+            let candidate = exe_dir.join("locale");
+            if candidate.is_dir() {
+                return candidate;
+            }
+        }
+    }
+
+    let direct = PathBuf::from("locale");
+    if direct.is_dir() {
+        return direct;
+    }
+
+    let rel_parent = PathBuf::from("../locale");
+    if rel_parent.is_dir() {
+        return rel_parent;
+    }
+
+    direct
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LocaleInfo {
+    pub code: String,
+    pub display_name: String,
+}
+
+pub fn list_available_locales() -> Vec<LocaleInfo> {
+    list_available_locales_in_dir(resolve_locale_dir())
+}
+
+pub fn list_available_locales_in_dir<P: AsRef<Path>>(dir: P) -> Vec<LocaleInfo> {
+    let mut locales = Vec::new();
+    if let Ok(entries) = std::fs::read_dir(dir.as_ref()) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                if let Some(dir_name) = path.file_name().and_then(|n| n.to_str()) {
+                    let ui_po = path.join("counterrush-ui.po");
+                    let ui_lc_po = path.join("LC_MESSAGES").join("counterrush-ui.po");
+                    let generic_po = path.join("counterrush.po");
+                    if ui_po.exists() || ui_lc_po.exists() || generic_po.exists() {
+                        let display_name = match dir_name {
+                            "pt_BR" => "Português (Brasil)",
+                            "en" => "English",
+                            "en_US" => "English (United States)",
+                            "ru" => "Русский",
+                            "ru_RU" => "Русский (Россия)",
+                            other => other,
+                        };
+                        locales.push(LocaleInfo {
+                            code: dir_name.to_string(),
+                            display_name: display_name.to_string(),
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    locales.sort_by(|a, b| {
+        let order = |code: &str| match code {
+            "pt_BR" => 0,
+            "en" => 1,
+            "en_US" => 2,
+            "ru" => 3,
+            "ru_RU" => 4,
+            _ => 10,
+        };
+        let ord_a = order(&a.code);
+        let ord_b = order(&b.code);
+        if ord_a != ord_b {
+            ord_a.cmp(&ord_b)
+        } else {
+            a.code.cmp(&b.code)
+        }
+    });
+
+    locales
+}
+
+pub fn set_clipboard(text: &str) -> Result<(), CoreError> {
+    windows_api::clipboard::set_clipboard_text(text)?;
+    Ok(())
+}
+
 pub fn validate_profile_name(name: &str) -> Result<String, String> {
     let trimmed = name.trim();
     if trimmed.is_empty() {
@@ -1639,5 +1755,49 @@ mod tests {
 
         let empty_res = delete_optimization_profile_in_dir(temp_dir.path(), "   ");
         assert!(empty_res.is_err(), "Nome vazio deve ser rejeitado");
+    }
+
+    #[test]
+    fn test_resolve_app_settings_path_structure() {
+        let path = resolve_app_settings_path();
+        assert!(path.to_string_lossy().ends_with("settings.json"));
+    }
+
+    #[test]
+    fn test_list_available_locales_in_dir() {
+        let temp_dir = tempfile::tempdir().expect("Falha ao criar diretório temporário");
+        let root = temp_dir.path();
+
+        // Cria estrutura de mock locales: pt_BR, en, ru
+        let pt_dir = root.join("pt_BR");
+        std::fs::create_dir_all(&pt_dir).unwrap();
+        std::fs::write(pt_dir.join("counterrush-ui.po"), "msgid \"\"\nmsgstr \"\"\n").unwrap();
+
+        let en_dir = root.join("en");
+        std::fs::create_dir_all(&en_dir).unwrap();
+        std::fs::write(en_dir.join("counterrush-ui.po"), "msgid \"\"\nmsgstr \"\"\n").unwrap();
+
+        let ru_dir = root.join("ru");
+        std::fs::create_dir_all(&ru_dir).unwrap();
+        std::fs::write(ru_dir.join("counterrush-ui.po"), "msgid \"\"\nmsgstr \"\"\n").unwrap();
+
+        // Pasta sem arquivo .po não deve ser listada
+        let dummy_dir = root.join("dummy");
+        std::fs::create_dir_all(&dummy_dir).unwrap();
+
+        let locales = list_available_locales_in_dir(root);
+        assert_eq!(locales.len(), 3);
+        assert_eq!(locales[0].code, "pt_BR");
+        assert_eq!(locales[0].display_name, "Português (Brasil)");
+        assert_eq!(locales[1].code, "en");
+        assert_eq!(locales[1].display_name, "English");
+        assert_eq!(locales[2].code, "ru");
+        assert_eq!(locales[2].display_name, "Русский");
+    }
+
+    #[test]
+    fn test_core_set_clipboard() {
+        let res = set_clipboard("CounterRush Core Test Clipboard");
+        assert!(res.is_ok(), "set_clipboard em core deve retornar Ok: {:?}", res.err());
     }
 }

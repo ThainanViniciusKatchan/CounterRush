@@ -539,3 +539,81 @@ msgstr "Otimizando sistema o CS2..."
 
 msgid "Otimizando sistema para o CS2..."
 msgstr "Otimizando sistema para o CS2..."
+
+msgid "Preferências do aplicativo, integração com o sistema e links da comunidade."
+msgstr "Preferências do aplicativo, integração com o sistema e links da comunidade."
+
+msgid "IDIOMA DA INTERFACE"
+msgstr "IDIOMA DA INTERFACE"
+
+msgid "Selecione o idioma padrão para a interface do CounterRush."
+msgstr "Selecione o idioma padrão para a interface do CounterRush."
+
+msgid "Português (Brasil)"
+msgstr "Português (Brasil)"
+
+msgid "English"
+msgstr "English"
+
+msgid "English (United States)"
+msgstr "English (United States)"
+
+msgid "Русский"
+msgstr "Русский"
+
+msgid "Русский (Россия)"
+msgstr "Русский (Россия)"
+
+msgid "Idioma alterado para {}."
+msgstr "Idioma alterado para {}."
+
+msgid "INICIALIZAÇÃO E SISTEMA"
+msgstr "INICIALIZAÇÃO E SISTEMA"
+
+msgid "Iniciar com o Windows"
+msgstr "Iniciar com o Windows"
+
+msgid "Executar o CounterRush automaticamente na inicialização do sistema operacional."
+msgstr "Executar o CounterRush automaticamente na inicialização do sistema operacional."
+
+msgid "Auto-Otimização Steam"
+msgstr "Auto-Otimização Steam"
+
+msgid "Detectar a execução do Counter-Strike 2 pela Steam e aplicar otimizações em tempo real."
+msgstr "Detectar a execução do Counter-Strike 2 pela Steam e aplicar otimizações em tempo real."
+
+msgid "SOBRE E COMUNIDADE"
+msgstr "SOBRE E COMUNIDADE"
+
+msgid "Compartilhar Projeto"
+msgstr "Compartilhar Projeto"
+
+msgid "Copiar o link oficial do CounterRush para divulgar o projeto com amigos."
+msgstr "Copiar o link oficial do CounterRush para divulgar o projeto com amigos."
+
+msgid "Repositório GitHub"
+msgstr "Repositório GitHub"
+
+msgid "Acessar o código-fonte aberto, notas de versão e novidades no GitHub."
+msgstr "Acessar o código-fonte aberto, notas de versão e novidades no GitHub."
+
+msgid "Website Oficial"
+msgstr "Website Oficial"
+
+msgid "Visitar a página inicial oficial do CounterRush na web."
+msgstr "Visitar a página inicial oficial do CounterRush na web."
+
+msgid "RECURSO EM DESENVOLVIMENTO"
+msgstr "RECURSO EM DESENVOLVIMENTO"
+
+msgid "Ainda em Desenvolvimento"
+msgstr "Ainda em Desenvolvimento"
+
+msgid "O recurso '{}' estará disponível em uma atualização futura do CounterRush."
+msgstr "O recurso '{}' estará disponível em uma atualização futura do CounterRush."
+
+msgid "Entendido"
+msgstr "Entendido"
+
+msgid "Link oficial do CounterRush copiado para a área de transferência!"
+msgstr "Link oficial do CounterRush copiado para a área de transferência!"

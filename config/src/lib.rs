@@ -19,6 +19,61 @@ pub struct AppConfig {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
+pub struct AppSettings {
+    pub language: String,
+    pub start_with_system: bool,
+    pub optimize_on_steam_launch: bool,
+}
+
+impl Default for AppSettings {
+    fn default() -> Self {
+        Self {
+            language: "pt_BR".to_string(),
+            start_with_system: false,
+            optimize_on_steam_launch: false,
+        }
+    }
+}
+
+impl AppSettings {
+    pub fn load_from_file<P: AsRef<Path>>(path: P) -> Result<Self, ConfigError> {
+        let content = std::fs::read_to_string(path.as_ref())?;
+        let trimmed = content.trim_start_matches('\u{feff}').trim();
+        if trimmed.is_empty() {
+            let default_settings = Self::default();
+            let _ = default_settings.save_to_file(path.as_ref());
+            return Ok(default_settings);
+        }
+        let settings = serde_json::from_str(trimmed)?;
+        Ok(settings)
+    }
+
+    pub fn save_to_file<P: AsRef<Path>>(&self, path: P) -> Result<(), ConfigError> {
+        let path = path.as_ref();
+        if let Some(parent) = path.parent() {
+            if !parent.as_os_str().is_empty() && !parent.exists() {
+                std::fs::create_dir_all(parent)?;
+            }
+        }
+        let json = serde_json::to_string_pretty(self)?;
+        std::fs::write(path, json)?;
+        Ok(())
+    }
+
+    pub fn load_or_create<P: AsRef<Path>>(path: P) -> Result<Self, ConfigError> {
+        let path = path.as_ref();
+        if path.exists() {
+            Self::load_from_file(path)
+        } else {
+            let default_settings = Self::default();
+            default_settings.save_to_file(path)?;
+            Ok(default_settings)
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
 pub struct CustomOptimizationConfig {
     pub launch_args: Vec<String>,
     pub empty_standby_list: bool,
@@ -234,5 +289,56 @@ mod tests {
         assert_eq!(loaded.apply_timer_resolution, default_config.apply_timer_resolution);
         assert_eq!(loaded.cs2_priority, default_config.cs2_priority);
         assert_eq!(loaded.disable_game_bar, default_config.disable_game_bar);
+    }
+
+    #[test]
+    fn test_app_settings_default() {
+        let settings = AppSettings::default();
+        assert_eq!(settings.language, "pt_BR");
+        assert!(!settings.start_with_system);
+        assert!(!settings.optimize_on_steam_launch);
+    }
+
+    #[test]
+    fn test_app_settings_roundtrip() {
+        let original = AppSettings {
+            language: "en_US".to_string(),
+            start_with_system: true,
+            optimize_on_steam_launch: true,
+        };
+
+        let json = serde_json::to_string_pretty(&original).expect("Falha ao serializar AppSettings");
+        let deserialized: AppSettings =
+            serde_json::from_str(&json).expect("Falha ao desserializar AppSettings");
+        assert_eq!(original, deserialized);
+    }
+
+    #[test]
+    fn test_app_settings_save_and_load_file() {
+        let temp_dir = tempfile::tempdir().expect("Falha ao criar tempdir");
+        let path = temp_dir.path().join("config").join("settings.json");
+
+        let settings = AppSettings {
+            language: "ru".to_string(),
+            start_with_system: false,
+            optimize_on_steam_launch: true,
+        };
+
+        settings.save_to_file(&path).expect("Falha ao salvar settings.json");
+        assert!(path.exists());
+
+        let loaded = AppSettings::load_from_file(&path).expect("Falha ao carregar settings.json");
+        assert_eq!(settings, loaded);
+    }
+
+    #[test]
+    fn test_app_settings_load_or_create() {
+        let temp_dir = tempfile::tempdir().expect("Falha ao criar tempdir");
+        let path = temp_dir.path().join("config").join("new_settings.json");
+
+        assert!(!path.exists());
+        let created = AppSettings::load_or_create(&path).expect("Falha no load_or_create");
+        assert!(path.exists());
+        assert_eq!(created, AppSettings::default());
     }
 }

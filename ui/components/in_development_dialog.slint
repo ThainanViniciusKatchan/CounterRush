@@ -1,0 +1,140 @@
+import { CS2Theme } from "../theme.slint";
+
+export component InDevelopmentDialog inherits Rectangle {
+    in property <string> feature-name: "";
+    callback close();
+
+    width: 980px;
+    height: 620px;
+    background: rgba(11, 15, 23, 0.88);
+
+    // Bloqueador de cliques de fundo para não interagir com a janela principal
+    TouchArea {
+        mouse-cursor: default;
+    }
+
+    // Card Centralizado Tático
+    Rectangle {
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        width: 440px;
+        height: 180px;
+        background: CS2Theme.bg-card;
+        border-radius: CS2Theme.radius-md;
+        border-width: 1px;
+        border-color: CS2Theme.accent-t-gold;
+        clip: true;
+
+        VerticalLayout {
+            padding: 20px;
+            spacing: 14px;
+            alignment: space-between;
+
+            // Cabeçalho com Título Tático e Botão Fechar
+            HorizontalLayout {
+                alignment: space-between;
+
+                HorizontalLayout {
+                    spacing: 8px;
+                    alignment: start;
+
+                    Rectangle {
+                        width: 8px;
+                        height: 8px;
+                        border-radius: 4px;
+                        background: CS2Theme.accent-t-gold;
+                        y: (parent.height - self.height) / 2;
+                    }
+
+                    Text {
+                        text: @tr("RECURSO EM DESENVOLVIMENTO");
+                        font-size: 13px;
+                        font-weight: 900;
+                        letter-spacing: 0.8px;
+                        color: CS2Theme.accent-t-gold;
+                        vertical-alignment: center;
+                    }
+                }
+
+                // Botão Fechar (✕)
+                Rectangle {
+                    width: 24px;
+                    height: 24px;
+                    border-radius: CS2Theme.radius-xs;
+                    background: close-touch.has-hover ? CS2Theme.bg-card-hover : CS2Theme.bg-surface;
+                    border-width: 1px;
+                    border-color: close-touch.has-hover ? CS2Theme.border-hover : CS2Theme.border;
+
+                    Text {
+                        text: "X";
+                        font-size: 11px;
+                        font-weight: 800;
+                        color: close-touch.has-hover ? #ffffff : CS2Theme.text-dim;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+
+                    close-touch := TouchArea {
+                        mouse-cursor: pointer;
+                        clicked => {
+                            root.close();
+                        }
+                    }
+                }
+            }
+
+            Rectangle {
+                height: 1px;
+                background: CS2Theme.border;
+            }
+
+            // Mensagem de Aviso Exigida
+            VerticalLayout {
+                spacing: 4px;
+
+                Text {
+                    text: @tr("Ainda em Desenvolvimento");
+                    font-size: 13px;
+                    font-weight: 700;
+                    color: CS2Theme.text-primary;
+                }
+
+                Text {
+                    text: @tr("O recurso '{}' estará disponível em uma atualização futura do CounterRush.", root.feature-name);
+                    font-size: 11px;
+                    color: CS2Theme.text-dim;
+                    wrap: word-wrap;
+                }
+            }
+
+            // Rodapé com o botão Entendido
+            HorizontalLayout {
+                alignment: end;
+
+                Rectangle {
+                    width: 120px;
+                    height: 34px;
+                    background: ok-touch.has-hover ? #b45309 : CS2Theme.accent-t-gold;
+                    border-radius: CS2Theme.radius-sm;
+
+                    Text {
+                        text: @tr("Entendido");
+                        font-size: 11px;
+                        font-weight: 900;
+                        letter-spacing: 0.5px;
+                        color: #ffffff;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+
+                    ok-touch := TouchArea {
+                        mouse-cursor: pointer;
+                        clicked => {
+                            root.close();
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

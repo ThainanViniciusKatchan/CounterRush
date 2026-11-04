@@ -540,3 +540,81 @@ msgstr "Оптимизация системы для CS2..."
 msgid "Otimizando sistema para o CS2..."
 msgstr "Оптимизация системы для CS2..."
 
+
+msgid "Preferências do aplicativo, integração com o sistema e links da comunidade."
+msgstr "Настройки приложения, системные интеграции и ссылки сообщества."
+
+msgid "IDIOMA DA INTERFACE"
+msgstr "ЯЗЫК ИНТЕРФЕЙСА"
+
+msgid "Selecione o idioma padrão para a interface do CounterRush."
+msgstr "Выберите язык по умолчанию для интерфейса CounterRush."
+
+msgid "Português (Brasil)"
+msgstr "Португальский (Бразилия)"
+
+msgid "English"
+msgstr "Английский"
+
+msgid "English (United States)"
+msgstr "Английский (США)"
+
+msgid "Русский"
+msgstr "Русский"
+
+msgid "Русский (Россия)"
+msgstr "Русский (Россия)"
+
+msgid "Idioma alterado para {}."
+msgstr "Язык изменен на {}."
+
+msgid "INICIALIZAÇÃO E SISTEMA"
+msgstr "ЗАПУСК И СИСТЕМА"
+
+msgid "Iniciar com o Windows"
+msgstr "Автозапуск с Windows"
+
+msgid "Executar o CounterRush automaticamente na inicialização do sistema operacional."
+msgstr "Автоматически запускать CounterRush при старте операционной системы Windows."
+
+msgid "Auto-Otimização Steam"
+msgstr "Авто-оптимизация Steam"
+
+msgid "Detectar a execução do Counter-Strike 2 pela Steam e aplicar otimizações em tempo real."
+msgstr "Обнаруживать запуск Counter-Strike 2 через Steam и применять оптимизации в реальном времени."
+
+msgid "SOBRE E COMUNIDADE"
+msgstr "О ПРОЕКТЕ И СООБЩЕСТВО"
+
+msgid "Compartilhar Projeto"
+msgstr "Поделиться проектом"
+
+msgid "Copiar o link oficial do CounterRush para divulgar o projeto com amigos."
+msgstr "Скопировать официальную ссылку CounterRush, чтобы поделиться с друзьями."
+
+msgid "Repositório GitHub"
+msgstr "Репозиторий GitHub"
+
+msgid "Acessar o código-fonte aberto, notas de versão e novidades no GitHub."
+msgstr "Открыть исходный код, историю версий и обновления на GitHub."
+
+msgid "Website Oficial"
+msgstr "Официальный сайт"
+
+msgid "Visitar a página inicial oficial do CounterRush na web."
+msgstr "Посетить официальную веб-страницу CounterRush."
+
+msgid "RECURSO EM DESENVOLVIMENTO"
+msgstr "ФУНКЦИЯ В РАЗРАБОТКЕ"
+
+msgid "Ainda em Desenvolvimento"
+msgstr "В разработке"
+
+msgid "O recurso '{}' estará disponível em uma atualização futura do CounterRush."
+msgstr "Функция '{}' будет доступна в будущем обновлении CounterRush."
+
+msgid "Entendido"
+msgstr "Понятно"
+
+msgid "Link oficial do CounterRush copiado para a área de transferência!"
+msgstr "Официальная ссылка CounterRush скопирована в буфер обмена!"

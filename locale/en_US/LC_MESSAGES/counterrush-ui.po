@@ -540,3 +540,81 @@ msgstr "Optimizing system for CS2..."
 msgid "Otimizando sistema para o CS2..."
 msgstr "Optimizing system for CS2..."
 
+
+msgid "Preferências do aplicativo, integração com o sistema e links da comunidade."
+msgstr "Application preferences, system integration and community links."
+
+msgid "IDIOMA DA INTERFACE"
+msgstr "INTERFACE LANGUAGE"
+
+msgid "Selecione o idioma padrão para a interface do CounterRush."
+msgstr "Select the default language for the CounterRush interface."
+
+msgid "Português (Brasil)"
+msgstr "Portuguese (Brazil)"
+
+msgid "English"
+msgstr "English"
+
+msgid "English (United States)"
+msgstr "English (United States)"
+
+msgid "Русский"
+msgstr "Russian"
+
+msgid "Русский (Россия)"
+msgstr "Russian (Russia)"
+
+msgid "Idioma alterado para {}."
+msgstr "Language changed to {}."
+
+msgid "INICIALIZAÇÃO E SISTEMA"
+msgstr "STARTUP & SYSTEM"
+
+msgid "Iniciar com o Windows"
+msgstr "Start with Windows"
+
+msgid "Executar o CounterRush automaticamente na inicialização do sistema operacional."
+msgstr "Run CounterRush automatically upon Windows system startup."
+
+msgid "Auto-Otimização Steam"
+msgstr "Steam Auto-Optimization"
+
+msgid "Detectar a execução do Counter-Strike 2 pela Steam e aplicar otimizações em tempo real."
+msgstr "Detect Counter-Strike 2 launch via Steam and apply optimizations in real time."
+
+msgid "SOBRE E COMUNIDADE"
+msgstr "ABOUT & COMMUNITY"
+
+msgid "Compartilhar Projeto"
+msgstr "Share Project"
+
+msgid "Copiar o link oficial do CounterRush para divulgar o projeto com amigos."
+msgstr "Copy official CounterRush link to share the project with friends."
+
+msgid "Repositório GitHub"
+msgstr "GitHub Repository"
+
+msgid "Acessar o código-fonte aberto, notas de versão e novidades no GitHub."
+msgstr "Access open-source code, release notes and updates on GitHub."
+
+msgid "Website Oficial"
+msgstr "Official Website"
+
+msgid "Visitar a página inicial oficial do CounterRush na web."
+msgstr "Visit official CounterRush homepage on the web."
+
+msgid "RECURSO EM DESENVOLVIMENTO"
+msgstr "FEATURE UNDER DEVELOPMENT"
+
+msgid "Ainda em Desenvolvimento"
+msgstr "Still in Development"
+
+msgid "O recurso '{}' estará disponível em uma atualização futura do CounterRush."
+msgstr "The feature '{}' will be available in a future CounterRush update."
+
+msgid "Entendido"
+msgstr "Understood"
+
+msgid "Link oficial do CounterRush copiado para a área de transferência!"
+msgstr "Official CounterRush link copied to clipboard!"

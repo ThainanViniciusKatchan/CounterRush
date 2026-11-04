@@ -37,6 +37,39 @@ fn main() -> Result<(), slint::PlatformError> {
 
     let main_window = MainWindow::new()?;
 
+    // Inicialização de AppSettings e seleção dinâmica de idiomas
+    let settings_path = counterrush_core::resolve_app_settings_path();
+    let app_settings = counterrush_core::config::AppSettings::load_or_create(&settings_path)
+        .unwrap_or_default();
+
+    let target_lang = match app_settings.language.as_str() {
+        "en" | "en_US" | "en-US" | "en-EUA" => "en_US",
+        "ru" | "ru_RU" | "ru-RU" => "ru_RU",
+        "pt" | "pt_BR" | "pt-BR" => "pt_BR",
+        _ => "pt_BR",
+    };
+
+    if let Err(e) = slint::select_bundled_translation(target_lang) {
+        eprintln!("Aviso: falha ao carregar tradução embutida para '{}': {:?}", target_lang, e);
+    }
+
+    let language_items = vec![
+        LanguageItem {
+            code: "pt_BR".into(),
+            display_name: "pt-BR".into(),
+        },
+        LanguageItem {
+            code: "ru_RU".into(),
+            display_name: "ru-RU".into(),
+        },
+        LanguageItem {
+            code: "en_US".into(),
+            display_name: "en-EUA".into(),
+        },
+    ];
+    main_window.set_available_languages(slint::ModelRc::new(slint::VecModel::from(language_items)));
+    main_window.set_active_language(target_lang.into());
+
     // Inicializa a lista de perfis de otimização na interface a partir do disco
     let initial_presets = scan_presets();
     main_window.set_presets(slint::ModelRc::new(slint::VecModel::from(initial_presets.clone())));
@@ -761,6 +794,88 @@ fn main() -> Result<(), slint::PlatformError> {
                 }
             }
         }
+    });
+
+    // Callback para seleção dinâmica de idioma na aba de Configurações
+    let window_handle = main_window.as_weak();
+    let settings_path_for_lang = settings_path.clone();
+    main_window.on_language_selected(move |code| {
+        let ui = match window_handle.upgrade() {
+            Some(ui) => ui,
+            None => return,
+        };
+        let target_code = match code.as_str() {
+            "en" | "en_US" | "en-US" | "en-EUA" => "en_US",
+            "ru" | "ru_RU" | "ru-RU" => "ru_RU",
+            "pt" | "pt_BR" | "pt-BR" => "pt_BR",
+            other => other,
+        };
+        if let Err(e) = slint::select_bundled_translation(target_code) {
+            eprintln!("Erro ao alternar idioma para '{target_code}': {e:?}");
+        }
+        ui.set_active_language(target_code.into());
+
+        if let Ok(mut settings) = counterrush_core::config::AppSettings::load_or_create(&settings_path_for_lang) {
+            settings.language = target_code.to_string();
+            let _ = settings.save_to_file(&settings_path_for_lang);
+        }
+
+        let msg = match target_code {
+            "en" | "en_US" => format!("Language changed to '{}'.", target_code),
+            "ru" | "ru_RU" => format!("Язык изменен на '{}'.", target_code),
+            _ => format!("Idioma alterado para '{}'.", target_code),
+        };
+        ui.set_status_message(msg.into());
+    });
+
+    // Callback para compartilhamento do projeto (cópia para o clipboard do Windows)
+    let window_handle = main_window.as_weak();
+    main_window.on_share_project_clicked(move || {
+        let ui = match window_handle.upgrade() {
+            Some(ui) => ui,
+            None => return,
+        };
+        let share_text = "CounterRush - Otimizador de Desempenho e Latência para Counter-Strike 2: https://github.com/ThainanViniciusKatchan/CounterRush";
+        let lang = ui.get_active_language();
+        if let Err(e) = counterrush_core::set_clipboard(share_text) {
+            eprintln!("Erro ao copiar link para o clipboard: {e}");
+            let err_prefix = match lang.as_str() {
+                "en" | "en_US" => "Error accessing clipboard",
+                "ru" | "ru_RU" => "Ошибка доступа к буферу обмена",
+                _ => "Erro ao acessar clipboard",
+            };
+            ui.set_status_message(format!("{err_prefix}: {e}").into());
+        } else {
+            let msg = match lang.as_str() {
+                "en" | "en_US" => "Official CounterRush link copied to clipboard!",
+                "ru" | "ru_RU" => "Официальная ссылка CounterRush скопирована в буфер обмена!",
+                _ => "Link oficial do CounterRush copiado para a área de transferência!",
+            };
+            ui.set_status_message(msg.into());
+        }
+    });
+
+    // Callback para abertura de links externos no navegador padrão
+    let window_handle = main_window.as_weak();
+    main_window.on_open_external_url(move |url| {
+        let url_str = url.to_string();
+        let window_handle_clone = window_handle.clone();
+        std::thread::spawn(move || {
+            if let Err(e) = counterrush_core::windows_api::launcher::shell_execute(&url_str, None) {
+                eprintln!("Erro ao abrir URL '{url_str}': {e}");
+                let _ = slint::invoke_from_event_loop(move || {
+                    if let Some(ui) = window_handle_clone.upgrade() {
+                        let lang = ui.get_active_language();
+                        let err_prefix = match lang.as_str() {
+                            "en" | "en_US" => "Error opening link",
+                            "ru" | "ru_RU" => "Ошибка при открытии ссылки",
+                            _ => "Erro ao abrir link",
+                        };
+                        ui.set_status_message(format!("{err_prefix}: {e}").into());
+                    }
+                });
+            }
+        });
     });
 
     main_window.run()
