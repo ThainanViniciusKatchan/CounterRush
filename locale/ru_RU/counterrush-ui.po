@@ -474,8 +474,8 @@ msgstr "Панель"
 msgid "Otimizações"
 msgstr "Оптимизации"
 
-msgid "Configurações"
-msgstr "Настройки"
+msgid "Configurar"
+msgstr "Настройка"
 
 msgid "Ranking CS"
 msgstr "Рейтинг CS"
