@@ -931,7 +931,9 @@ export component MainWindow inherits Window {
 
                     for preset in root.presets : PresetButton {
                         file-name: preset.name;
-                        tag: preset.tag;
+                        tag: preset.tag == "auto" ? @tr("HARDWARE ADAPTATIVO")
+                            : preset.tag == "custom" ? @tr("CUSTOMIZADO / MANUAL")
+                            : @tr("PERFIL DO USUÁRIO");
                         is-active: root.active-preset == preset.name;
                         accent-color: preset.name == "AutoDetect" ? CS2Theme.accent-ct-cyan : CS2Theme.accent-orange;
                         active-bg: preset.name == "AutoDetect" ? CS2Theme.accent-ct-soft : CS2Theme.accent-orange-soft;

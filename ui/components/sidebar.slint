@@ -96,7 +96,7 @@ export component Sidebar inherits Rectangle {
         }
 
         NavButton {
-            text: @tr("Configurações");
+            text: @tr("Configurar");
             icon-src: @image-url("../assets/icons/settings.svg");
             active: root.active-tab == 2;
             clicked => { root.active-tab = 2; root.tab-selected(2); }

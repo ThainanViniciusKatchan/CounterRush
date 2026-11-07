@@ -37,12 +37,14 @@
 ### O que está sendo feito:
 
 - [ ] Interface gráfica moderna (Slint) com switches e controles modulares.
-- [ ] Verificação de hardware na primeira vez que o usuário abrir o software.
-- [ ] Criar sistema de temas para o layout do software.
+- [ ] Inicialização do otimizador junto ao sistema
+- [ ] Criar sistema para que rode em segundo plano para otimizar o game assim que ele for aberto diretamente pela steam, dessa forma ele será otimizado para jogar em servidores como GC e Faceit.
 
 ### O que ainda vai ser feito:
 
 - Função para criar binds (atalhos dentro do game) para todos os comandos permitidos em servidores oficiais e comandos de treino.
+- Criar sistema de temas para o layout do software.
+- Verificação de hardware na primeira vez que o usuário abrir o software.
 - Interface gráfica moderna (Slint) com switches e controles modulares.
 - Função para configurar o próprio `autoexec.cfg` ou baixar a configuração de algum profissional.
 - Possibilidade de abrir e, talvez, baixar mapas da Oficina diretamente pelo software.

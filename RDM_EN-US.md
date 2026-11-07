@@ -37,12 +37,14 @@
 ### What is currently in progress:
 
 - [ ] Modern graphical interface (Slint) with modular switches and controls.
-- [ ] Hardware verification the first time the user opens the software.
-- [ ] Create a theme system for the software layout.
+- [ ] Initialize the optimizer alongside the system
+- [ ] Create a background system that optimizes the game as soon as it is launched via Steam, ensuring it is optimized for play on servers such as GC and Faceit.
 
 ### What is planned:
 
 - Feature to create keybinds (in-game shortcuts) for all commands allowed in official and practice servers.
+- Hardware verification the first time the user opens the software.
+- Create a theme system for the software layout.
 - Modern graphical interface (Slint) with modular switches and controls.
 - Feature to configure a custom `autoexec.cfg` or download pro players' configs.
 - Ability to open and, potentially, download Workshop maps directly through the software.
