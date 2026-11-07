@@ -5,6 +5,8 @@ edition.workspace      = true
 rust-version.workspace = true
 authors.workspace      = true
 license.workspace      = true
+description = "Otimizador de sistema para Counter-Strike 2 (Windows)"
+repository  = "https://github.com/ThainanViniciusKatchan/CounterRush"
 
 [dependencies]
 slint = { version = "1.8", features = ["gettext"] }
@@ -12,3 +14,12 @@ counterrush_core = { package = "core", path = "../core" }
 
 [build-dependencies]
 slint-build = "1.8"
+
+[package.metadata.wix]
+product-name = "CounterRush"
+manufacturer = "Thainan Vinicis Katchan"
+license      = "../LICENSE"
+eula         = false
+linker-args  = ["-sice:ICE38", "-sice:ICE91", "-sice:ICE64"]
+upgrade-guid = "6F1C2A3B-9D4E-4C7A-8B15-2E9F3D0A7C61"
+path-guid    = "B3E7D582-4A16-4F89-9C2D-7E0B5A1F8D34"

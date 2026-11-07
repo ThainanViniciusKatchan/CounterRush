@@ -1,0 +1,199 @@
+<?xml version='1.0' encoding='windows-1252'?>
+<!--
+  Instalador do CounterRush.
+
+  A instalação é por usuário (%LOCALAPPDATA%\CounterRush) porque o aplicativo
+  grava config\settings.json e config\optimzations\*.json ao lado do executável
+  e lê as traduções de locale\<idioma>\LC_MESSAGES. Em Program Files esses
+  caminhos não seriam graváveis sem elevação.
+
+  Variáveis fornecidas pelo `cargo wix`:
+    CargoTargetBinDir = diretório do binário compilado (release)
+    Version           = versão do pacote
+-->
+
+<Wix xmlns='http://schemas.microsoft.com/wix/2006/wi'>
+
+    <Product
+        Id='*'
+        Name='CounterRush'
+        UpgradeCode='6F1C2A3B-9D4E-4C7A-8B15-2E9F3D0A7C61'
+        Manufacturer='Thainan Vinicis Katchan'
+        Language='1033'
+        Codepage='1252'
+        Version='$(var.Version)'>
+
+        <Package Id='*'
+            Keywords='Installer'
+            Description='Otimizador de sistema para Counter-Strike 2 (Windows)'
+            Manufacturer='Thainan Vinicis Katchan'
+            InstallerVersion='450'
+            Languages='1033'
+            Compressed='yes'
+            InstallScope='perUser'
+            SummaryCodepage='1252'
+            />
+
+        <MajorUpgrade
+            Schedule='afterInstallInitialize'
+            DowngradeErrorMessage='A newer version of [ProductName] is already installed. Setup will now exit.'/>
+
+        <Media Id='1' Cabinet='media1.cab' EmbedCab='yes' DiskPrompt='CD-ROM #1'/>
+        <Property Id='DiskPrompt' Value='CounterRush Installation'/>
+
+        <Directory Id='TARGETDIR' Name='SourceDir'>
+            <Directory Id='LocalAppDataFolder'>
+                <Directory Id='APPLICATIONFOLDER' Name='CounterRush'>
+
+                    <Component Id='License' Guid='*'>
+                        <File Id='LicenseFile'
+                            DiskId='1'
+                            Source='../LICENSE'
+                            KeyPath='yes'/>
+                    </Component>
+
+                    <Component Id='binary0' Guid='*'>
+                        <File
+                            Id='exe0'
+                            Name='counterrush-ui.exe'
+                            DiskId='1'
+                            Source='$(var.CargoTargetBinDir)\counterrush-ui.exe'
+                            KeyPath='yes'/>
+                    </Component>
+
+                    <Directory Id='LocaleDir' Name='locale'>
+                        <Directory Id='LocaleDirEn' Name='en'>
+                            <Directory Id='LocaleDirEnMessages' Name='LC_MESSAGES'>
+                                <Component Id='LocaleEn' Guid='*'>
+                                    <File Id='LocaleEnFile'
+                                        Name='counterrush-ui.mo'
+                                        DiskId='1'
+                                        Source='../locale/en/LC_MESSAGES/counterrush-ui.mo'
+                                        KeyPath='yes'/>
+                                </Component>
+                            </Directory>
+                        </Directory>
+                        <Directory Id='LocaleDirEnUs' Name='en_US'>
+                            <Directory Id='LocaleDirEnUsMessages' Name='LC_MESSAGES'>
+                                <Component Id='LocaleEnUs' Guid='*'>
+                                    <File Id='LocaleEnUsFile'
+                                        Name='counterrush-ui.mo'
+                                        DiskId='1'
+                                        Source='../locale/en_US/LC_MESSAGES/counterrush-ui.mo'
+                                        KeyPath='yes'/>
+                                </Component>
+                            </Directory>
+                        </Directory>
+                        <Directory Id='LocaleDirPtBr' Name='pt_BR'>
+                            <Directory Id='LocaleDirPtBrMessages' Name='LC_MESSAGES'>
+                                <Component Id='LocalePtBr' Guid='*'>
+                                    <File Id='LocalePtBrFile'
+                                        Name='counterrush-ui.mo'
+                                        DiskId='1'
+                                        Source='../locale/pt_BR/LC_MESSAGES/counterrush-ui.mo'
+                                        KeyPath='yes'/>
+                                </Component>
+                            </Directory>
+                        </Directory>
+                        <Directory Id='LocaleDirRu' Name='ru'>
+                            <Directory Id='LocaleDirRuMessages' Name='LC_MESSAGES'>
+                                <Component Id='LocaleRu' Guid='*'>
+                                    <File Id='LocaleRuFile'
+                                        Name='counterrush-ui.mo'
+                                        DiskId='1'
+                                        Source='../locale/ru/LC_MESSAGES/counterrush-ui.mo'
+                                        KeyPath='yes'/>
+                                </Component>
+                            </Directory>
+                        </Directory>
+                        <Directory Id='LocaleDirRuRu' Name='ru_RU'>
+                            <Directory Id='LocaleDirRuRuMessages' Name='LC_MESSAGES'>
+                                <Component Id='LocaleRuRu' Guid='*'>
+                                    <File Id='LocaleRuRuFile'
+                                        Name='counterrush-ui.mo'
+                                        DiskId='1'
+                                        Source='../locale/ru_RU/LC_MESSAGES/counterrush-ui.mo'
+                                        KeyPath='yes'/>
+                                </Component>
+                            </Directory>
+                        </Directory>
+                    </Directory>
+
+                    <Directory Id='ConfigDir' Name='config'>
+                        <Directory Id='OptimizationsDir' Name='optimzations'>
+                            <Component Id='AutoDetectPreset' Guid='*'>
+                                <File Id='AutoDetectJson'
+                                    Name='AutoDetect.json'
+                                    DiskId='1'
+                                    Source='../config/optimzations/AutoDetect.json'
+                                    KeyPath='yes'/>
+                            </Component>
+                            <Component Id='CustomPreset' Guid='*'>
+                                <File Id='CustomOptimizationJson'
+                                    Name='custom_optimization.json'
+                                    DiskId='1'
+                                    Source='../config/optimzations/custom_optimization.json'
+                                    KeyPath='yes'/>
+                            </Component>
+                        </Directory>
+                    </Directory>
+
+                </Directory>
+            </Directory>
+
+            <Directory Id='ProgramMenuFolder'>
+                <Directory Id='ApplicationProgramsFolder' Name='CounterRush'>
+                    <Component Id='ApplicationShortcut' Guid='*'>
+                        <Shortcut
+                            Id='ApplicationStartMenuShortcut'
+                            Name='CounterRush'
+                            Description='Otimizador de sistema para Counter-Strike 2'
+                            Target='[APPLICATIONFOLDER]counterrush-ui.exe'
+                            WorkingDirectory='APPLICATIONFOLDER'
+                            Advertise='no'/>
+                        <RemoveFolder Id='ApplicationProgramsFolder' On='uninstall'/>
+                        <RegistryValue
+                            Root='HKCU'
+                            Key='Software\CounterRush\CounterRush'
+                            Name='installed'
+                            Type='integer'
+                            Value='1'
+                            KeyPath='yes'/>
+                    </Component>
+                </Directory>
+            </Directory>
+        </Directory>
+
+        <Feature
+            Id='Binaries'
+            Title='CounterRush'
+            Description='Installs the application, the translations and the default optimization profiles.'
+            Level='1'
+            AllowAdvertise='no'
+            Display='expand'
+            Absent='disallow'>
+            <ComponentRef Id='License'/>
+            <ComponentRef Id='binary0'/>
+            <ComponentRef Id='ApplicationShortcut'/>
+            <ComponentRef Id='LocaleEn'/>
+            <ComponentRef Id='LocaleEnUs'/>
+            <ComponentRef Id='LocalePtBr'/>
+            <ComponentRef Id='LocaleRu'/>
+            <ComponentRef Id='LocaleRuRu'/>
+            <ComponentRef Id='AutoDetectPreset'/>
+            <ComponentRef Id='CustomPreset'/>
+        </Feature>
+
+        <SetProperty Id='ARPINSTALLLOCATION' Value='[APPLICATIONFOLDER]' After='CostFinalize'/>
+
+        <Property Id='ARPHELPLINK' Value='https://github.com/ThainanViniciusKatchan/CounterRush'/>
+
+        <UI>
+            <UIRef Id='WixUI_Minimal'/>
+        </UI>
+
+        <WixVariable Id='WixUILicenseRtf' Value='wix\License.rtf'/>
+
+    </Product>
+
+</Wix>
