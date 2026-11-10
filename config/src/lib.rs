@@ -23,6 +23,7 @@ pub struct AppSettings {
     pub language: String,
     pub start_with_system: bool,
     pub optimize_on_steam_launch: bool,
+    pub initial_optimization_done: bool,
 }
 
 impl Default for AppSettings {
@@ -31,6 +32,7 @@ impl Default for AppSettings {
             language: "pt_BR".to_string(),
             start_with_system: false,
             optimize_on_steam_launch: false,
+            initial_optimization_done: false,
         }
     }
 }
@@ -297,6 +299,7 @@ mod tests {
         assert_eq!(settings.language, "pt_BR");
         assert!(!settings.start_with_system);
         assert!(!settings.optimize_on_steam_launch);
+        assert!(!settings.initial_optimization_done);
     }
 
     #[test]
@@ -305,12 +308,27 @@ mod tests {
             language: "en_US".to_string(),
             start_with_system: true,
             optimize_on_steam_launch: true,
+            initial_optimization_done: true,
         };
 
         let json = serde_json::to_string_pretty(&original).expect("Falha ao serializar AppSettings");
         let deserialized: AppSettings =
             serde_json::from_str(&json).expect("Falha ao desserializar AppSettings");
         assert_eq!(original, deserialized);
+    }
+
+    #[test]
+    fn test_app_settings_backwards_compatible_with_missing_initial_optimization() {
+        let json_legacy = r#"{
+            "language": "pt_BR",
+            "start_with_system": true,
+            "optimize_on_steam_launch": false
+        }"#;
+        let settings: AppSettings = serde_json::from_str(json_legacy).expect("Falha ao desserializar");
+        assert_eq!(settings.language, "pt_BR");
+        assert!(settings.start_with_system);
+        assert!(!settings.optimize_on_steam_launch);
+        assert!(!settings.initial_optimization_done);
     }
 
     #[test]
@@ -322,6 +340,7 @@ mod tests {
             language: "ru".to_string(),
             start_with_system: false,
             optimize_on_steam_launch: true,
+            initial_optimization_done: true,
         };
 
         settings.save_to_file(&path).expect("Falha ao salvar settings.json");

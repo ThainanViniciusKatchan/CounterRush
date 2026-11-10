@@ -1,0 +1,436 @@
+import { CS2Theme } from "../theme.slint";
+import { TacticalButton } from "tactical_button.slint";
+
+export component AutoOptimizeDialog inherits Rectangle {
+    in property <float> progress: 0.0;
+    in property <string> current-step-name: "";
+    in property <bool> is-finished: false;
+    in-out property <bool> show-cancel-confirm: false;
+
+    callback request-cancel();
+    callback confirm-cancel();
+    callback dismiss-cancel-confirm();
+    callback play-cs2();
+    callback close();
+
+    width: 980px;
+    height: 620px;
+    background: rgba(11, 15, 23, 0.90);
+
+    // Bloqueador de cliques de fundo para impedir qualquer interação com a janela principal
+    TouchArea {
+        mouse-cursor: default;
+    }
+
+    // Card Centralizado Tático
+    Rectangle {
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        width: 540px;
+        height: 330px;
+        background: CS2Theme.bg-card;
+        border-radius: CS2Theme.radius-md;
+        border-width: 1px;
+        border-color: root.is-finished ? CS2Theme.status-success : CS2Theme.accent-orange;
+        clip: true;
+
+        VerticalLayout {
+            padding: 22px;
+            spacing: 16px;
+            alignment: space-between;
+
+            // Cabeçalho com Título Tático e Botão Fechar 'X'
+            HorizontalLayout {
+                alignment: space-between;
+
+                HorizontalLayout {
+                    spacing: 8px;
+                    alignment: start;
+
+                    Rectangle {
+                        width: 8px;
+                        height: 8px;
+                        border-radius: 4px;
+                        background: root.is-finished ? CS2Theme.status-success : CS2Theme.accent-orange;
+                        y: (parent.height - self.height) / 2;
+                    }
+
+                    Text {
+                        text: root.is-finished ? @tr("OTIMIZAÇÃO CONCLUÍDA") : @tr("CALIBRAÇÃO AUTOMÁTICA");
+                        font-size: 13px;
+                        font-weight: 900;
+                        letter-spacing: 0.8px;
+                        color: root.is-finished ? CS2Theme.status-success-bright : CS2Theme.accent-orange;
+                        vertical-alignment: center;
+                    }
+                }
+
+                // Botão Fechar (✕)
+                Rectangle {
+                    width: 24px;
+                    height: 24px;
+                    border-radius: CS2Theme.radius-xs;
+                    background: close-touch.has-hover ? CS2Theme.bg-card-hover : CS2Theme.bg-surface;
+                    border-width: 1px;
+                    border-color: close-touch.has-hover ? CS2Theme.border-hover : CS2Theme.border;
+
+                    Text {
+                        text: "X";
+                        font-size: 11px;
+                        font-weight: 800;
+                        color: close-touch.has-hover ? #ffffff : CS2Theme.text-dim;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+
+                    close-touch := TouchArea {
+                        mouse-cursor: pointer;
+                        clicked => {
+                            if root.is-finished {
+                                root.close();
+                            } else {
+                                root.show-cancel-confirm = true;
+                                root.request-cancel();
+                            }
+                        }
+                    }
+                }
+            }
+
+            Rectangle {
+                height: 1px;
+                background: CS2Theme.border;
+            }
+
+            // Área Central: Execução Ativa vs Estado Concluído
+            if !root.is-finished : VerticalLayout {
+                spacing: 16px;
+                alignment: center;
+
+                // Indicador da Etapa Atual
+                VerticalLayout {
+                    spacing: 6px;
+                    alignment: center;
+
+                    Text {
+                        text: @tr("CALIBRANDO SISTEMA PARA COUNTER-STRIKE 2");
+                        font-size: 10px;
+                        font-weight: 800;
+                        letter-spacing: 0.6px;
+                        color: CS2Theme.accent-orange;
+                        horizontal-alignment: center;
+                    }
+
+                    Text {
+                        text: root.current-step-name != "" ? root.current-step-name : @tr("Iniciando calibração...");
+                        font-size: 13px;
+                        font-weight: 700;
+                        color: CS2Theme.text-primary;
+                        horizontal-alignment: center;
+                        wrap: word-wrap;
+                    }
+                }
+
+                // Barra de Progresso e Percentual Reativo
+                VerticalLayout {
+                    spacing: 8px;
+
+                    HorizontalLayout {
+                        alignment: space-between;
+
+                        Text {
+                            text: @tr("Progresso da Aplicação");
+                            font-size: 11px;
+                            font-weight: 600;
+                            color: CS2Theme.text-muted;
+                            vertical-alignment: center;
+                        }
+
+                        Text {
+                            text: Math.round(Math.clamp(root.progress, 0.0, 1.0) * 100) + "%";
+                            font-size: 16px;
+                            font-weight: 900;
+                            color: CS2Theme.accent-orange-bright;
+                            vertical-alignment: center;
+                        }
+                    }
+
+                    Rectangle {
+                        height: 10px;
+                        background: CS2Theme.bg-surface;
+                        border-radius: 5px;
+                        border-width: 1px;
+                        border-color: CS2Theme.border;
+                        clip: true;
+
+                        Rectangle {
+                            x: 0px;
+                            y: 0px;
+                            height: 100%;
+                            width: Math.clamp(root.progress, 0.0, 1.0) * parent.width;
+                            background: CS2Theme.accent-orange;
+                            border-radius: 4px;
+                            animate width { duration: 150ms; easing: ease-out; }
+                        }
+                    }
+                }
+
+                // Botão Cancelar
+                HorizontalLayout {
+                    alignment: center;
+                    padding-top: 4px;
+
+                    Rectangle {
+                        width: 120px;
+                        height: 34px;
+                        background: cancel-touch.has-hover ? CS2Theme.bg-card-hover : CS2Theme.bg-surface;
+                        border-radius: CS2Theme.radius-sm;
+                        border-width: 1px;
+                        border-color: cancel-touch.has-hover ? CS2Theme.border-hover : CS2Theme.border;
+
+                        Text {
+                            text: @tr("CANCELAR");
+                            font-size: 11px;
+                            font-weight: 800;
+                            letter-spacing: 0.5px;
+                            color: cancel-touch.has-hover ? CS2Theme.text-primary : CS2Theme.text-muted;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+
+                        cancel-touch := TouchArea {
+                            mouse-cursor: pointer;
+                            clicked => {
+                                root.show-cancel-confirm = true;
+                                root.request-cancel();
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Estado Final de Sucesso (100%): Estático até interação
+            if root.is-finished : VerticalLayout {
+                spacing: 14px;
+                alignment: center;
+
+                HorizontalLayout {
+                    alignment: center;
+                    spacing: 14px;
+
+                    Rectangle {
+                        width: 44px;
+                        height: 44px;
+                        border-radius: 22px;
+                        background: CS2Theme.status-success-soft;
+                        border-width: 2px;
+                        border-color: CS2Theme.status-success;
+
+                        Text {
+                            text: "✓";
+                            font-size: 22px;
+                            font-weight: 900;
+                            color: CS2Theme.status-success-bright;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                    }
+
+                    VerticalLayout {
+                        alignment: center;
+                        spacing: 2px;
+
+                        Text {
+                            text: @tr("SISTEMA OTIMIZADO COM SUCESSO!");
+                            font-size: 14px;
+                            font-weight: 900;
+                            letter-spacing: 0.5px;
+                            color: CS2Theme.status-success-bright;
+                        }
+
+                        Text {
+                            text: @tr("Perfil AutoDetect gerado e aplicado para o seu hardware.");
+                            font-size: 11px;
+                            color: CS2Theme.text-muted;
+                        }
+                    }
+                }
+
+                // Trilha de 100% em verde
+                Rectangle {
+                    height: 8px;
+                    background: CS2Theme.bg-surface;
+                    border-radius: 4px;
+                    border-width: 1px;
+                    border-color: CS2Theme.border;
+                    clip: true;
+
+                    Rectangle {
+                        x: 0px;
+                        y: 0px;
+                        height: 100%;
+                        width: parent.width;
+                        background: CS2Theme.status-success;
+                        border-radius: 3px;
+                    }
+                }
+
+                // Botão "JOGAR CS2" de Destaque
+                HorizontalLayout {
+                    alignment: center;
+                    padding-top: 6px;
+
+                    TacticalButton {
+                        text: @tr("JOGAR CS2");
+                        badge: @tr("INICIAR COM ALTA PERFORMANCE");
+                        background-color: CS2Theme.accent-orange;
+                        hover-color: #ff771a;
+                        custom-border-color: #c2410c;
+                        custom-border-hover-color: #ff851b;
+                        custom-border-width: 3px;
+                        button-width: 340px;
+                        text-color: #ffffff;
+                        icon-src: @image-url("../assets/icons/play.svg");
+                        clicked => {
+                            root.play-cs2();
+                        }
+                    }
+                }
+            }
+        }
+
+        // Sub-diálogo interno de confirmação de cancelamento
+        if root.show-cancel-confirm : Rectangle {
+            x: 0px;
+            y: 0px;
+            width: parent.width;
+            height: parent.height;
+            background: rgba(11, 15, 23, 0.96);
+            border-radius: CS2Theme.radius-md;
+            border-width: 1px;
+            border-color: CS2Theme.status-danger;
+
+            TouchArea {
+                mouse-cursor: default;
+            }
+
+            VerticalLayout {
+                padding: 24px;
+                spacing: 16px;
+                alignment: space-between;
+
+                // Cabeçalho de confirmação
+                HorizontalLayout {
+                    spacing: 8px;
+                    alignment: center;
+
+                    Rectangle {
+                        width: 8px;
+                        height: 8px;
+                        border-radius: 4px;
+                        background: CS2Theme.status-danger;
+                        y: (parent.height - self.height) / 2;
+                    }
+
+                    Text {
+                        text: @tr("CANCELAR OTIMIZAÇÃO?");
+                        font-size: 13px;
+                        font-weight: 900;
+                        letter-spacing: 0.8px;
+                        color: CS2Theme.status-danger;
+                        vertical-alignment: center;
+                    }
+                }
+
+                Rectangle {
+                    height: 1px;
+                    background: CS2Theme.border;
+                }
+
+                VerticalLayout {
+                    spacing: 6px;
+                    alignment: center;
+
+                    Text {
+                        text: @tr("Deseja realmente cancelar o processo de calibração automática?");
+                        font-size: 12px;
+                        font-weight: 700;
+                        color: CS2Theme.text-primary;
+                        horizontal-alignment: center;
+                        wrap: word-wrap;
+                    }
+
+                    Text {
+                        text: @tr("Os ajustes aplicados nesta sessão serão revertidos e o perfil não será salvo.");
+                        font-size: 11px;
+                        color: CS2Theme.text-dim;
+                        horizontal-alignment: center;
+                        wrap: word-wrap;
+                    }
+                }
+
+                // Botões de confirmação: NÃO (continua) vs SIM (cancela)
+                HorizontalLayout {
+                    alignment: center;
+                    spacing: 14px;
+
+                    // Botão NÃO, CONTINUAR
+                    Rectangle {
+                        width: 140px;
+                        height: 36px;
+                        background: cont-touch.has-hover ? CS2Theme.bg-card-hover : CS2Theme.bg-surface;
+                        border-radius: CS2Theme.radius-sm;
+                        border-width: 1px;
+                        border-color: cont-touch.has-hover ? CS2Theme.border-hover : CS2Theme.border;
+
+                        Text {
+                            text: @tr("NÃO, CONTINUAR");
+                            font-size: 11px;
+                            font-weight: 800;
+                            letter-spacing: 0.5px;
+                            color: cont-touch.has-hover ? CS2Theme.text-primary : CS2Theme.text-muted;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+
+                        cont-touch := TouchArea {
+                            mouse-cursor: pointer;
+                            clicked => {
+                                root.show-cancel-confirm = false;
+                                root.dismiss-cancel-confirm();
+                            }
+                        }
+                    }
+
+                    // Botão SIM, CANCELAR
+                    Rectangle {
+                        width: 140px;
+                        height: 36px;
+                        background: abort-touch.has-hover ? #dc2626 : CS2Theme.status-danger;
+                        border-radius: CS2Theme.radius-sm;
+                        border-width: 1px;
+                        border-color: #991b1b;
+
+                        Text {
+                            text: @tr("SIM, CANCELAR");
+                            font-size: 11px;
+                            font-weight: 900;
+                            letter-spacing: 0.5px;
+                            color: #ffffff;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+
+                        abort-touch := TouchArea {
+                            mouse-cursor: pointer;
+                            clicked => {
+                                root.show-cancel-confirm = false;
+                                root.confirm-cancel();
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

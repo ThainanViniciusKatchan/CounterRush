@@ -25,15 +25,26 @@
 | 14 | F14: Compartilhamento do Projeto | Botão de compartilhamento que copia texto/link para o clipboard nativo com feedback visual no HUD e botão | M3 | ORIGINAL_REQUEST § R4 |
 | 15 | F15: Links Externos (GitHub e Site) | Botões para abrir GitHub oficial e Website do projeto no navegador padrão via `ShellExecuteW` | M3 | ORIGINAL_REQUEST § R5 |
 | 16 | F16: Persistência de Configurações | Entidade `AppSettings` em `config` salvando e carregando preferências em `config/settings.json` | M3 | Regras de Arquitetura Limpa |
+| 17 | F17: Componente Slint AutoOptimizeDialog | Modal overlay 980x620 com TouchArea bloqueador, layout tático CS2 conciso | M4 | ORIGINAL_REQUEST § Condições |
+| 18 | F18: Barra de Progresso e Percentual Reativo | Barra com animação fluida e texto de porcentagem 0% a 100% | M4 | ORIGINAL_REQUEST § Descrição |
+| 19 | F19: Indicador da Etapa de Otimização | Exibição em tempo real da otimização / calibração sendo aplicada | M4 | ORIGINAL_REQUEST § Descrição |
+| 20 | F20: Cancelamento Funcional e Confirmação | Botão Cancelar e 'X' com confirmação prévia; cancelamento real via token atômico e rollback seguro | M4 | ORIGINAL_REQUEST § Condições |
+| 21 | F21: Estado de Sucesso Estático com Sinal Verde | Indicador verde de conclusão e botão 'JOGAR CS2' retidos até ação do usuário | M4 | ORIGINAL_REQUEST § Condições |
+| 22 | F22: Ação JOGAR CS2 com Redirecionamento | Fecha modal, altera active-tab = 0 (Painel) e executa lançamento automático do CS2 | M4 | ORIGINAL_REQUEST § Descrição |
+| 23 | F23: Fechamento Direto por 'X' Pós-Término | Clique em 'X' após 100% fecha o modal diretamente sem mensagem de alerta | M4 | ORIGINAL_REQUEST § Condições |
+| 24 | F24: Persistência de Primeira Execução | Rastreamento em AppSettings (config/settings.json) do estado de primeira otimização | M4 | ORIGINAL_REQUEST § Descrição |
 
 ## Code Layout
-- `core/src/lib.rs`: Implementação de `delete_optimization_profile` e `delete_optimization_profile_in_dir`, testes unitários.
+- `config/src/lib.rs`: Campo `initial_optimization_done: bool` em `AppSettings`.
+- `core/src/lib.rs`: Implementação de `delete_optimization_profile` e suporte a calibração com cancelamento.
 - `ui/assets/icons/trash.svg`: Ícone vetorial Lucide Feather em SVG.
 - `ui/components/delete_profile_dialog.slint`: Componente do modal compacto de confirmação de exclusão.
 - `ui/components/no_profile_dialog.slint`: Componente do modal de aviso de ausência de perfis para o botão "Jogar CS2".
+- `ui/components/in_development_dialog.slint`: Diálogo de recurso em desenvolvimento.
 - `ui/components/preset_button.slint`: Layout do perfil com botão de lixeira.
-- `ui/main.slint`: Integração do diálogo `NoProfileDialog`, interceptação no botão "JOGAR CS2", navegação para a aba Otimizações e controle de `show-no-profile-modal`.
-- `ui/src/main.rs`: Salvaguarda defensiva em `on_launch_cs2_clicked`.
+- `ui/components/auto_optimize_dialog.slint`: Componente modal de animação da otimização automática.
+- `ui/main.slint`: Integração do `AutoOptimizeDialog`, propriedades reativas de progresso e estado, callback de cancelamento e redirecionamento para o Painel.
+- `ui/src/main.rs`: Rotina de execução assíncrona da calibração com feedback de progresso, cancelamento cooperativo via `AtomicBool`, rollback e disparo de `on_launch_cs2_clicked`.
 
 ## Milestones
 | # | Name | Scope | Dependencies | Status |
@@ -41,6 +52,7 @@
 | 1 | M1: Implementação da Exclusão de Perfis de Otimização | Core Backend (`core/src/lib.rs`), UI Slint (`trash.svg`, `delete_profile_dialog.slint`, `preset_button.slint`, `main.slint`), Bridge Rust (`ui/src/main.rs`) e testes | none | DONE |
 | 2 | M2: Comportamento do botão "Jogar CS2" sem perfis | UI Slint (`no_profile_dialog.slint`, `main.slint`), Bridge Rust (`ui/src/main.rs`), testes e auditoria forense | M1 | DONE |
 | 3 | M3: Aba de Configurações (Settings) | UI Slint (`in_development_dialog.slint`, `main.slint`), i18n (`locale/`), persistência (`config/src/lib.rs`), core backend (`core/src/lib.rs`), Win32 clipboard (`windows_api`), bridge Rust (`ui/src/main.rs`) | none | DONE |
+| 4 | M4: Modal de Animação de Otimização Automática e Lançamento CS2 | UI Slint (`auto_optimize_dialog.slint`, `main.slint`), Config (`config/src/lib.rs`), Bridge Rust (`ui/src/main.rs`) com cancelamento atômico, rollback e E2E tests | M1, M2, M3 | DONE |
 
 ## Interface Contracts
 ### `ui/components/preset_button.slint` ↔ `ui/main.slint`
@@ -55,22 +67,24 @@
 - `callback create-profile();`: Fecha o modal e muda `active-tab = 1;`.
 - `callback close();`: Fecha o modal (`show-no-profile-modal = false`).
 
+### `ui/components/auto_optimize_dialog.slint` ↔ `ui/main.slint`
+- `in property <float> progress`: Valor normalizado de 0.0 a 1.0 (barra e porcentagem).
+- `in property <string> current-step-name`: Descrição da otimização sendo aplicada no instante.
+- `in property <bool> is-finished`: Estado indicando 100% concluído.
+- `in-out property <bool> show-cancel-confirm`: Sub-alerta de confirmação de cancelamento.
+- `callback request-cancel();`: Acionado pelo botão Cancelar ou 'X' durante a execução para abrir sub-alerta.
+- `callback confirm-cancel();`: Acionado pelo usuário ao confirmar cancelamento, fecha modal e aborta no backend.
+- `callback dismiss-cancel-confirm();`: Fecha apenas o sub-alerta de confirmação mantendo a otimização em andamento.
+- `callback play-cs2();`: Acionado no estado final pelo botão "JOGAR CS2", fecha modal, navega para Painel e inicia CS2.
+- `callback close();`: Acionado pelo 'X' no estado final, fechando imediatamente sem confirmação.
+
 ### `ui/main.slint` ↔ `ui/src/main.rs`
-- `in-out property <bool> show-no-profile-modal: false;`: Visibilidade do modal de ausência de perfis.
-- `callback delete-profile-confirmed(string)`: Envia o nome do perfil confirmado para exclusão no backend.
-- `ui.set_presets(ModelRc::new(VecModel::from(scan_presets())))`: Atualiza a lista reativa de perfis.
-- Em `on_launch_cs2_clicked`: Se `presets.is_empty()`, cancela o lançamento, reseta `is_launching = false` e abre `show-no-profile-modal = true`.
-
-### `ui/components/in_development_dialog.slint` ↔ `ui/main.slint`
-- `in property <string> feature-name`: Nome do recurso que foi clicado.
-- `callback close();`: Fecha o modal (`show-in-development-modal = false`).
-
-### `ui/main.slint` ↔ `ui/src/main.rs` (Configurações M3)
-- `in-out property <string> active-language: "pt_BR"`: Idioma selecionado ativo.
-- `in-out property <[LanguageItem]> available-languages`: Lista de idiomas para renderizar os botões/chips.
-- `callback language-selected(string)`: Notifica o Rust para chamar `slint::select_bundled_translation` e salvar em `settings.json`.
-- `callback share-project-clicked()`: Notifica o Rust para copiar texto/link do projeto para o clipboard nativo e atualizar a barra de status.
-- `callback open-external-url(string)`: Notifica o Rust para invocar `windows_api::launcher::shell_execute(url, None)`.
-- `in-out property <bool> show-in-development-modal: false`: Controla exibição do modal de aviso.
-- `in-out property <string> in-development-feature-name: ""`: Nome da funcionalidade em desenvolvimento exibida no modal.
+- `in-out property <bool> show-no-profile-modal: false`: Visibilidade do modal de ausência de perfis.
+- `in-out property <bool> show-auto-optimize-modal: false`: Visibilidade do modal de otimização automática.
+- `in-out property <float> auto-optimize-progress: 0.0`: Progresso reativo da calibração (0.0 a 1.0).
+- `in-out property <string> auto-optimize-step-name: ""`: Descrição textual da etapa corrente.
+- `in-out property <bool> auto-optimize-finished: false`: Flag de conclusão da calibração.
+- `callback auto-optimize-clicked()`: Inicia o processo assíncrono em thread com token de cancelamento.
+- `callback cancel-auto-optimize-clicked()`: Sinaliza `cancel_token.store(true)` para abortar e reverter tweaks.
+- `ui.set_presets(...)`: Atualiza lista de perfis gerada pelo `AutoDetect.json`.
 

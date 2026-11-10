@@ -8,6 +8,7 @@ import { CreateProfileDialog, NewProfileData } from "components/create_profile_d
 import { DeleteProfileDialog } from "components/delete_profile_dialog.slint";
 import { NoProfileDialog } from "components/no_profile_dialog.slint";
 import { InDevelopmentDialog } from "components/in_development_dialog.slint";
+import { AutoOptimizeDialog } from "components/auto_optimize_dialog.slint";
 
 export struct PresetModel {
     name: string,
@@ -65,6 +66,10 @@ export component MainWindow inherits Window {
     ];
     in-out property <bool> show-in-development-modal: false;
     in-out property <string> in-development-feature-name: "";
+    in-out property <bool> show-auto-optimize-modal: false;
+    in-out property <float> auto-optimize-progress: 0.0;
+    in-out property <string> auto-optimize-step-name: "";
+    in-out property <bool> auto-optimize-finished: false;
 
     // Estado reativo geral para o botão mestre
     property <bool> is-all-tweaks-active: 
@@ -95,6 +100,7 @@ export component MainWindow inherits Window {
     callback language-selected(string);
     callback share-project-clicked();
     callback open-external-url(string);
+    callback cancel-auto-optimize-clicked();
 
     HorizontalLayout {
         // 1. Barra Lateral Tática Sólida (Sem Bordas)
@@ -879,6 +885,10 @@ export component MainWindow inherits Window {
                     text-color: #ffffff;
                     icon-src: @image-url("assets/icons/rocket.svg");
                     clicked => {
+                        root.auto-optimize-progress = 0.0;
+                        root.auto-optimize-step-name = @tr("Iniciando calibração...");
+                        root.auto-optimize-finished = false;
+                        root.show-auto-optimize-modal = true;
                         root.auto-optimize-clicked();
                     }
                 }
@@ -1500,6 +1510,27 @@ export component MainWindow inherits Window {
         close => {
             root.show-in-development-modal = false;
             root.in-development-feature-name = "";
+        }
+    }
+
+    // Modal Overlay de Animação de Otimização Automática
+    if root.show-auto-optimize-modal : AutoOptimizeDialog {
+        progress: root.auto-optimize-progress;
+        current-step-name: root.auto-optimize-step-name;
+        is-finished: root.auto-optimize-finished;
+        confirm-cancel => {
+            root.show-auto-optimize-modal = false;
+            root.cancel-auto-optimize-clicked();
+        }
+        play-cs2 => {
+            root.show-auto-optimize-modal = false;
+            root.active-tab = 0;
+            root.status-message = @tr("Iniciando Counter-Strike 2 pela Steam com perfil otimizado...");
+            root.is-launching = true;
+            root.launch-cs2-clicked();
+        }
+        close => {
+            root.show-auto-optimize-modal = false;
         }
     }
 }
