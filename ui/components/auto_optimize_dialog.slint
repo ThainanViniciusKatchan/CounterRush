@@ -5,6 +5,7 @@ export component AutoOptimizeDialog inherits Rectangle {
     in property <float> progress: 0.0;
     in property <string> current-step-name: "";
     in property <bool> is-finished: false;
+    in property <bool> is-launch-mode: false;
     in-out property <bool> show-cancel-confirm: false;
 
     callback request-cancel();
@@ -56,7 +57,7 @@ export component AutoOptimizeDialog inherits Rectangle {
                     }
 
                     Text {
-                        text: root.is-finished ? @tr("OTIMIZAÇÃO CONCLUÍDA") : @tr("CALIBRAÇÃO AUTOMÁTICA");
+                        text: root.is-launch-mode ? (root.is-finished ? @tr("CS2 OTIMIZADO COM SUCESSO") : @tr("INICIANDO CS2")) : (root.is-finished ? @tr("OTIMIZAÇÃO CONCLUÍDA") : @tr("CALIBRAÇÃO AUTOMÁTICA"));
                         font-size: 13px;
                         font-weight: 900;
                         letter-spacing: 0.8px;
@@ -113,7 +114,7 @@ export component AutoOptimizeDialog inherits Rectangle {
                     alignment: center;
 
                     Text {
-                        text: @tr("CALIBRANDO SISTEMA PARA COUNTER-STRIKE 2");
+                        text: root.is-launch-mode ? @tr("APLICANDO OTIMIZAÇÕES PARA O COUNTER-STRIKE 2") : @tr("CALIBRANDO SISTEMA PARA COUNTER-STRIKE 2");
                         font-size: 10px;
                         font-weight: 800;
                         letter-spacing: 0.6px;
@@ -122,7 +123,7 @@ export component AutoOptimizeDialog inherits Rectangle {
                     }
 
                     Text {
-                        text: root.current-step-name != "" ? root.current-step-name : @tr("Iniciando calibração...");
+                        text: root.current-step-name != "" ? root.current-step-name : (root.is-launch-mode ? @tr("Iniciando aplicação dos tweaks...") : @tr("Iniciando calibração..."));
                         font-size: 13px;
                         font-weight: 700;
                         color: CS2Theme.text-primary;
@@ -241,7 +242,7 @@ export component AutoOptimizeDialog inherits Rectangle {
                         spacing: 2px;
 
                         Text {
-                            text: @tr("SISTEMA OTIMIZADO COM SUCESSO!");
+                            text: root.is-launch-mode ? @tr("CS2 OTIMIZADO COM SUCESSO") : @tr("SISTEMA OTIMIZADO COM SUCESSO!");
                             font-size: 14px;
                             font-weight: 900;
                             letter-spacing: 0.5px;
@@ -249,7 +250,7 @@ export component AutoOptimizeDialog inherits Rectangle {
                         }
 
                         Text {
-                            text: @tr("Perfil AutoDetect gerado e aplicado para o seu hardware.");
+                            text: root.is-launch-mode ? @tr("O jogo foi iniciado com todas as otimizações ativas.") : @tr("Perfil AutoDetect gerado e aplicado para o seu hardware.");
                             font-size: 11px;
                             color: CS2Theme.text-muted;
                         }
@@ -275,8 +276,8 @@ export component AutoOptimizeDialog inherits Rectangle {
                     }
                 }
 
-                // Botão "JOGAR CS2" de Destaque
-                HorizontalLayout {
+                // Botão "JOGAR CS2" de Destaque (exibido apenas se NÃO for modo de inicialização)
+                if !root.is-launch-mode : HorizontalLayout {
                     alignment: center;
                     padding-top: 6px;
 
@@ -293,6 +294,44 @@ export component AutoOptimizeDialog inherits Rectangle {
                         icon-src: @image-url("../assets/icons/play.svg");
                         clicked => {
                             root.play-cs2();
+                        }
+                    }
+                }
+
+                // Indicativo tático no modo de inicialização
+                if root.is-launch-mode : HorizontalLayout {
+                    alignment: center;
+                    padding-top: 6px;
+
+                    Rectangle {
+                        height: 32px;
+                        border-radius: CS2Theme.radius-xs;
+                        background: CS2Theme.bg-surface;
+                        border-width: 1px;
+                        border-color: CS2Theme.status-success;
+
+                        HorizontalLayout {
+                            spacing: 8px;
+                            alignment: center;
+                            padding-left: 14px;
+                            padding-right: 14px;
+
+                            Rectangle {
+                                width: 6px;
+                                height: 6px;
+                                border-radius: 3px;
+                                background: CS2Theme.status-success;
+                                y: (parent.height - self.height) / 2;
+                            }
+
+                            Text {
+                                text: @tr("PROCESSO ATIVO • BOM JOGO!");
+                                font-size: 11px;
+                                font-weight: 800;
+                                letter-spacing: 0.5px;
+                                color: CS2Theme.status-success-bright;
+                                vertical-alignment: center;
+                            }
                         }
                     }
                 }
@@ -333,7 +372,7 @@ export component AutoOptimizeDialog inherits Rectangle {
                     }
 
                     Text {
-                        text: @tr("CANCELAR OTIMIZAÇÃO?");
+                        text: root.is-launch-mode ? @tr("CANCELAR INICIALIZAÇÃO?") : @tr("CANCELAR OTIMIZAÇÃO?");
                         font-size: 13px;
                         font-weight: 900;
                         letter-spacing: 0.8px;
@@ -352,7 +391,7 @@ export component AutoOptimizeDialog inherits Rectangle {
                     alignment: center;
 
                     Text {
-                        text: @tr("Deseja realmente cancelar o processo de calibração automática?");
+                        text: root.is-launch-mode ? @tr("Deseja realmente cancelar a inicialização do Counter-Strike 2?") : @tr("Deseja realmente cancelar o processo de calibração automática?");
                         font-size: 12px;
                         font-weight: 700;
                         color: CS2Theme.text-primary;
@@ -361,7 +400,7 @@ export component AutoOptimizeDialog inherits Rectangle {
                     }
 
                     Text {
-                        text: @tr("Os ajustes aplicados nesta sessão serão revertidos e o perfil não será salvo.");
+                        text: root.is-launch-mode ? @tr("As otimizações parciais aplicadas serão revertidas e o jogo não será iniciado.") : @tr("Os ajustes aplicados nesta sessão serão revertidos e o perfil não será salvo.");
                         font-size: 11px;
                         color: CS2Theme.text-dim;
                         horizontal-alignment: center;

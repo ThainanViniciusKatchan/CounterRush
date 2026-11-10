@@ -246,6 +246,7 @@ enum AppliedSessionTweak {
     Dpi,
     GpuAccel,
     MemCompression,
+    Hpet,
     GameBar,
     Msi,
     PowerSaving,
@@ -272,6 +273,9 @@ fn rollback_applied_tweaks(
             }
             AppliedSessionTweak::MemCompression => {
                 let _ = core.rollback_memory_compression();
+            }
+            AppliedSessionTweak::Hpet => {
+                let _ = core.rollback_hpet();
             }
             AppliedSessionTweak::GameBar => {
                 let _ = core.rollback_all_game_bar_features();
@@ -664,6 +668,407 @@ fn run_auto_optimize_flow(
         ui.set_auto_optimize_progress(1.0);
         ui.set_auto_optimize_step_name("Sistema otimizado com sucesso!".into());
         ui.set_auto_optimize_finished(true);
+    });
+}
+
+fn run_launch_flow(
+    ui: &slint::Weak<MainWindow>,
+    config_path: &std::sync::Arc<std::sync::RwLock<std::path::PathBuf>>,
+    fallback_path: std::path::PathBuf,
+    token: std::sync::Arc<std::sync::atomic::AtomicBool>,
+) {
+    if scan_presets().is_empty() {
+        post_ui(ui, |ui| {
+            ui.set_is_launching(false);
+            ui.set_show_auto_optimize_modal(false);
+            ui.set_show_no_profile_modal(true);
+        });
+        return;
+    }
+
+    let target_cfg_path = config_path.read().map(|p| p.clone()).unwrap_or(fallback_path);
+    let core = counterrush_core::OptimizerCore::default();
+    let (_resolved, mut config) = match core.load_or_create_custom_config(Some(&target_cfg_path)) {
+        Ok(res) => res,
+        Err(err) => {
+            let err_msg = format!("Erro na configuração: {err}");
+            post_ui(ui, move |ui| {
+                ui.set_show_auto_optimize_modal(false);
+                ui.set_is_launching(false);
+                ui.set_status_message(err_msg.into());
+            });
+            return;
+        }
+    };
+
+    post_ui(ui, |ui| {
+        ui.set_auto_optimize_is_launch(true);
+        ui.set_auto_optimize_progress(0.0);
+        ui.set_auto_optimize_step_name("Iniciando calibração e aplicação de otimizações...".into());
+        ui.set_auto_optimize_finished(false);
+        ui.set_show_auto_optimize_modal(true);
+        ui.set_is_launching(true);
+    });
+
+    if let Ok((hw_info, _)) = core.get_hardware_profile() {
+        let _ = counterrush_core::enforce_hardware_restrictions_for_info(&mut config, &hw_info);
+    }
+
+    let mut applied_tweaks = Vec::new();
+    let step_duration = std::time::Duration::from_millis(180);
+
+    // Etapa 1: Hardware & Perfil
+    if token.load(std::sync::atomic::Ordering::SeqCst) {
+        return;
+    }
+    update_auto_optimize_ui(ui, 0.08, "Verificando perfil e compatibilidade do hardware...");
+    if !sleep_with_cancellation(step_duration, &token) {
+        rollback_applied_tweaks(&core, applied_tweaks);
+        post_ui(ui, |ui| {
+            ui.set_show_auto_optimize_modal(false);
+            ui.set_is_launching(false);
+            ui.set_status_message("Inicialização cancelada pelo usuário.".into());
+        });
+        return;
+    }
+
+    // Etapa 2: Standby List (RAM)
+    if token.load(std::sync::atomic::Ordering::SeqCst) {
+        rollback_applied_tweaks(&core, applied_tweaks);
+        post_ui(ui, |ui| {
+            ui.set_show_auto_optimize_modal(false);
+            ui.set_is_launching(false);
+            ui.set_status_message("Inicialização cancelada pelo usuário.".into());
+        });
+        return;
+    }
+    if config.empty_standby_list {
+        update_auto_optimize_ui(ui, 0.16, "Liberando cache de memória RAM em Standby...");
+        let _ = core.empty_standby_list();
+        if !sleep_with_cancellation(step_duration, &token) {
+            rollback_applied_tweaks(&core, applied_tweaks);
+            post_ui(ui, |ui| {
+                ui.set_show_auto_optimize_modal(false);
+                ui.set_is_launching(false);
+                ui.set_status_message("Inicialização cancelada pelo usuário.".into());
+            });
+            return;
+        }
+    }
+
+    // Etapa 3: Temporizador (0.5ms)
+    if token.load(std::sync::atomic::Ordering::SeqCst) {
+        rollback_applied_tweaks(&core, applied_tweaks);
+        post_ui(ui, |ui| {
+            ui.set_show_auto_optimize_modal(false);
+            ui.set_is_launching(false);
+            ui.set_status_message("Inicialização cancelada pelo usuário. Alterações revertidas.".into());
+        });
+        return;
+    }
+    if config.apply_timer_resolution {
+        update_auto_optimize_ui(ui, 0.24, "Otimizando resolução do temporizador (0.5ms)...");
+        if core.apply_timer_resolution().is_ok() {
+            applied_tweaks.push(AppliedSessionTweak::Timer);
+        }
+        if !sleep_with_cancellation(step_duration, &token) {
+            rollback_applied_tweaks(&core, applied_tweaks);
+            post_ui(ui, |ui| {
+                ui.set_show_auto_optimize_modal(false);
+                ui.set_is_launching(false);
+                ui.set_status_message("Inicialização cancelada pelo usuário. Alterações revertidas.".into());
+            });
+            return;
+        }
+    }
+
+    // Etapa 4: MMCSS
+    if token.load(std::sync::atomic::Ordering::SeqCst) {
+        rollback_applied_tweaks(&core, applied_tweaks);
+        post_ui(ui, |ui| {
+            ui.set_show_auto_optimize_modal(false);
+            ui.set_is_launching(false);
+            ui.set_status_message("Inicialização cancelada pelo usuário. Alterações revertidas.".into());
+        });
+        return;
+    }
+    if config.apply_mmcss {
+        update_auto_optimize_ui(ui, 0.32, "Configurando agendador multimídia e rede (MMCSS)...");
+        if core.apply_all_mmcss().is_ok() {
+            applied_tweaks.push(AppliedSessionTweak::Mmcss);
+        }
+        if !sleep_with_cancellation(step_duration, &token) {
+            rollback_applied_tweaks(&core, applied_tweaks);
+            post_ui(ui, |ui| {
+                ui.set_show_auto_optimize_modal(false);
+                ui.set_is_launching(false);
+                ui.set_status_message("Inicialização cancelada pelo usuário. Alterações revertidas.".into());
+            });
+            return;
+        }
+    }
+
+    // Etapa 5: DPI
+    if token.load(std::sync::atomic::Ordering::SeqCst) {
+        rollback_applied_tweaks(&core, applied_tweaks);
+        post_ui(ui, |ui| {
+            ui.set_show_auto_optimize_modal(false);
+            ui.set_is_launching(false);
+            ui.set_status_message("Inicialização cancelada pelo usuário. Alterações revertidas.".into());
+        });
+        return;
+    }
+    if config.apply_dpi_optimization {
+        update_auto_optimize_ui(ui, 0.40, "Ajustando DPI e compatibilidade de tela inteira CS2...");
+        if core.apply_dpi_optimization().is_ok() {
+            applied_tweaks.push(AppliedSessionTweak::Dpi);
+        }
+        if !sleep_with_cancellation(step_duration, &token) {
+            rollback_applied_tweaks(&core, applied_tweaks);
+            post_ui(ui, |ui| {
+                ui.set_show_auto_optimize_modal(false);
+                ui.set_is_launching(false);
+                ui.set_status_message("Inicialização cancelada pelo usuário. Alterações revertidas.".into());
+            });
+            return;
+        }
+    }
+
+    // Etapa 6: GPU Accel
+    if token.load(std::sync::atomic::Ordering::SeqCst) {
+        rollback_applied_tweaks(&core, applied_tweaks);
+        post_ui(ui, |ui| {
+            ui.set_show_auto_optimize_modal(false);
+            ui.set_is_launching(false);
+            ui.set_status_message("Inicialização cancelada pelo usuário. Alterações revertidas.".into());
+        });
+        return;
+    }
+    if config.disable_gpu_acceleration {
+        update_auto_optimize_ui(ui, 0.48, "Desativando aceleração de GPU em aplicativos secundários...");
+        if core.disable_all_gpu_acceleration().is_ok() {
+            applied_tweaks.push(AppliedSessionTweak::GpuAccel);
+        }
+        if !sleep_with_cancellation(step_duration, &token) {
+            rollback_applied_tweaks(&core, applied_tweaks);
+            post_ui(ui, |ui| {
+                ui.set_show_auto_optimize_modal(false);
+                ui.set_is_launching(false);
+                ui.set_status_message("Inicialização cancelada pelo usuário. Alterações revertidas.".into());
+            });
+            return;
+        }
+    }
+
+    // Etapa 7: Compactação de Memória
+    if token.load(std::sync::atomic::Ordering::SeqCst) {
+        rollback_applied_tweaks(&core, applied_tweaks);
+        post_ui(ui, |ui| {
+            ui.set_show_auto_optimize_modal(false);
+            ui.set_is_launching(false);
+            ui.set_status_message("Inicialização cancelada pelo usuário. Alterações revertidas.".into());
+        });
+        return;
+    }
+    if config.disable_memory_compression {
+        update_auto_optimize_ui(ui, 0.56, "Calibrando compactação de memória do Windows...");
+        if core.disable_memory_compression().is_ok() {
+            applied_tweaks.push(AppliedSessionTweak::MemCompression);
+        }
+        if !sleep_with_cancellation(step_duration, &token) {
+            rollback_applied_tweaks(&core, applied_tweaks);
+            post_ui(ui, |ui| {
+                ui.set_show_auto_optimize_modal(false);
+                ui.set_is_launching(false);
+                ui.set_status_message("Inicialização cancelada pelo usuário. Alterações revertidas.".into());
+            });
+            return;
+        }
+    }
+
+    // Etapa 8: HPET
+    if token.load(std::sync::atomic::Ordering::SeqCst) {
+        rollback_applied_tweaks(&core, applied_tweaks);
+        post_ui(ui, |ui| {
+            ui.set_show_auto_optimize_modal(false);
+            ui.set_is_launching(false);
+            ui.set_status_message("Inicialização cancelada pelo usuário. Alterações revertidas.".into());
+        });
+        return;
+    }
+    if config.disable_hpet {
+        update_auto_optimize_ui(ui, 0.64, "Desativando HPET (temporizador de alta precisão)...");
+        if core.disable_hpet().is_ok() {
+            applied_tweaks.push(AppliedSessionTweak::Hpet);
+        }
+        if !sleep_with_cancellation(step_duration, &token) {
+            rollback_applied_tweaks(&core, applied_tweaks);
+            post_ui(ui, |ui| {
+                ui.set_show_auto_optimize_modal(false);
+                ui.set_is_launching(false);
+                ui.set_status_message("Inicialização cancelada pelo usuário. Alterações revertidas.".into());
+            });
+            return;
+        }
+    }
+
+    // Etapa 9: Game Bar & GameDVR
+    if token.load(std::sync::atomic::Ordering::SeqCst) {
+        rollback_applied_tweaks(&core, applied_tweaks);
+        post_ui(ui, |ui| {
+            ui.set_show_auto_optimize_modal(false);
+            ui.set_is_launching(false);
+            ui.set_status_message("Inicialização cancelada pelo usuário. Alterações revertidas.".into());
+        });
+        return;
+    }
+    if config.disable_game_bar {
+        update_auto_optimize_ui(ui, 0.72, "Desativando Xbox Game Bar e capturas GameDVR...");
+        if core.disable_all_game_bar_features().is_ok() {
+            applied_tweaks.push(AppliedSessionTweak::GameBar);
+        }
+        if !sleep_with_cancellation(step_duration, &token) {
+            rollback_applied_tweaks(&core, applied_tweaks);
+            post_ui(ui, |ui| {
+                ui.set_show_auto_optimize_modal(false);
+                ui.set_is_launching(false);
+                ui.set_status_message("Inicialização cancelada pelo usuário. Alterações revertidas.".into());
+            });
+            return;
+        }
+    }
+
+    // Etapa 10: MSI Mode
+    if token.load(std::sync::atomic::Ordering::SeqCst) {
+        rollback_applied_tweaks(&core, applied_tweaks);
+        post_ui(ui, |ui| {
+            ui.set_show_auto_optimize_modal(false);
+            ui.set_is_launching(false);
+            ui.set_status_message("Inicialização cancelada pelo usuário. Alterações revertidas.".into());
+        });
+        return;
+    }
+    if config.enable_msi {
+        update_auto_optimize_ui(ui, 0.80, "Ativando Modo MSI para GPU e periféricos...");
+        if core.enable_all_msi().is_ok() {
+            applied_tweaks.push(AppliedSessionTweak::Msi);
+        }
+        if !sleep_with_cancellation(step_duration, &token) {
+            rollback_applied_tweaks(&core, applied_tweaks);
+            post_ui(ui, |ui| {
+                ui.set_show_auto_optimize_modal(false);
+                ui.set_is_launching(false);
+                ui.set_status_message("Inicialização cancelada pelo usuário. Alterações revertidas.".into());
+            });
+            return;
+        }
+    }
+
+    // Etapa 11: Economia de Energia PCIe e USB
+    if token.load(std::sync::atomic::Ordering::SeqCst) {
+        rollback_applied_tweaks(&core, applied_tweaks);
+        post_ui(ui, |ui| {
+            ui.set_show_auto_optimize_modal(false);
+            ui.set_is_launching(false);
+            ui.set_status_message("Inicialização cancelada pelo usuário. Alterações revertidas.".into());
+        });
+        return;
+    }
+    if config.disable_power_saving {
+        update_auto_optimize_ui(ui, 0.86, "Desativando suspensão de energia PCIe e USB...");
+        if core.disable_all_power_saving().is_ok() {
+            applied_tweaks.push(AppliedSessionTweak::PowerSaving);
+        }
+        if !sleep_with_cancellation(step_duration, &token) {
+            rollback_applied_tweaks(&core, applied_tweaks);
+            post_ui(ui, |ui| {
+                ui.set_show_auto_optimize_modal(false);
+                ui.set_is_launching(false);
+                ui.set_status_message("Inicialização cancelada pelo usuário. Alterações revertidas.".into());
+            });
+            return;
+        }
+    }
+
+    // Etapa 12: Fila de Renderização (Render Queue)
+    if token.load(std::sync::atomic::Ordering::SeqCst) {
+        rollback_applied_tweaks(&core, applied_tweaks);
+        post_ui(ui, |ui| {
+            ui.set_show_auto_optimize_modal(false);
+            ui.set_is_launching(false);
+            ui.set_status_message("Inicialização cancelada pelo usuário. Alterações revertidas.".into());
+        });
+        return;
+    }
+    if config.apply_render_queue {
+        update_auto_optimize_ui(ui, 0.92, "Configurando fila de renderização (Render Queue)...");
+        if core.apply_render_queue().is_ok() {
+            applied_tweaks.push(AppliedSessionTweak::RenderQueue);
+        }
+        if !sleep_with_cancellation(step_duration, &token) {
+            rollback_applied_tweaks(&core, applied_tweaks);
+            post_ui(ui, |ui| {
+                ui.set_show_auto_optimize_modal(false);
+                ui.set_is_launching(false);
+                ui.set_status_message("Inicialização cancelada pelo usuário. Alterações revertidas.".into());
+            });
+            return;
+        }
+    }
+
+    // Etapa 13: Inicialização via Steam
+    if token.load(std::sync::atomic::Ordering::SeqCst) {
+        rollback_applied_tweaks(&core, applied_tweaks);
+        post_ui(ui, |ui| {
+            ui.set_show_auto_optimize_modal(false);
+            ui.set_is_launching(false);
+            ui.set_status_message("Inicialização cancelada pelo usuário. Alterações revertidas.".into());
+        });
+        return;
+    }
+    update_auto_optimize_ui(ui, 0.96, "Inicializando Counter-Strike 2 pela Steam...");
+    if let Err(e) = counterrush_core::windows_api::launch_cs2_with_args_slice(&config.launch_args) {
+        let err_msg = format!("Falha ao iniciar CS2: {e}");
+        post_ui(ui, move |ui| {
+            ui.set_show_auto_optimize_modal(false);
+            ui.set_is_launching(false);
+            ui.set_status_message(err_msg.into());
+        });
+        return;
+    }
+
+    let _ = counterrush_core::windows_api::wait_for_process("cs2", std::time::Duration::from_millis(500));
+    {
+        use counterrush_core::tweaks::Tweak;
+        if config.cs2_priority {
+            let _ = counterrush_core::tweaks::Cs2PriorityTweak.apply();
+        }
+        if config.cs2_affinity {
+            let _ = counterrush_core::tweaks::Cs2AffinityTweak.apply();
+        }
+    }
+
+    // Estado Concluído a 100%
+    post_ui(ui, |ui| {
+        ui.set_auto_optimize_progress(1.0);
+        ui.set_auto_optimize_step_name("CS2 OTIMIZADO COM SUCESSO".into());
+        ui.set_auto_optimize_finished(true);
+        ui.set_status_message("CS2 OTIMIZADO COM SUCESSO".into());
+    });
+
+    // Aguarda 5 segundos antes de fechar o modal automaticamente
+    for _ in 0..50 {
+        std::thread::sleep(std::time::Duration::from_millis(100));
+        if token.load(std::sync::atomic::Ordering::SeqCst) {
+            break;
+        }
+    }
+
+    // Fecha o modal automaticamente e garante mensagem de status
+    post_ui(ui, |ui| {
+        ui.set_show_auto_optimize_modal(false);
+        ui.set_is_launching(false);
+        ui.set_status_message("CS2 OTIMIZADO COM SUCESSO".into());
     });
 }
 
@@ -1103,129 +1508,40 @@ fn main() -> Result<(), slint::PlatformError> {
     // deixando a thread da janela apenas no loop de eventos.
     let command_sender = spawn_command_worker(main_window.as_weak(), active_config_path.clone());
 
+    let auto_optimize_cancel_token = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+
     // Callback para Lançamento do CS2 com Otimizações Personalizadas (test_custom_launch)
     let window_handle = main_window.as_weak();
     let launch_config_ref = active_config_path.clone();
     let fallback_path = resolved_path.clone();
+    let launch_cancel_token = auto_optimize_cancel_token.clone();
     main_window.on_launch_cs2_clicked(move || {
         let ui = match window_handle.upgrade() {
             Some(ui) => ui,
             None => return,
         };
 
-        ui.set_status_message("Otimizando sistema o CS2...".into());
-        let (
-            cpu_active,
-            timer_active,
-            priority_active,
-            ram_active,
-            gpu_active,
-            dpi_active,
-            mem_active,
-            mmcss_active,
-            hpet_active,
-            game_bar_active,
-            msi_active,
-            power_active,
-            render_queue_active,
-        ) = (
-            ui.get_cpu_tweak_active(),
-            ui.get_timer_tweak_active(),
-            ui.get_priority_tweak_active(),
-            ui.get_ram_tweak_active(),
-            ui.get_gpu_accel_tweak_active(),
-            ui.get_dpi_tweak_active(),
-            ui.get_mem_compression_tweak_active(),
-            ui.get_mmcss_tweak_active(),
-            ui.get_hpet_tweak_active(),
-            ui.get_game_bar_tweak_active(),
-            ui.get_msi_tweak_active(),
-            ui.get_power_saving_tweak_active(),
-            ui.get_render_queue_tweak_active(),
-        );
+        if scan_presets().is_empty() {
+            ui.set_is_launching(false);
+            ui.set_show_no_profile_modal(true);
+            return;
+        }
 
+        ui.set_is_launching(true);
+        ui.set_auto_optimize_is_launch(true);
+        ui.set_auto_optimize_progress(0.0);
+        ui.set_auto_optimize_step_name("Iniciando otimizações para o CS2...".into());
+        ui.set_auto_optimize_finished(false);
+        ui.set_show_auto_optimize_modal(true);
+        ui.set_status_message("Otimizando sistema e iniciando CS2...".into());
+
+        launch_cancel_token.store(false, std::sync::atomic::Ordering::SeqCst);
         let handle_for_thread = window_handle.clone();
-        let target_cfg_path = launch_config_ref.read().map(|p| p.clone()).unwrap_or_else(|_| fallback_path.clone());
+        let target_cfg_path = launch_config_ref.clone();
+        let fallback_cfg = fallback_path.clone();
+        let token = launch_cancel_token.clone();
         std::thread::spawn(move || {
-            // Salvaguarda defensiva: Se não houver perfis, bloqueia o lançamento e exibe o modal
-            if scan_presets().is_empty() {
-                let _ = slint::invoke_from_event_loop({
-                    let handle = handle_for_thread.clone();
-                    move || {
-                        if let Some(ui) = handle.upgrade() {
-                            ui.set_is_launching(false);
-                            ui.set_show_no_profile_modal(true);
-                        }
-                    }
-                });
-                return;
-            }
-
-            let core = counterrush_core::OptimizerCore::default();
-            let (resolved, mut config) = match core.load_or_create_custom_config(Some(&target_cfg_path)) {
-                Ok(res) => res,
-                Err(err) => {
-                    let err_msg = format!("Erro na configuração: {err}");
-                    let _ = slint::invoke_from_event_loop(move || {
-                        if let Some(ui) = handle_for_thread.upgrade() {
-                            ui.set_status_message(err_msg.into());
-                            ui.set_is_launching(false);
-                        }
-                    });
-                    return;
-                }
-            };
-
-            // Sincroniza a configuração com as escolhas da interface
-            config.cs2_affinity = cpu_active;
-            config.apply_timer_resolution = timer_active;
-            config.cs2_priority = priority_active;
-            config.empty_standby_list = ram_active;
-            config.disable_gpu_acceleration = gpu_active;
-            config.apply_dpi_optimization = dpi_active;
-            config.disable_memory_compression = mem_active;
-            config.apply_mmcss = mmcss_active;
-            config.disable_hpet = hpet_active;
-            config.disable_game_bar = game_bar_active;
-            config.enable_msi = msi_active;
-            config.disable_power_saving = power_active;
-            config.apply_render_queue = render_queue_active;
-            let _ = config.save_to_file(&resolved);
-
-            let _ = slint::invoke_from_event_loop({
-                let handle = handle_for_thread.clone();
-                move || {
-                    if let Some(ui) = handle.upgrade() {
-                        ui.set_status_message("Aplicando tweaks e inicializando CS2 via Steam...".into());
-                    }
-                }
-            });
-
-            match core.launch_custom(Some(&resolved), std::time::Duration::from_secs(90)) {
-                Ok(report) => {
-                    let count_applied = report.applied_tweaks.len();
-                    let count_skipped = report.skipped_tweaks.len();
-                    let msg = format!(
-                        "Sistema otimizado com sucesso! ({} tweaks aplicados, {} pulados)",
-                        count_applied, count_skipped
-                    );
-                    let _ = slint::invoke_from_event_loop(move || {
-                        if let Some(ui) = handle_for_thread.upgrade() {
-                            ui.set_status_message(msg.into());
-                            ui.set_is_launching(false);
-                        }
-                    });
-                }
-                Err(err) => {
-                    let msg = format!("Falha ao iniciar CS2: {err}");
-                    let _ = slint::invoke_from_event_loop(move || {
-                        if let Some(ui) = handle_for_thread.upgrade() {
-                            ui.set_status_message(msg.into());
-                            ui.set_is_launching(false);
-                        }
-                    });
-                }
-            }
+            run_launch_flow(&handle_for_thread, &target_cfg_path, fallback_cfg, token);
         });
     });
 
@@ -1263,13 +1579,18 @@ fn main() -> Result<(), slint::PlatformError> {
         });
     });
 
-    let auto_optimize_cancel_token = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
-
     // Callback para o botão "Otimizar Automaticamente" na aba Otimizações
     let auto_opt_ui = main_window.as_weak();
     let auto_opt_config_path = active_config_path.clone();
     let auto_opt_cancel = auto_optimize_cancel_token.clone();
     main_window.on_auto_optimize_clicked(move || {
+        if let Some(ui) = auto_opt_ui.upgrade() {
+            ui.set_auto_optimize_is_launch(false);
+            ui.set_auto_optimize_progress(0.0);
+            ui.set_auto_optimize_step_name("Iniciando calibração...".into());
+            ui.set_auto_optimize_finished(false);
+            ui.set_show_auto_optimize_modal(true);
+        }
         auto_opt_cancel.store(false, std::sync::atomic::Ordering::SeqCst);
         let ui_weak = auto_opt_ui.clone();
         let cfg_path = auto_opt_config_path.clone();

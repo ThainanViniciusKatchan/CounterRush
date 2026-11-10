@@ -23,6 +23,7 @@ pub mod classifier;
 pub use classifier::{classify_pc, PcCategory};
 pub use config;
 pub use windows_api;
+pub use tweaks;
 
 #[derive(Debug, Clone, Default)]
 pub struct CustomLaunchReport {

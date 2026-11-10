@@ -70,6 +70,7 @@ export component MainWindow inherits Window {
     in-out property <float> auto-optimize-progress: 0.0;
     in-out property <string> auto-optimize-step-name: "";
     in-out property <bool> auto-optimize-finished: false;
+    in-out property <bool> auto-optimize-is-launch: false;
 
     // Estado reativo geral para o botão mestre
     property <bool> is-all-tweaks-active: 
@@ -1513,11 +1514,12 @@ export component MainWindow inherits Window {
         }
     }
 
-    // Modal Overlay de Animação de Otimização Automática
+    // Modal Overlay de Animação de Otimização Automática e Inicialização
     if root.show-auto-optimize-modal : AutoOptimizeDialog {
         progress: root.auto-optimize-progress;
         current-step-name: root.auto-optimize-step-name;
         is-finished: root.auto-optimize-finished;
+        is-launch-mode: root.auto-optimize-is-launch;
         confirm-cancel => {
             root.show-auto-optimize-modal = false;
             root.cancel-auto-optimize-clicked();
