@@ -1,0 +1,47 @@
+export component AppTray inherits SystemTrayIcon {
+    icon: @image-url("../assets/icons/tray.svg");
+    tooltip: @tr("CounterRush - CS2 Performance");
+    visible: true;
+
+    callback tray-clicked();
+    callback open-tab(int);
+    callback quit-app();
+
+    clicked => {
+        root.tray-clicked();
+    }
+
+    Menu {
+        MenuItem {
+            title: @tr("Painel");
+            activated => {
+                root.open-tab(0);
+            }
+        }
+        MenuItem {
+            title: @tr("Otimizações");
+            activated => {
+                root.open-tab(1);
+            }
+        }
+        MenuItem {
+            title: @tr("Configurar");
+            activated => {
+                root.open-tab(2);
+            }
+        }
+        MenuItem {
+            title: @tr("Ranking CS");
+            activated => {
+                root.open-tab(3);
+            }
+        }
+        MenuSeparator {}
+        MenuItem {
+            title: @tr("Encerrar");
+            activated => {
+                root.quit-app();
+            }
+        }
+    }
+}

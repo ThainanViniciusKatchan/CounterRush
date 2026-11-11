@@ -618,3 +618,16 @@ msgstr "Understood"
 
 msgid "Link oficial do CounterRush copiado para a área de transferência!"
 msgstr "Official CounterRush link copied to clipboard!"
+
+msgid "Encerrar"
+msgstr "Exit"
+
+msgid "Minimizar para a bandeja do sistema"
+msgstr "Minimize to system tray"
+
+msgid "Manter o CounterRush em execução em segundo plano ao fechar a janela principal."
+msgstr "Keep CounterRush running in the background when the main window is closed."
+
+
+msgid "Configurações"
+msgstr "Settings"

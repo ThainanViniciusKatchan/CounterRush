@@ -618,3 +618,16 @@ msgstr "Понятно"
 
 msgid "Link oficial do CounterRush copiado para a área de transferência!"
 msgstr "Официальная ссылка CounterRush скопирована в буфер обмена!"
+
+msgid "Encerrar"
+msgstr "Выход"
+
+msgid "Minimizar para a bandeja do sistema"
+msgstr "Сворачивать в системный трей"
+
+msgid "Manter o CounterRush em execução em segundo plano ao fechar a janela principal."
+msgstr "Оставлять CounterRush работать в фоновом режиме при закрытии главного окна."
+
+
+msgid "Configurar"
+msgstr "Настройка"

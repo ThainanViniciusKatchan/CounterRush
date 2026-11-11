@@ -617,3 +617,15 @@ msgstr "Entendido"
 
 msgid "Link oficial do CounterRush copiado para a área de transferência!"
 msgstr "Link oficial do CounterRush copiado para a área de transferência!"
+
+msgid "Configurar"
+msgstr "Configurar"
+
+msgid "Encerrar"
+msgstr "Encerrar"
+
+msgid "Minimizar para a bandeja do sistema"
+msgstr "Minimizar para a bandeja do sistema"
+
+msgid "Manter o CounterRush em execução em segundo plano ao fechar a janela principal."
+msgstr "Manter o CounterRush em execução em segundo plano ao fechar a janela principal."

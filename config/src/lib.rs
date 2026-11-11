@@ -24,6 +24,7 @@ pub struct AppSettings {
     pub start_with_system: bool,
     pub optimize_on_steam_launch: bool,
     pub initial_optimization_done: bool,
+    pub minimize_to_tray: bool,
 }
 
 impl Default for AppSettings {
@@ -33,8 +34,46 @@ impl Default for AppSettings {
             start_with_system: false,
             optimize_on_steam_launch: false,
             initial_optimization_done: false,
+            minimize_to_tray: false,
         }
     }
+}
+
+fn write_file_atomically(path: &Path, content: &str) -> Result<(), ConfigError> {
+    if let Some(parent) = path.parent() {
+        if !parent.as_os_str().is_empty() && !parent.exists() {
+            std::fs::create_dir_all(parent)?;
+        }
+    }
+    static COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let id = COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let temp_path = path.with_extension(format!("tmp.{}.{}", std::process::id(), id));
+
+    let res = (|| -> Result<(), std::io::Error> {
+        std::fs::write(&temp_path, content)?;
+        #[cfg(target_os = "windows")]
+        {
+            if let Err(_) = std::fs::rename(&temp_path, path) {
+                if path.exists() {
+                    let _ = std::fs::remove_file(path);
+                }
+                std::fs::rename(&temp_path, path)?;
+            }
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+            std::fs::rename(&temp_path, path)?;
+        }
+        Ok(())
+    })();
+
+    if let Err(e) = res {
+        if temp_path.exists() {
+            let _ = std::fs::remove_file(&temp_path);
+        }
+        return Err(e.into());
+    }
+    Ok(())
 }
 
 impl AppSettings {
@@ -51,15 +90,8 @@ impl AppSettings {
     }
 
     pub fn save_to_file<P: AsRef<Path>>(&self, path: P) -> Result<(), ConfigError> {
-        let path = path.as_ref();
-        if let Some(parent) = path.parent() {
-            if !parent.as_os_str().is_empty() && !parent.exists() {
-                std::fs::create_dir_all(parent)?;
-            }
-        }
         let json = serde_json::to_string_pretty(self)?;
-        std::fs::write(path, json)?;
-        Ok(())
+        write_file_atomically(path.as_ref(), &json)
     }
 
     pub fn load_or_create<P: AsRef<Path>>(path: P) -> Result<Self, ConfigError> {
@@ -154,15 +186,8 @@ impl CustomOptimizationConfig {
     }
 
     pub fn save_to_file<P: AsRef<Path>>(&self, path: P) -> Result<(), ConfigError> {
-        let path = path.as_ref();
-        if let Some(parent) = path.parent() {
-            if !parent.as_os_str().is_empty() && !parent.exists() {
-                std::fs::create_dir_all(parent)?;
-            }
-        }
         let json = serde_json::to_string_pretty(self)?;
-        std::fs::write(path, json)?;
-        Ok(())
+        write_file_atomically(path.as_ref(), &json)
     }
 
     pub fn load_or_create<P: AsRef<Path>>(
@@ -300,6 +325,7 @@ mod tests {
         assert!(!settings.start_with_system);
         assert!(!settings.optimize_on_steam_launch);
         assert!(!settings.initial_optimization_done);
+        assert!(!settings.minimize_to_tray);
     }
 
     #[test]
@@ -309,6 +335,7 @@ mod tests {
             start_with_system: true,
             optimize_on_steam_launch: true,
             initial_optimization_done: true,
+            minimize_to_tray: true,
         };
 
         let json = serde_json::to_string_pretty(&original).expect("Falha ao serializar AppSettings");
@@ -329,6 +356,23 @@ mod tests {
         assert!(settings.start_with_system);
         assert!(!settings.optimize_on_steam_launch);
         assert!(!settings.initial_optimization_done);
+        assert!(!settings.minimize_to_tray);
+    }
+
+    #[test]
+    fn test_app_settings_backwards_compatible_with_missing_minimize_to_tray() {
+        let json_legacy = r#"{
+            "language": "pt_BR",
+            "start_with_system": true,
+            "optimize_on_steam_launch": false,
+            "initial_optimization_done": true
+        }"#;
+        let settings: AppSettings = serde_json::from_str(json_legacy).expect("Falha ao desserializar");
+        assert_eq!(settings.language, "pt_BR");
+        assert!(settings.start_with_system);
+        assert!(!settings.optimize_on_steam_launch);
+        assert!(settings.initial_optimization_done);
+        assert!(!settings.minimize_to_tray);
     }
 
     #[test]
@@ -341,6 +385,7 @@ mod tests {
             start_with_system: false,
             optimize_on_steam_launch: true,
             initial_optimization_done: true,
+            minimize_to_tray: false,
         };
 
         settings.save_to_file(&path).expect("Falha ao salvar settings.json");
@@ -359,5 +404,43 @@ mod tests {
         let created = AppSettings::load_or_create(&path).expect("Falha no load_or_create");
         assert!(path.exists());
         assert_eq!(created, AppSettings::default());
+    }
+
+    #[test]
+    fn test_concurrent_save_and_load_atomic() {
+        use std::sync::Arc;
+        use std::thread;
+
+        let temp_dir = tempfile::tempdir().expect("Falha ao criar tempdir");
+        let path = Arc::new(temp_dir.path().join("concurrent_settings.json"));
+
+        let initial = AppSettings::default();
+        initial.save_to_file(&*path).expect("Falha ao salvar inicial");
+
+        let mut handles = Vec::new();
+        for tid in 0..6 {
+            let p = path.clone();
+            handles.push(thread::spawn(move || {
+                for i in 0..20 {
+                    if tid % 2 == 0 {
+                        let mut s = AppSettings::default();
+                        s.minimize_to_tray = (i % 2) == 0;
+                        s.language = format!("lang_{}_{}", tid, i);
+                        let _ = s.save_to_file(&*p);
+                    } else {
+                        if let Ok(loaded) = AppSettings::load_from_file(&*p) {
+                            assert!(!loaded.language.is_empty());
+                        }
+                    }
+                }
+            }));
+        }
+
+        for h in handles {
+            h.join().expect("Thread concorrente falhou");
+        }
+
+        let final_loaded = AppSettings::load_from_file(&*path).expect("Arquivo final deve ser válido");
+        assert!(!final_loaded.language.is_empty());
     }
 }

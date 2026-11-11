@@ -2,6 +2,8 @@
 
 slint::include_modules!();
 
+mod tray;
+
 fn scan_presets() -> Vec<PresetModel> {
     let files = counterrush_core::list_optimization_configs();
     let mut list = Vec::new();
@@ -1270,11 +1272,20 @@ fn main() -> Result<(), slint::PlatformError> {
     slint::init_translations!(locale_dir);
 
     let main_window = MainWindow::new()?;
+    let app_tray = AppTray::new()?;
 
     // Inicialização de AppSettings e seleção dinâmica de idiomas
     let settings_path = counterrush_core::resolve_app_settings_path();
     let app_settings = counterrush_core::config::AppSettings::load_or_create(&settings_path)
         .unwrap_or_default();
+
+    main_window.set_minimize_to_tray(app_settings.minimize_to_tray);
+    let _minimize_to_tray_flag = tray::setup_tray(
+        &main_window,
+        &app_tray,
+        settings_path.clone(),
+        app_settings.minimize_to_tray,
+    );
 
     let target_lang = match app_settings.language.as_str() {
         "en" | "en_US" | "en-US" | "en-EUA" => "en_US",
@@ -1742,5 +1753,7 @@ fn main() -> Result<(), slint::PlatformError> {
         });
     });
 
-    main_window.run()
+    main_window.show()?;
+    slint::run_event_loop_until_quit()?;
+    Ok(())
 }

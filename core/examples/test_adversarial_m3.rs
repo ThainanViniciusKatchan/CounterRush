@@ -117,6 +117,8 @@ fn main() {
         language: "en_US".to_string(),
         start_with_system: true,
         optimize_on_steam_launch: true,
+        initial_optimization_done: false,
+        minimize_to_tray: false,
     };
     let save_res = custom_settings.save_to_file(&roundtrip_file);
     check!("Save normal", save_res.is_ok(), format!("{:?}", save_res));
@@ -250,6 +252,8 @@ fn main() {
             language: lang.to_string(),
             start_with_system: i % 3 == 0,
             optimize_on_steam_launch: i % 5 == 0,
+            initial_optimization_done: false,
+            minimize_to_tray: false,
         };
         if cfg.save_to_file(&stress_file).is_err() {
             stress_ok = false;

@@ -9,6 +9,7 @@ import { DeleteProfileDialog } from "components/delete_profile_dialog.slint";
 import { NoProfileDialog } from "components/no_profile_dialog.slint";
 import { InDevelopmentDialog } from "components/in_development_dialog.slint";
 import { AutoOptimizeDialog } from "components/auto_optimize_dialog.slint";
+import { AppTray } from "components/tray.slint";
 
 export struct PresetModel {
     name: string,
@@ -20,7 +21,7 @@ export struct LanguageItem {
     display_name: string,
 }
 
-export { NewProfileData }
+export { NewProfileData, AppTray }
 
 export component MainWindow inherits Window {
     title: @tr("CounterRush - CS2 Performance");
@@ -71,6 +72,7 @@ export component MainWindow inherits Window {
     in-out property <string> auto-optimize-step-name: "";
     in-out property <bool> auto-optimize-finished: false;
     in-out property <bool> auto-optimize-is-launch: false;
+    in-out property <bool> minimize-to-tray: false;
 
     // Estado reativo geral para o botão mestre
     property <bool> is-all-tweaks-active: 
@@ -102,6 +104,7 @@ export component MainWindow inherits Window {
     callback share-project-clicked();
     callback open-external-url(string);
     callback cancel-auto-optimize-clicked();
+    callback minimize-to-tray-toggled(bool);
 
     HorizontalLayout {
         // 1. Barra Lateral Tática Sólida (Sem Bordas)
@@ -1233,6 +1236,81 @@ export component MainWindow inherits Window {
                             clicked => {
                                 root.in-development-feature-name = @tr("Auto-Otimização Steam");
                                 root.show-in-development-modal = true;
+                            }
+                        }
+                    }
+
+                    // Linha 3: Minimizar para a Bandeja do Sistema
+                    Rectangle {
+                        height: 42px;
+                        background: row3-touch.has-hover ? CS2Theme.bg-card-hover : CS2Theme.bg-surface;
+                        border-radius: CS2Theme.radius-xs;
+                        border-width: 1px;
+                        border-color: row3-touch.has-hover ? CS2Theme.border-hover : CS2Theme.border;
+                        animate background { duration: 100ms; }
+                        animate border-color { duration: 100ms; }
+
+                        HorizontalLayout {
+                            padding-left: 12px;
+                            padding-right: 12px;
+                            alignment: space-between;
+
+                            VerticalLayout {
+                                alignment: center;
+                                spacing: 2px;
+                                Text {
+                                    text: @tr("Minimizar para a bandeja do sistema");
+                                    font-size: 11px;
+                                    font-weight: 700;
+                                    color: CS2Theme.text-primary;
+                                }
+                                Text {
+                                    text: @tr("Manter o CounterRush em execução em segundo plano ao fechar a janela principal.");
+                                    font-size: 10px;
+                                    color: CS2Theme.text-dim;
+                                }
+                            }
+
+                            VerticalLayout {
+                                alignment: center;
+
+                                Rectangle {
+                                    width: 44px;
+                                    height: 22px;
+                                    background: root.minimize-to-tray ? #ffffff : CS2Theme.bg-main;
+                                    border-radius: CS2Theme.radius-xs;
+                                    animate background { duration: 120ms; }
+
+                                    HorizontalLayout {
+                                        spacing: 4px;
+                                        alignment: center;
+
+                                        Rectangle {
+                                            width: 5px;
+                                            height: 5px;
+                                            border-radius: 2.5px;
+                                            background: root.minimize-to-tray ? CS2Theme.accent-orange : CS2Theme.text-dim;
+                                            y: (parent.height - self.height) / 2;
+                                        }
+
+                                        Text {
+                                            text: root.minimize-to-tray ? @tr("ON") : @tr("OFF");
+                                            font-size: 8px;
+                                            font-weight: 900;
+                                            letter-spacing: 0.5px;
+                                            color: root.minimize-to-tray ? #0b0f17 : CS2Theme.text-dim;
+                                            vertical-alignment: center;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        row3-touch := TouchArea {
+                            mouse-cursor: pointer;
+                            clicked => {
+                                root.minimize-to-tray = !root.minimize-to-tray;
+                                root.minimize-to-tray-toggled(root.minimize-to-tray);
                             }
                         }
                     }
