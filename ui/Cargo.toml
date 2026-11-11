@@ -15,6 +15,9 @@ counterrush_core = { package = "core", path = "../core" }
 [build-dependencies]
 slint-build = "1.8"
 
+[target.'cfg(windows)'.build-dependencies]
+winres = "0.1"
+
 [package.metadata.wix]
 product-name = "CounterRush"
 manufacturer = "Thainan Vinicis Katchan"

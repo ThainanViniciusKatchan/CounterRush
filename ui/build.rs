@@ -6,4 +6,11 @@ fn main() {
         // textos de @tr(...) sejam encontrados nos arquivos .po.
         .with_default_translation_context(slint_build::DefaultTranslationContext::None);
     slint_build::compile_with_config("main.slint", config).expect("Falha ao compilar arquivos Slint");
+
+    #[cfg(windows)]
+    {
+        let mut res = winres::WindowsResource::new();
+        res.set_icon("assets/icons/app.ico");
+        res.compile().expect("Falha ao compilar recurso de ícone do Windows");
+    }
 }
