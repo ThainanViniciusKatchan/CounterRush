@@ -631,3 +631,9 @@ msgstr "Оставлять CounterRush работать в фоновом реж
 
 msgid "Configurações"
 msgstr "Настройки"
+
+msgid "JOGO EM PROCESSO DE DOWNLOAD OU ATUALIZAÇÃO"
+msgstr "ИГРА В ПРОЦЕССЕ ЗАГРУЗКИ ИЛИ ОБНОВЛЕНИЯ"
+
+msgid "Aguardando finalização para continuar"
+msgstr "Ожидание завершения для продолжения"

@@ -631,3 +631,9 @@ msgstr "Keep CounterRush running in the background when the main window is close
 
 msgid "Configurações"
 msgstr "Settings"
+
+msgid "JOGO EM PROCESSO DE DOWNLOAD OU ATUALIZAÇÃO"
+msgstr "GAME DOWNLOADING OR UPDATING"
+
+msgid "Aguardando finalização para continuar"
+msgstr "Waiting for completion to continue"

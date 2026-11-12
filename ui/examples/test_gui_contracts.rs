@@ -76,6 +76,33 @@ fn main() {
         format!("start_with_system = {}", initial_startup)
     );
 
+    // 1.5 auto-optimize stage title e subtitle vazios por padrão
+    check!(
+        "auto-optimize-stage-title default é vazio",
+        main_window.get_auto_optimize_stage_title().is_empty(),
+        format!("stage_title = '{}'", main_window.get_auto_optimize_stage_title())
+    );
+    check!(
+        "auto-optimize-stage-subtitle default é vazio",
+        main_window.get_auto_optimize_stage_subtitle().is_empty(),
+        format!("stage_subtitle = '{}'", main_window.get_auto_optimize_stage_subtitle())
+    );
+
+    main_window.set_auto_optimize_stage_title("JOGO EM PROCESSO DE DOWNLOAD OU ATUALIZAÇÃO".into());
+    main_window.set_auto_optimize_stage_subtitle("Aguardando finalização para continuar".into());
+    check!(
+        "auto-optimize-stage-title reflete mensagem de download",
+        main_window.get_auto_optimize_stage_title() == "JOGO EM PROCESSO DE DOWNLOAD OU ATUALIZAÇÃO",
+        format!("stage_title = '{}'", main_window.get_auto_optimize_stage_title())
+    );
+    check!(
+        "auto-optimize-stage-subtitle reflete subtexto de download",
+        main_window.get_auto_optimize_stage_subtitle() == "Aguardando finalização para continuar",
+        format!("stage_subtitle = '{}'", main_window.get_auto_optimize_stage_subtitle())
+    );
+    main_window.set_auto_optimize_stage_title("".into());
+    main_window.set_auto_optimize_stage_subtitle("".into());
+
     // -------------------------------------------------------------------------
     // [2] CONTRATO REATIVO DO MODAL DE DESENVOLVIMENTO (SETTERS, GETTERS, RESET)
     // -------------------------------------------------------------------------

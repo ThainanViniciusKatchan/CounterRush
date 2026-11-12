@@ -12,6 +12,9 @@ repository  = "https://github.com/ThainanViniciusKatchan/CounterRush"
 slint = { version = "1.8", features = ["gettext"] }
 counterrush_core = { package = "core", path = "../core" }
 
+[dev-dependencies]
+tempfile.workspace = true
+
 [build-dependencies]
 slint-build = "1.8"
 

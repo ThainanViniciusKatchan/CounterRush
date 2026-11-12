@@ -1,6 +1,6 @@
 use std::ffi::OsStr;
 use std::os::windows::ffi::OsStrExt;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 use crate::WindowsApiError;
 
@@ -265,4 +265,155 @@ pub fn launch_cs2_potente() -> Result<(), WindowsApiError> {
         "+engine_low_latency_sleep_after_client_tick",
         "true",
     ])
+}
+
+pub fn check_downloading_dir_has_730<P: AsRef<Path>>(dir: P) -> bool {
+    let path = dir.as_ref();
+    if !path.exists() || !path.is_dir() {
+        return false;
+    }
+    if let Ok(entries) = std::fs::read_dir(path) {
+        for entry in entries.flatten() {
+            let file_name = entry.file_name();
+            let name_lossy = file_name.to_string_lossy();
+            if name_lossy == "730" || name_lossy.contains("730") {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+pub fn get_steam_downloading_dirs_from_base<P: AsRef<Path>>(base_steam_dir: P) -> Vec<PathBuf> {
+    let mut dirs = Vec::new();
+    let base = base_steam_dir.as_ref();
+    let primary_downloading = base.join("steamapps").join("downloading");
+    dirs.push(primary_downloading);
+
+    let vdf_path = base.join("steamapps").join("libraryfolders.vdf");
+    if vdf_path.exists() {
+        if let Ok(content) = std::fs::read_to_string(&vdf_path) {
+            for line in content.lines() {
+                let trimmed = line.trim();
+                if trimmed.starts_with("\"path\"") {
+                    let parts: Vec<&str> = trimmed.split('"').filter(|s| !s.trim().is_empty()).collect();
+                    if parts.len() >= 2 {
+                        let raw_path = parts[1].replace("\\\\", "\\");
+                        let lib_downloading = PathBuf::from(raw_path).join("steamapps").join("downloading");
+                        if !dirs.iter().any(|d| d == &lib_downloading) {
+                            dirs.push(lib_downloading);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    dirs
+}
+
+pub fn get_steam_downloading_dirs() -> Vec<PathBuf> {
+    let (_steam_exe, steam_dir) = resolve_steam_paths();
+    get_steam_downloading_dirs_from_base(&steam_dir)
+}
+
+pub fn is_cs2_downloading_or_updating() -> bool {
+    let downloading_dirs = get_steam_downloading_dirs();
+    for dir in downloading_dirs {
+        if check_downloading_dir_has_730(&dir) {
+            return true;
+        }
+    }
+    false
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+
+    #[test]
+    fn test_check_downloading_dir_has_730_folder() {
+        let tmp = tempdir().unwrap();
+        let downloading = tmp.path().join("steamapps").join("downloading");
+        std::fs::create_dir_all(&downloading).unwrap();
+
+        assert!(!check_downloading_dir_has_730(&downloading));
+
+        let folder_730 = downloading.join("730");
+        std::fs::create_dir(&folder_730).unwrap();
+        assert!(check_downloading_dir_has_730(&downloading));
+
+        std::fs::remove_dir(&folder_730).unwrap();
+        assert!(!check_downloading_dir_has_730(&downloading));
+    }
+
+    #[test]
+    fn test_check_downloading_dir_has_730_file() {
+        let tmp = tempdir().unwrap();
+        let downloading = tmp.path().join("steamapps").join("downloading");
+        std::fs::create_dir_all(&downloading).unwrap();
+
+        let patch_file = downloading.join("state_730_23456.patch");
+        std::fs::write(&patch_file, b"test").unwrap();
+        assert!(check_downloading_dir_has_730(&downloading));
+
+        std::fs::remove_file(&patch_file).unwrap();
+        assert!(!check_downloading_dir_has_730(&downloading));
+    }
+
+    #[test]
+    fn test_check_downloading_dir_other_game_not_flagged() {
+        let tmp = tempdir().unwrap();
+        let downloading = tmp.path().join("steamapps").join("downloading");
+        std::fs::create_dir_all(&downloading).unwrap();
+
+        let dota_folder = downloading.join("570");
+        std::fs::create_dir(&dota_folder).unwrap();
+        let dota_file = downloading.join("state_570_123.patch");
+        std::fs::write(&dota_file, b"test").unwrap();
+
+        assert!(!check_downloading_dir_has_730(&downloading));
+    }
+
+    #[test]
+    fn test_check_downloading_dir_non_existent() {
+        let tmp = tempdir().unwrap();
+        let non_existent = tmp.path().join("does_not_exist");
+        assert!(!check_downloading_dir_has_730(&non_existent));
+    }
+
+    #[test]
+    fn test_get_steam_downloading_dirs_from_base_with_vdf() {
+        let tmp = tempdir().unwrap();
+        let steamapps = tmp.path().join("steamapps");
+        std::fs::create_dir_all(&steamapps).unwrap();
+
+        let extra_lib = tempdir().unwrap();
+        let extra_path_str = extra_lib.path().to_str().unwrap().replace('\\', "\\\\");
+
+        let vdf_content = format!(
+            r#""libraryfolders"
+{{
+	"0"
+	{{
+		"path"		"{}"
+	}}
+	"1"
+	{{
+		"path"		"{}"
+	}}
+}}
+"#,
+            tmp.path().to_str().unwrap().replace('\\', "\\\\"),
+            extra_path_str
+        );
+
+        std::fs::write(steamapps.join("libraryfolders.vdf"), vdf_content).unwrap();
+
+        let dirs = get_steam_downloading_dirs_from_base(tmp.path());
+        assert_eq!(dirs.len(), 2);
+        assert_eq!(dirs[0], tmp.path().join("steamapps").join("downloading"));
+        assert_eq!(dirs[1], extra_lib.path().join("steamapps").join("downloading"));
+    }
 }

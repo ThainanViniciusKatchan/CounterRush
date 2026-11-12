@@ -71,6 +71,8 @@ export component MainWindow inherits Window {
     in-out property <bool> show-auto-optimize-modal: false;
     in-out property <float> auto-optimize-progress: 0.0;
     in-out property <string> auto-optimize-step-name: "";
+    in-out property <string> auto-optimize-stage-title: "";
+    in-out property <string> auto-optimize-stage-subtitle: "";
     in-out property <bool> auto-optimize-finished: false;
     in-out property <bool> auto-optimize-is-launch: false;
     in-out property <bool> minimize-to-tray: false;
@@ -1611,6 +1613,8 @@ export component MainWindow inherits Window {
     if root.show-auto-optimize-modal : AutoOptimizeDialog {
         progress: root.auto-optimize-progress;
         current-step-name: root.auto-optimize-step-name;
+        stage-title: root.auto-optimize-stage-title;
+        stage-subtitle: root.auto-optimize-stage-subtitle;
         is-finished: root.auto-optimize-finished;
         is-launch-mode: root.auto-optimize-is-launch;
         confirm-cancel => {

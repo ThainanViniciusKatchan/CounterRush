@@ -14,9 +14,10 @@ pub enum WindowsApiError {
 
 pub mod launcher;
 pub use launcher::{
-    ensure_steam_running, launch_cs2, launch_cs2_economico, launch_cs2_intermediario,
-    launch_cs2_potente, launch_cs2_with_args, launch_cs2_with_args_slice,
-    launch_on_interactive_desktop, shell_execute,
+    check_downloading_dir_has_730, ensure_steam_running, get_steam_downloading_dirs,
+    get_steam_downloading_dirs_from_base, is_cs2_downloading_or_updating, launch_cs2,
+    launch_cs2_economico, launch_cs2_intermediario, launch_cs2_potente, launch_cs2_with_args,
+    launch_cs2_with_args_slice, launch_on_interactive_desktop, shell_execute,
 };
 
 pub mod powershell;

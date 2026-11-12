@@ -11,6 +11,9 @@ thiserror.workspace = true
 serde.workspace     = true
 sysinfo.workspace   = true
 
+[dev-dependencies]
+tempfile.workspace = true
+
 [target.'cfg(windows)'.dependencies]
 # Bindings oficiais da Microsoft. Adicionar features conforme forem usadas.
 # Exemplo (NÃO ativar agora, só quando um tweak precisar):

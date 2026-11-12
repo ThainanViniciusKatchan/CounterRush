@@ -4,6 +4,8 @@ import { TacticalButton } from "tactical_button.slint";
 export component AutoOptimizeDialog inherits Rectangle {
     in property <float> progress: 0.0;
     in property <string> current-step-name: "";
+    in property <string> stage-title: "";
+    in property <string> stage-subtitle: "";
     in property <bool> is-finished: false;
     in property <bool> is-launch-mode: false;
     in-out property <bool> show-cancel-confirm: false;
@@ -114,8 +116,8 @@ export component AutoOptimizeDialog inherits Rectangle {
                     alignment: center;
 
                     Text {
-                        text: root.is-launch-mode ? @tr("APLICANDO OTIMIZAÇÕES PARA O COUNTER-STRIKE 2") : @tr("CALIBRANDO SISTEMA PARA COUNTER-STRIKE 2");
-                        font-size: 10px;
+                        text: root.stage-title != "" ? root.stage-title : (root.is-launch-mode ? @tr("APLICANDO OTIMIZAÇÕES PARA O COUNTER-STRIKE 2") : @tr("CALIBRANDO SISTEMA PARA COUNTER-STRIKE 2"));
+                        font-size: root.stage-title != "" ? 12px : 10px;
                         font-weight: 800;
                         letter-spacing: 0.6px;
                         color: CS2Theme.accent-orange;
@@ -123,7 +125,7 @@ export component AutoOptimizeDialog inherits Rectangle {
                     }
 
                     Text {
-                        text: root.current-step-name != "" ? root.current-step-name : (root.is-launch-mode ? @tr("Iniciando aplicação dos tweaks...") : @tr("Iniciando calibração..."));
+                        text: root.stage-subtitle != "" ? root.stage-subtitle : (root.current-step-name != "" ? root.current-step-name : (root.is-launch-mode ? @tr("Iniciando aplicação dos tweaks...") : @tr("Iniciando calibração...")));
                         font-size: 13px;
                         font-weight: 700;
                         color: CS2Theme.text-primary;

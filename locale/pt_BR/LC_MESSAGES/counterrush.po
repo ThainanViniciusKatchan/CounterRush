@@ -629,3 +629,9 @@ msgstr "Minimizar para a bandeja do sistema"
 
 msgid "Manter o CounterRush em execução em segundo plano ao fechar a janela principal."
 msgstr "Manter o CounterRush em execução em segundo plano ao fechar a janela principal."
+
+msgid "JOGO EM PROCESSO DE DOWNLOAD OU ATUALIZAÇÃO"
+msgstr "JOGO EM PROCESSO DE DOWNLOAD OU ATUALIZAÇÃO"
+
+msgid "Aguardando finalização para continuar"
+msgstr "Aguardando finalização para continuar"

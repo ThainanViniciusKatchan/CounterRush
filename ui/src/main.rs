@@ -707,6 +707,8 @@ fn run_launch_flow(
         ui.set_auto_optimize_is_launch(true);
         ui.set_auto_optimize_progress(0.0);
         ui.set_auto_optimize_step_name("Iniciando calibração e aplicação de otimizações...".into());
+        ui.set_auto_optimize_stage_title("".into());
+        ui.set_auto_optimize_stage_subtitle("".into());
         ui.set_auto_optimize_finished(false);
         ui.set_show_auto_optimize_modal(true);
         ui.set_is_launching(true);
@@ -1018,7 +1020,7 @@ fn run_launch_flow(
         }
     }
 
-    // Etapa 13: Inicialização via Steam
+    // Etapa 13: Verificação de Download/Atualização Ativa da Steam e Inicialização
     if token.load(std::sync::atomic::Ordering::SeqCst) {
         rollback_applied_tweaks(&core, applied_tweaks);
         post_ui(ui, |ui| {
@@ -1028,6 +1030,50 @@ fn run_launch_flow(
         });
         return;
     }
+
+    let mut was_downloading = false;
+    while counterrush_core::windows_api::is_cs2_downloading_or_updating() {
+        if token.load(std::sync::atomic::Ordering::SeqCst) {
+            rollback_applied_tweaks(&core, applied_tweaks);
+            post_ui(ui, |ui| {
+                ui.set_show_auto_optimize_modal(false);
+                ui.set_is_launching(false);
+                ui.set_auto_optimize_stage_title("".into());
+                ui.set_auto_optimize_stage_subtitle("".into());
+                ui.set_status_message("Inicialização cancelada pelo usuário. Alterações revertidas.".into());
+            });
+            return;
+        }
+
+        if !was_downloading {
+            was_downloading = true;
+            post_ui(ui, |ui| {
+                ui.set_auto_optimize_stage_title("JOGO EM PROCESSO DE DOWNLOAD OU ATUALIZAÇÃO".into());
+                ui.set_auto_optimize_stage_subtitle("Aguardando finalização para continuar".into());
+                ui.set_auto_optimize_progress(0.95);
+            });
+        }
+
+        if !sleep_with_cancellation(std::time::Duration::from_millis(500), &token) {
+            rollback_applied_tweaks(&core, applied_tweaks);
+            post_ui(ui, |ui| {
+                ui.set_show_auto_optimize_modal(false);
+                ui.set_is_launching(false);
+                ui.set_auto_optimize_stage_title("".into());
+                ui.set_auto_optimize_stage_subtitle("".into());
+                ui.set_status_message("Inicialização cancelada pelo usuário. Alterações revertidas.".into());
+            });
+            return;
+        }
+    }
+
+    if was_downloading {
+        post_ui(ui, |ui| {
+            ui.set_auto_optimize_stage_title("".into());
+            ui.set_auto_optimize_stage_subtitle("".into());
+        });
+    }
+
     update_auto_optimize_ui(ui, 0.96, "Inicializando Counter-Strike 2 pela Steam...");
     if let Err(e) = counterrush_core::windows_api::launch_cs2_with_args_slice(&config.launch_args) {
         let err_msg = format!("Falha ao iniciar CS2: {e}");
@@ -1052,6 +1098,8 @@ fn run_launch_flow(
 
     // Estado Concluído a 100%
     post_ui(ui, |ui| {
+        ui.set_auto_optimize_stage_title("".into());
+        ui.set_auto_optimize_stage_subtitle("".into());
         ui.set_auto_optimize_progress(1.0);
         ui.set_auto_optimize_step_name("CS2 OTIMIZADO COM SUCESSO".into());
         ui.set_auto_optimize_finished(true);
