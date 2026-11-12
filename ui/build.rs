@@ -11,6 +11,7 @@ fn main() {
     {
         let mut res = winres::WindowsResource::new();
         res.set_icon("assets/icons/app.ico");
-        res.compile().expect("Falha ao compilar recurso de ícone do Windows");
+        res.set_manifest_file("counterrush.exe.manifest");
+        res.compile().expect("Falha ao compilar recurso de ícone e manifesto do Windows");
     }
 }

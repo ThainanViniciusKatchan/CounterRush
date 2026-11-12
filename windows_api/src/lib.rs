@@ -33,3 +33,9 @@ pub use memory::empty_standby_list;
 
 pub mod clipboard;
 pub use clipboard::set_clipboard_text;
+
+pub mod security;
+pub use security::{is_elevated, relaunch_as_admin};
+
+pub mod scheduler;
+pub use scheduler::{create_logon_task, delete_task, is_task_registered, DEFAULT_STARTUP_TASK_NAME};

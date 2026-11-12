@@ -74,6 +74,7 @@ export component MainWindow inherits Window {
     in-out property <bool> auto-optimize-finished: false;
     in-out property <bool> auto-optimize-is-launch: false;
     in-out property <bool> minimize-to-tray: false;
+    in-out property <bool> start-with-system: false;
 
     // Estado reativo geral para o botão mestre
     property <bool> is-all-tweaks-active: 
@@ -106,6 +107,7 @@ export component MainWindow inherits Window {
     callback open-external-url(string);
     callback cancel-auto-optimize-clicked();
     callback minimize-to-tray-toggled(bool);
+    callback start-with-system-toggled(bool);
 
     HorizontalLayout {
         // 1. Barra Lateral Tática Sólida (Sem Bordas)
@@ -1150,20 +1152,32 @@ export component MainWindow inherits Window {
                                 alignment: center;
 
                                 Rectangle {
-                                    width: 76px;
+                                    width: 44px;
                                     height: 22px;
+                                    background: root.start-with-system ? #ffffff : CS2Theme.bg-main;
                                     border-radius: CS2Theme.radius-xs;
-                                    background: CS2Theme.accent-t-soft;
-                                    border-width: 1px;
-                                    border-color: CS2Theme.accent-t-gold;
-                                    Text {
-                                        text: @tr("EM BREVE");
-                                        font-size: 9px;
-                                        font-weight: 800;
-                                        letter-spacing: 0.5px;
-                                        color: CS2Theme.accent-t-gold;
-                                        horizontal-alignment: center;
-                                        vertical-alignment: center;
+                                    animate background { duration: 120ms; }
+
+                                    HorizontalLayout {
+                                        spacing: 4px;
+                                        alignment: center;
+
+                                        Rectangle {
+                                            width: 5px;
+                                            height: 5px;
+                                            border-radius: 2.5px;
+                                            background: root.start-with-system ? CS2Theme.accent-orange : CS2Theme.text-dim;
+                                            y: (parent.height - self.height) / 2;
+                                        }
+
+                                        Text {
+                                            text: root.start-with-system ? @tr("ON") : @tr("OFF");
+                                            font-size: 8px;
+                                            font-weight: 900;
+                                            letter-spacing: 0.5px;
+                                            color: root.start-with-system ? #0b0f17 : CS2Theme.text-dim;
+                                            vertical-alignment: center;
+                                        }
                                     }
                                 }
                             }
@@ -1172,8 +1186,8 @@ export component MainWindow inherits Window {
                         row1-touch := TouchArea {
                             mouse-cursor: pointer;
                             clicked => {
-                                root.in-development-feature-name = @tr("Iniciar com o Windows");
-                                root.show-in-development-modal = true;
+                                root.start-with-system = !root.start-with-system;
+                                root.start-with-system-toggled(root.start-with-system);
                             }
                         }
                     }

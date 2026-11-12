@@ -16,7 +16,7 @@ trigger: always_on
 - Nunca rode comandos destrutivos sem minha aprovação.
 - Caso seja necessário realizar testes automatizados, realize somente quando aprovado.
 - Nunca realize mudanças nas branchs remotas sem minha permissão.
-- Ao rodar qualquer comando git que não seja somente de leitura, solicite minha permissão
+- Ao rodar qualquer comando git que não seja somente de leitura, solicite minha permissão.
 
 ## Planejamento
 
@@ -36,5 +36,7 @@ trigger: always_on
 - Se a mudança envolver UI\Gui o agente deve utilizar a função de HotReload caso esteja disponível para validar se a mudança reflete exatamente o que foi solicitado.
 
 - Caso seja necessário alterar mais arquivos do que o usuário solicitou, o agente deve descrever essas mudanças de forma explicita no plano.
+
+- Após cada mudança altere a versão no Cargo.toml da raiz do projeto, a versão deve depender da mudança realizada, por exemplo, uma correção de bug é minor, implementação pequena patch e grande mudança ou lançamento major.
 
 - Nenhum mudança deve ser realizada sem que o plano seja aprovado!.

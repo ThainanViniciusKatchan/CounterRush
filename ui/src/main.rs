@@ -1258,6 +1258,14 @@ fn delete_profile(
 }
 
 fn main() -> Result<(), slint::PlatformError> {
+    #[cfg(windows)]
+    if !counterrush_core::windows_api::is_elevated() {
+        if let Ok(()) = counterrush_core::windows_api::relaunch_as_admin() {
+            return Ok(());
+        }
+        eprintln!("Aviso: Não foi possível obter privilégios de Administrador automaticamente.");
+    }
+
     if std::env::var("LANG").is_err() && std::env::var("LC_ALL").is_err() {
         std::env::set_var("LANG", "pt_BR.UTF-8");
         std::env::set_var("LANGUAGE", "pt_BR");
@@ -1278,6 +1286,15 @@ fn main() -> Result<(), slint::PlatformError> {
     let settings_path = counterrush_core::resolve_app_settings_path();
     let app_settings = counterrush_core::config::AppSettings::load_or_create(&settings_path)
         .unwrap_or_default();
+
+    // Reconciliação do estado de inicialização com o Task Scheduler do Windows
+    let startup_status = counterrush_core::is_system_startup_enabled().unwrap_or(app_settings.start_with_system);
+    if startup_status != app_settings.start_with_system {
+        let mut reconciled = app_settings.clone();
+        reconciled.start_with_system = startup_status;
+        let _ = reconciled.save_to_file(&settings_path);
+    }
+    main_window.set_start_with_system(startup_status);
 
     main_window.set_minimize_to_tray(app_settings.minimize_to_tray);
     let _minimize_to_tray_flag = tray::setup_tray(
@@ -1750,6 +1767,53 @@ fn main() -> Result<(), slint::PlatformError> {
                     }
                 });
             }
+        });
+    });
+
+    // Callback para alternância de Inicialização com o Windows (schtasks ONLOGON /RL HIGHEST)
+    let window_handle = main_window.as_weak();
+    let startup_settings_path = settings_path.clone();
+    main_window.on_start_with_system_toggled(move |enabled| {
+        let ui_weak = window_handle.clone();
+        let target_path = startup_settings_path.clone();
+        std::thread::spawn(move || {
+            let result = if enabled {
+                counterrush_core::enable_system_startup()
+            } else {
+                counterrush_core::disable_system_startup()
+            };
+
+            let _ = slint::invoke_from_event_loop(move || {
+                if let Some(ui) = ui_weak.upgrade() {
+                    let lang = ui.get_active_language();
+                    match result {
+                        Ok(()) => {
+                            if let Ok(mut settings) = counterrush_core::config::AppSettings::load_or_create(&target_path) {
+                                settings.start_with_system = enabled;
+                                let _ = settings.save_to_file(&target_path);
+                            }
+                            let msg = match (lang.as_str(), enabled) {
+                                ("en" | "en_US" | "en-US" | "en-EUA", true) => "Start with Windows enabled (Highest privileges).",
+                                ("en" | "en_US" | "en-US" | "en-EUA", false) => "Start with Windows disabled.",
+                                ("ru" | "ru_RU" | "ru-RU", true) => "Автозапуск с Windows включен (Наивысшие права).",
+                                ("ru" | "ru_RU" | "ru-RU", false) => "Автозапуск с Windows отключен.",
+                                (_, true) => "Inicialização com o Windows ativada com privilégios máximos.",
+                                (_, false) => "Inicialização com o Windows desativada.",
+                            };
+                            ui.set_status_message(msg.into());
+                        }
+                        Err(err) => {
+                            ui.set_start_with_system(!enabled);
+                            let err_prefix = match lang.as_str() {
+                                "en" | "en_US" | "en-US" | "en-EUA" => "Failed to configure Windows startup",
+                                "ru" | "ru_RU" | "ru-RU" => "Ошибка настройки автозапуска Windows",
+                                _ => "Falha ao configurar inicialização com o Windows",
+                            };
+                            ui.set_status_message(format!("{err_prefix}: {err}").into());
+                        }
+                    }
+                }
+            });
         });
     });
 

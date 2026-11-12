@@ -21,6 +21,11 @@ pub enum CoreError {
 
 pub mod classifier;
 pub use classifier::{classify_pc, PcCategory};
+pub mod startup;
+pub use startup::{
+    disable_system_startup, enable_system_startup, is_system_startup_enabled,
+    normalize_exe_path, StartupManager, TaskSchedulerStartupManager,
+};
 pub use config;
 pub use windows_api;
 pub use tweaks;

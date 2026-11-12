@@ -68,6 +68,14 @@ fn main() {
         format!("active_language = '{}'", initial_language)
     );
 
+    // 1.4 start-with-system default é false
+    let initial_startup = main_window.get_start_with_system();
+    check!(
+        "start-with-system default é false",
+        !initial_startup,
+        format!("start_with_system = {}", initial_startup)
+    );
+
     // -------------------------------------------------------------------------
     // [2] CONTRATO REATIVO DO MODAL DE DESENVOLVIMENTO (SETTERS, GETTERS, RESET)
     // -------------------------------------------------------------------------
@@ -389,10 +397,10 @@ fn main() {
             .expect("Falha ao ler ui/main.slint");
 
         check!(
-            "Linha 'Iniciar com o Windows' dispara in-development-feature-name e modal = true",
-            main_slint_src.contains("root.in-development-feature-name = @tr(\"Iniciar com o Windows\");")
-                && main_slint_src.contains("root.show-in-development-modal = true;"),
-            "Trigger de Iniciar com o Windows validado"
+            "Linha 'Iniciar com o Windows' alterna start-with-system e dispara start-with-system-toggled",
+            main_slint_src.contains("root.start-with-system = !root.start-with-system;")
+                && main_slint_src.contains("root.start-with-system-toggled(root.start-with-system);"),
+            "Trigger de Iniciar com o Windows com switch funcional validado"
         );
 
         check!(
