@@ -138,6 +138,14 @@
                         </Directory>
                     </Directory>
 
+                    <Component Id='SteamCmdInstallerScript' Guid='*'>
+                        <File Id='InstallSteamCmdPs1'
+                            Name='install_steamcmd.ps1'
+                            DiskId='1'
+                            Source='wix\install_steamcmd.ps1'
+                            KeyPath='yes'/>
+                    </Component>
+
                 </Directory>
             </Directory>
 
@@ -182,7 +190,22 @@
             <ComponentRef Id='LocaleRuRu'/>
             <ComponentRef Id='AutoDetectPreset'/>
             <ComponentRef Id='CustomPreset'/>
+            <ComponentRef Id='SteamCmdInstallerScript'/>
         </Feature>
+
+        <CustomAction
+            Id='SetupSteamCmd'
+            Directory='APPLICATIONFOLDER'
+            ExeCommand='"[SystemFolder]WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File "[APPLICATIONFOLDER]install_steamcmd.ps1"'
+            Execute='deferred'
+            Impersonate='yes'
+            Return='check'/>
+
+        <InstallExecuteSequence>
+            <Custom Action='SetupSteamCmd' After='InstallFiles'>
+                <![CDATA[(NOT Installed OR REINSTALL) AND NOT (REMOVE="ALL")]]>
+            </Custom>
+        </InstallExecuteSequence>
 
         <SetProperty Id='ARPINSTALLLOCATION' Value='[APPLICATIONFOLDER]' After='CostFinalize'/>
 
@@ -190,6 +213,7 @@
 
         <UI>
             <UIRef Id='WixUI_Minimal'/>
+            <ProgressText Action='SetupSteamCmd'>Baixando e verificando SteamCMD em C:\steamcmd...</ProgressText>
         </UI>
 
         <WixVariable Id='WixUILicenseRtf' Value='wix\License.rtf'/>
