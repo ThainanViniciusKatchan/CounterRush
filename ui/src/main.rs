@@ -1032,7 +1032,14 @@ fn run_launch_flow(
     }
 
     let mut was_downloading = false;
-    while counterrush_core::windows_api::is_cs2_downloading_or_updating() {
+    let mut last_logged_detail = String::new();
+    loop {
+        let validation_status =
+            counterrush_core::windows_api::get_cs2_download_validation_status();
+        if !validation_status.is_active() {
+            break;
+        }
+
         if token.load(std::sync::atomic::Ordering::SeqCst) {
             rollback_applied_tweaks(&core, applied_tweaks);
             post_ui(ui, |ui| {
@@ -1043,6 +1050,15 @@ fn run_launch_flow(
                 ui.set_status_message("Inicialização cancelada pelo usuário. Alterações revertidas.".into());
             });
             return;
+        }
+
+        let current_detail = format!(
+            "[VALIDAÇÃO] Camada '{}' detectou estado {:?} ({})",
+            validation_status.source, validation_status.state, validation_status.detail
+        );
+        if current_detail != last_logged_detail {
+            println!("   {}", current_detail);
+            last_logged_detail = current_detail;
         }
 
         if !was_downloading {

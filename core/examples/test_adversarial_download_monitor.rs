@@ -107,8 +107,175 @@ fn main() {
     );
     fs::remove_dir(&sec_730).unwrap();
 
-    // 3. Teste de Cancelamento Resiliente durante Espera
-    println!("\n--- 3. Cancelamento Resiliente Durante o Download ---");
+    // 3. Validação via logs SteamCMD (content_log.txt e bootstrap_log.txt)
+    println!("\n--- 3. Camadas de Log do SteamCMD (content_log.txt / bootstrap_log.txt) ---");
+    let steamcmd_sim = tempdir().unwrap();
+    let logs_dir = steamcmd_sim.path().join("logs");
+    fs::create_dir_all(&logs_dir).unwrap();
+    let content_log_path = logs_dir.join("content_log.txt");
+    let bootstrap_log_path = logs_dir.join("bootstrap_log.txt");
+
+    fs::write(
+        &content_log_path,
+        "[2026-11-13 14:10:00] Client version: 1788292693\n[2026-11-13 14:10:01] AppID 730 App update changed : Running Update,Downloading,\n",
+    )
+    .unwrap();
+    let st_content_dl = windows_api::check_steamcmd_logs_in_dir(steamcmd_sim.path(), 730);
+    check!(
+        "Detecta downloading ativo em logs/content_log.txt",
+        st_content_dl.state == windows_api::DownloadActivityState::Downloading
+    );
+
+    fs::write(
+        &content_log_path,
+        "[2026-11-13 14:10:00] Client version: 1788292693\n[2026-11-13 14:10:02] AppID 730 App update changed : Running Update,Verifying Installed,\n",
+    )
+    .unwrap();
+    let st_content_val = windows_api::check_steamcmd_logs_in_dir(steamcmd_sim.path(), 730);
+    check!(
+        "Detecta validação (Verifying Installed) em logs/content_log.txt",
+        st_content_val.state == windows_api::DownloadActivityState::Validating
+    );
+
+    fs::write(
+        &content_log_path,
+        "[2026-11-13 14:10:00] Client version: 1788292693\n[2026-11-13 14:10:03] AppID 730 App update changed : None\n[2026-11-13 14:10:03] AppID 730 scheduler finished : removed from schedule (result No Error, state 0xc)\n",
+    )
+    .unwrap();
+    let st_content_done = windows_api::check_steamcmd_logs_in_dir(steamcmd_sim.path(), 730);
+    check!(
+        "Após 'None' e 'scheduler finished' no content_log.txt, libera fluxo",
+        !st_content_done.is_active()
+    );
+
+    fs::write(
+        &bootstrap_log_path,
+        "[2026-11-13 14:11:00] Startup - updater built Sep 1 2026\n[2026-11-13 14:11:01] Downloading update (15,000 of 30,000 KB)...\n",
+    )
+    .unwrap();
+    let st_boot_dl = windows_api::check_steamcmd_logs_in_dir(steamcmd_sim.path(), 730);
+    check!(
+        "Detecta atualização bootstrap ativa em logs/bootstrap_log.txt",
+        st_boot_dl.is_active()
+            && st_boot_dl.progress_percent.map(|p| (p - 50.0).abs() < 0.1).unwrap_or(false)
+    );
+
+    fs::write(
+        &bootstrap_log_path,
+        "[2026-11-13 14:11:00] Startup - updater built Sep 1 2026\n[2026-11-13 14:11:05] Update complete, launching...\n[2026-11-13 14:11:05] Shutdown\n",
+    )
+    .unwrap();
+    let st_boot_done = windows_api::check_steamcmd_logs_in_dir(steamcmd_sim.path(), 730);
+    check!(
+        "Após Shutdown em logs/bootstrap_log.txt, libera fluxo",
+        !st_boot_done.is_active()
+    );
+
+    if std::path::Path::new(windows_api::DEFAULT_STEAMCMD_DIR).exists() {
+        let real_status = windows_api::SteamCmdClient::default().check_validation_status(730);
+        check!(
+            "Logs históricos reais em C:\\steamcmd não geram falso positivo quando inativos",
+            !real_status.is_active()
+        );
+    }
+
+    // 4. Análise de stdout em tempo real e linha de comando de processo
+    println!("\n--- 4. Análise de Stdout (+app_update) e Processo ---");
+    let mut cmd = std::process::Command::new("powershell");
+    cmd.args([
+        "-NoProfile",
+        "-Command",
+        "Write-Output 'Update state (0x61) downloading, progress: 61.25 (1000 / 1632)'; Start-Sleep -Milliseconds 120; Write-Output \"Success! App '730' fully installed.\"",
+    ])
+    .stdout(std::process::Stdio::piped())
+    .stderr(std::process::Stdio::null());
+
+    let mut child = cmd.spawn().expect("Falha ao spawnar simulador de stdout");
+    let mut seen_pct = None;
+    let summary = windows_api::monitor_child_stdout(&mut child, 730, None, |ev| {
+        if let windows_api::SteamCmdStdoutEvent::Progress {
+            state: windows_api::DownloadActivityState::Downloading,
+            percent: Some(p),
+            ..
+        } = ev
+        {
+            seen_pct = Some(*p);
+        }
+    })
+    .unwrap();
+
+    check!(
+        "Stdout parser captura 'Update state (0x61) downloading, progress: XX.XX' em tempo real",
+        seen_pct.map(|p| (p - 61.25).abs() < 0.01).unwrap_or(false) && summary.completed
+    );
+
+    check!(
+        "Validador multi-camada integrado (dir + steamcmd + steam logs) detecta e libera corretamente",
+        {
+            let status_idle = windows_api::get_cs2_download_validation_status_for_paths(
+                tmp.path(),
+                steamcmd_sim.path(),
+                false,
+            );
+            !status_idle.is_active()
+        }
+    );
+
+    // 4b. Pasta 730 vazia em Steam\steamapps\downloading continua checando logs
+    let empty_730_dir = downloading.join("730");
+    fs::create_dir_all(&empty_730_dir).unwrap();
+    let steam_logs_dir = tmp.path().join("logs");
+    fs::create_dir_all(&steam_logs_dir).unwrap();
+    fs::write(
+        steam_logs_dir.join("content_log.txt"),
+        "[2026-11-13 15:10:00] AppID 730 App update changed : None\n[2026-11-13 15:10:01] AppID 730 scheduler finished : removed from schedule\n",
+    )
+    .unwrap();
+    check!(
+        "Pasta 730 vazia com logs finalizados continua checando os logs e libera o fluxo",
+        !windows_api::get_cs2_download_validation_status_for_paths(
+            tmp.path(),
+            steamcmd_sim.path(),
+            false,
+        )
+        .is_active()
+    );
+
+    fs::write(
+        steam_logs_dir.join("content_log.txt"),
+        "[2026-11-13 15:11:00] AppID 730 App update changed : Running Update,Verifying Installed,\n",
+    )
+    .unwrap();
+    check!(
+        "Pasta 730 vazia com log ativo continua aos logs e detecta validação",
+        windows_api::get_cs2_download_validation_status_for_paths(
+            tmp.path(),
+            steamcmd_sim.path(),
+            false,
+        )
+        .state
+            == windows_api::DownloadActivityState::Validating
+    );
+    fs::write(
+        steam_logs_dir.join("content_log.txt"),
+        "[2026-11-13 15:12:00] AppID 730 App update changed : None\n",
+    )
+    .unwrap();
+    fs::write(empty_730_dir.join("depot_chunk.bin"), b"bytes").unwrap();
+    check!(
+        "Pasta 730 com arquivo interno detecta download ativo imediatamente",
+        windows_api::get_cs2_download_validation_status_for_paths(
+            tmp.path(),
+            steamcmd_sim.path(),
+            false,
+        )
+        .state
+            == windows_api::DownloadActivityState::Downloading
+    );
+    fs::remove_dir_all(&empty_730_dir).unwrap();
+
+    // 5. Teste de Cancelamento Resiliente durante Espera
+    println!("\n--- 5. Cancelamento Resiliente Durante o Download ---");
     let cancel_token = Arc::new(AtomicBool::new(false));
     let token_clone = cancel_token.clone();
 

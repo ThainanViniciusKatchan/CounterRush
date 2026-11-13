@@ -14,10 +14,21 @@ pub enum WindowsApiError {
 
 pub mod launcher;
 pub use launcher::{
-    check_downloading_dir_has_730, ensure_steam_running, get_steam_downloading_dirs,
-    get_steam_downloading_dirs_from_base, is_cs2_downloading_or_updating, launch_cs2,
-    launch_cs2_economico, launch_cs2_intermediario, launch_cs2_potente, launch_cs2_with_args,
-    launch_cs2_with_args_slice, launch_on_interactive_desktop, shell_execute,
+    check_downloading_dir_has_730, ensure_steam_running, get_cs2_download_validation_status,
+    get_cs2_download_validation_status_for_paths, get_steam_downloading_dirs,
+    get_steam_downloading_dirs_from_base, inspect_downloading_dir_730,
+    is_cs2_downloading_or_updating, launch_cs2, launch_cs2_economico, launch_cs2_intermediario,
+    launch_cs2_potente, launch_cs2_with_args, launch_cs2_with_args_slice,
+    launch_on_interactive_desktop, shell_execute, DownloadingDirCheckResult,
+};
+
+pub mod steamcmd;
+pub use steamcmd::{
+    check_bootstrap_log_file, check_content_log_file, check_steamcmd_logs_in_dir,
+    get_running_steamcmd_processes, is_command_line_updating_app, monitor_child_stdout,
+    parse_bootstrap_log_lines, parse_content_log_lines, parse_steamcmd_stdout_line,
+    DownloadActivityState, SteamCmdClient, SteamCmdLogStatus, SteamCmdProcessInfo,
+    SteamCmdStdoutEvent, SteamCmdUpdateSummary, CS2_APP_ID, DEFAULT_STEAMCMD_DIR,
 };
 
 pub mod powershell;

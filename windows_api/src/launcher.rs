@@ -267,21 +267,67 @@ pub fn launch_cs2_potente() -> Result<(), WindowsApiError> {
     ])
 }
 
-pub fn check_downloading_dir_has_730<P: AsRef<Path>>(dir: P) -> bool {
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DownloadingDirCheckResult {
+    None,
+    Empty730Folder(PathBuf),
+    Active730Content(PathBuf),
+}
+
+fn dir_contains_any_file(dir: &Path, depth: u8) -> bool {
+    if depth > 32 {
+        return true;
+    }
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return false;
+    };
+    for entry in entries.flatten() {
+        let Ok(ft) = entry.file_type() else {
+            continue;
+        };
+        if ft.is_file() {
+            return true;
+        }
+        if ft.is_dir() && dir_contains_any_file(&entry.path(), depth + 1) {
+            return true;
+        }
+    }
+    false
+}
+
+pub fn inspect_downloading_dir_730<P: AsRef<Path>>(dir: P) -> DownloadingDirCheckResult {
     let path = dir.as_ref();
     if !path.exists() || !path.is_dir() {
-        return false;
+        return DownloadingDirCheckResult::None;
     }
+
+    let mut found_empty_folder: Option<PathBuf> = None;
     if let Ok(entries) = std::fs::read_dir(path) {
         for entry in entries.flatten() {
             let file_name = entry.file_name();
             let name_lossy = file_name.to_string_lossy();
             if name_lossy == "730" || name_lossy.contains("730") {
-                return true;
+                let entry_path = entry.path();
+                if entry_path.is_file()
+                    || (entry_path.is_dir() && dir_contains_any_file(&entry_path, 0))
+                {
+                    return DownloadingDirCheckResult::Active730Content(entry_path);
+                }
+                if entry_path.is_dir() && found_empty_folder.is_none() {
+                    found_empty_folder = Some(entry_path);
+                }
             }
         }
     }
-    false
+
+    match found_empty_folder {
+        Some(empty_path) => DownloadingDirCheckResult::Empty730Folder(empty_path),
+        None => DownloadingDirCheckResult::None,
+    }
+}
+
+pub fn check_downloading_dir_has_730<P: AsRef<Path>>(dir: P) -> bool {
+    !matches!(inspect_downloading_dir_730(dir), DownloadingDirCheckResult::None)
 }
 
 pub fn get_steam_downloading_dirs_from_base<P: AsRef<Path>>(base_steam_dir: P) -> Vec<PathBuf> {
@@ -314,17 +360,86 @@ pub fn get_steam_downloading_dirs_from_base<P: AsRef<Path>>(base_steam_dir: P) -
 
 pub fn get_steam_downloading_dirs() -> Vec<PathBuf> {
     let (_steam_exe, steam_dir) = resolve_steam_paths();
-    get_steam_downloading_dirs_from_base(&steam_dir)
+    let mut dirs = get_steam_downloading_dirs_from_base(&steam_dir);
+
+    let steamcmd_dir = Path::new(crate::steamcmd::DEFAULT_STEAMCMD_DIR);
+    if steamcmd_dir.exists() {
+        for cmd_dl_dir in get_steam_downloading_dirs_from_base(steamcmd_dir) {
+            if !dirs.iter().any(|d| d == &cmd_dl_dir) {
+                dirs.push(cmd_dl_dir);
+            }
+        }
+    }
+
+    dirs
+}
+
+pub fn get_cs2_download_validation_status_for_paths<P1: AsRef<Path>, P2: AsRef<Path>>(
+    steam_base_dir: P1,
+    steamcmd_base_dir: P2,
+    require_live_steam_process: bool,
+) -> crate::steamcmd::SteamCmdLogStatus {
+    let mut dirs = get_steam_downloading_dirs_from_base(steam_base_dir.as_ref());
+    if steamcmd_base_dir.as_ref().exists() {
+        for cmd_dir in get_steam_downloading_dirs_from_base(steamcmd_base_dir.as_ref()) {
+            if !dirs.iter().any(|d| d == &cmd_dir) {
+                dirs.push(cmd_dir);
+            }
+        }
+    }
+
+    for dir in dirs {
+        if let DownloadingDirCheckResult::Active730Content(matched_path) =
+            inspect_downloading_dir_730(&dir)
+        {
+            return crate::steamcmd::SteamCmdLogStatus {
+                state: crate::steamcmd::DownloadActivityState::Downloading,
+                progress_percent: None,
+                source: "steamapps/downloading/".to_string(),
+                detail: format!(
+                    "Arquivos ativos de download 730 detectados em {}",
+                    matched_path.display()
+                ),
+            };
+        }
+    }
+
+    if steamcmd_base_dir.as_ref().exists() {
+        let steamcmd_client = crate::steamcmd::SteamCmdClient::new(steamcmd_base_dir.as_ref());
+        let cmd_status = steamcmd_client.check_validation_status(crate::steamcmd::CS2_APP_ID);
+        if cmd_status.is_active() {
+            return cmd_status;
+        }
+    }
+
+    let steam_content_log = steam_base_dir.as_ref().join("logs").join("content_log.txt");
+    let steam_log_status =
+        crate::steamcmd::check_content_log_file(&steam_content_log, crate::steamcmd::CS2_APP_ID);
+    if steam_log_status.is_active() {
+        let process_ok = if require_live_steam_process {
+            crate::is_process_running("steam").unwrap_or(false)
+        } else {
+            true
+        };
+        if process_ok {
+            return steam_log_status;
+        }
+    }
+
+    crate::steamcmd::SteamCmdLogStatus::idle()
+}
+
+pub fn get_cs2_download_validation_status() -> crate::steamcmd::SteamCmdLogStatus {
+    let (_steam_exe, steam_dir) = resolve_steam_paths();
+    get_cs2_download_validation_status_for_paths(
+        steam_dir,
+        crate::steamcmd::DEFAULT_STEAMCMD_DIR,
+        true,
+    )
 }
 
 pub fn is_cs2_downloading_or_updating() -> bool {
-    let downloading_dirs = get_steam_downloading_dirs();
-    for dir in downloading_dirs {
-        if check_downloading_dir_has_730(&dir) {
-            return true;
-        }
-    }
-    false
+    get_cs2_download_validation_status().is_active()
 }
 
 #[cfg(test)]
@@ -415,5 +530,163 @@ mod tests {
         assert_eq!(dirs.len(), 2);
         assert_eq!(dirs[0], tmp.path().join("steamapps").join("downloading"));
         assert_eq!(dirs[1], extra_lib.path().join("steamapps").join("downloading"));
+    }
+
+    #[test]
+    fn test_multi_layer_validation_combines_dir_steamcmd_and_steam_logs() {
+        let steam_tmp = tempdir().unwrap();
+        let steamcmd_tmp = tempdir().unwrap();
+
+        std::fs::create_dir_all(steam_tmp.path().join("logs")).unwrap();
+        std::fs::create_dir_all(steam_tmp.path().join("steamapps").join("downloading")).unwrap();
+        std::fs::create_dir_all(steamcmd_tmp.path().join("logs")).unwrap();
+
+        let idle_status = get_cs2_download_validation_status_for_paths(
+            steam_tmp.path(),
+            steamcmd_tmp.path(),
+            false,
+        );
+        assert!(!idle_status.is_active());
+
+        // Camada SteamCMD content_log indicando validação em andamento
+        let cmd_content_log = steamcmd_tmp.path().join("logs").join("content_log.txt");
+        std::fs::write(
+            &cmd_content_log,
+            "[2026-11-13 14:00:00] Client version: 1788292693\n[2026-11-13 14:00:01] AppID 730 App update changed : Running Update,Verifying Installed,\n",
+        )
+        .unwrap();
+
+        let cmd_val_status = get_cs2_download_validation_status_for_paths(
+            steam_tmp.path(),
+            steamcmd_tmp.path(),
+            false,
+        );
+        assert_eq!(
+            cmd_val_status.state,
+            crate::steamcmd::DownloadActivityState::Validating
+        );
+
+        // Conclui log do SteamCMD e ativa validação na Steam Desktop
+        std::fs::write(
+            &cmd_content_log,
+            "[2026-11-13 14:00:00] Client version: 1788292693\n[2026-11-13 14:00:01] AppID 730 App update changed : None\n[2026-11-13 14:00:02] AppID 730 scheduler finished : removed from schedule\n",
+        )
+        .unwrap();
+
+        let steam_content_log = steam_tmp.path().join("logs").join("content_log.txt");
+        std::fs::write(
+            &steam_content_log,
+            "[2026-11-13 14:05:00] Start validating appID 730 on BuildID 26598758\n[2026-11-13 14:05:00] AppID 730 App update changed : Running Update,Verifying Installed,\n",
+        )
+        .unwrap();
+
+        let steam_val_status = get_cs2_download_validation_status_for_paths(
+            steam_tmp.path(),
+            steamcmd_tmp.path(),
+            false,
+        );
+        assert_eq!(
+            steam_val_status.state,
+            crate::steamcmd::DownloadActivityState::Validating
+        );
+
+        // Quando Steam também finaliza, volta para Idle
+        std::fs::write(
+            &steam_content_log,
+            "[2026-11-13 14:05:00] AppID 730 App update changed : None\n[2026-11-13 14:06:00] AppID 730 scheduler finished : removed from schedule\n",
+        )
+        .unwrap();
+
+        let final_status = get_cs2_download_validation_status_for_paths(
+            steam_tmp.path(),
+            steamcmd_tmp.path(),
+            false,
+        );
+        assert!(!final_status.is_active());
+    }
+
+    #[test]
+    fn test_empty_730_downloading_folder_continues_to_check_logs() {
+        let steam_tmp = tempdir().unwrap();
+        let steamcmd_tmp = tempdir().unwrap();
+
+        let downloading_730 = steam_tmp
+            .path()
+            .join("steamapps")
+            .join("downloading")
+            .join("730");
+        std::fs::create_dir_all(&downloading_730).unwrap();
+        std::fs::create_dir_all(steam_tmp.path().join("logs")).unwrap();
+        std::fs::create_dir_all(steamcmd_tmp.path().join("logs")).unwrap();
+
+        assert_eq!(
+            inspect_downloading_dir_730(downloading_730.parent().unwrap()),
+            DownloadingDirCheckResult::Empty730Folder(downloading_730.clone())
+        );
+
+        // Caso 1: Pasta 730 existe e está vazia + logs inativos => libera (Idle)
+        let steam_log = steam_tmp.path().join("logs").join("content_log.txt");
+        std::fs::write(
+            &steam_log,
+            "[2026-11-13 15:00:00] AppID 730 App update changed : None\n[2026-11-13 15:00:01] AppID 730 scheduler finished : removed from schedule\n",
+        )
+        .unwrap();
+
+        let status_idle = get_cs2_download_validation_status_for_paths(
+            steam_tmp.path(),
+            steamcmd_tmp.path(),
+            false,
+        );
+        assert!(
+            !status_idle.is_active(),
+            "Pasta 730 vazia com logs finalizados deve continuar aos logs e retornar Idle"
+        );
+
+        // Subpasta vazia dentro de 730 também deve continuar aos logs
+        let empty_sub = downloading_730.join("game");
+        std::fs::create_dir_all(&empty_sub).unwrap();
+        let status_empty_sub = get_cs2_download_validation_status_for_paths(
+            steam_tmp.path(),
+            steamcmd_tmp.path(),
+            false,
+        );
+        assert!(!status_empty_sub.is_active());
+
+        // Caso 2: Pasta 730 existe e está vazia, mas logs mostram validação/download ativo => bloqueia pelos logs
+        std::fs::write(
+            &steam_log,
+            "[2026-11-13 15:02:00] AppID 730 App update changed : Running Update,Verifying Installed,\n",
+        )
+        .unwrap();
+
+        let status_active_from_logs = get_cs2_download_validation_status_for_paths(
+            steam_tmp.path(),
+            steamcmd_tmp.path(),
+            false,
+        );
+        assert_eq!(
+            status_active_from_logs.state,
+            crate::steamcmd::DownloadActivityState::Validating
+        );
+        assert_eq!(status_active_from_logs.source, "logs/content_log.txt");
+
+        // Caso 3: Logs finalizados, mas pasta 730 contém arquivo ativo => detecta download
+        std::fs::write(
+            &steam_log,
+            "[2026-11-13 15:03:00] AppID 730 App update changed : None\n",
+        )
+        .unwrap();
+        std::fs::write(empty_sub.join("chunk.tmp"), b"payload").unwrap();
+
+        let status_with_file = get_cs2_download_validation_status_for_paths(
+            steam_tmp.path(),
+            steamcmd_tmp.path(),
+            false,
+        );
+        assert_eq!(
+            status_with_file.state,
+            crate::steamcmd::DownloadActivityState::Downloading
+        );
+        assert_eq!(status_with_file.source, "steamapps/downloading/");
     }
 }
