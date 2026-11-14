@@ -25,6 +25,7 @@ pub struct AppSettings {
     pub optimize_on_steam_launch: bool,
     pub initial_optimization_done: bool,
     pub minimize_to_tray: bool,
+    pub active_preset: Option<String>,
 }
 
 impl Default for AppSettings {
@@ -35,6 +36,7 @@ impl Default for AppSettings {
             optimize_on_steam_launch: false,
             initial_optimization_done: false,
             minimize_to_tray: false,
+            active_preset: None,
         }
     }
 }
@@ -326,6 +328,7 @@ mod tests {
         assert!(!settings.optimize_on_steam_launch);
         assert!(!settings.initial_optimization_done);
         assert!(!settings.minimize_to_tray);
+        assert!(settings.active_preset.is_none());
     }
 
     #[test]
@@ -336,6 +339,7 @@ mod tests {
             optimize_on_steam_launch: true,
             initial_optimization_done: true,
             minimize_to_tray: true,
+            active_preset: Some("AutoDetect".to_string()),
         };
 
         let json = serde_json::to_string_pretty(&original).expect("Falha ao serializar AppSettings");
@@ -357,6 +361,7 @@ mod tests {
         assert!(!settings.optimize_on_steam_launch);
         assert!(!settings.initial_optimization_done);
         assert!(!settings.minimize_to_tray);
+        assert!(settings.active_preset.is_none());
     }
 
     #[test]
@@ -373,6 +378,7 @@ mod tests {
         assert!(!settings.optimize_on_steam_launch);
         assert!(settings.initial_optimization_done);
         assert!(!settings.minimize_to_tray);
+        assert!(settings.active_preset.is_none());
     }
 
     #[test]
@@ -386,6 +392,7 @@ mod tests {
             optimize_on_steam_launch: true,
             initial_optimization_done: true,
             minimize_to_tray: false,
+            active_preset: Some("custom_optimization".to_string()),
         };
 
         settings.save_to_file(&path).expect("Falha ao salvar settings.json");

@@ -51,3 +51,11 @@ pub use security::{is_elevated, relaunch_as_admin};
 
 pub mod scheduler;
 pub use scheduler::{create_logon_task, delete_task, is_task_registered, DEFAULT_STARTUP_TASK_NAME};
+
+pub mod steam_monitor;
+pub use steam_monitor::{
+    get_foreground_process_id, get_process_id_by_name, get_steam_running_app_id,
+    is_cs2_process_running_win32, is_pid_alive, is_steam_app_running_in_registry,
+    resolve_steam_install_path_from_registry, RegistryWatcher, SteamGameLaunchEvent,
+    SteamGameProcessLogWatcher,
+};

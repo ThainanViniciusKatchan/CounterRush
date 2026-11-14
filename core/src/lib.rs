@@ -30,6 +30,20 @@ pub use config;
 pub use windows_api;
 pub use tweaks;
 
+pub mod steam_monitor;
+pub use steam_monitor::{
+    GameMonitorService, MonitorState, ProcessQuery, SteamLogDetector, SteamRegistryDetector,
+    Win32ProcessQuery, Win32SteamLogDetector, Win32SteamRegistryDetector, CS2_STEAM_APP_ID,
+};
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TweakExecutionResult {
+    pub id: String,
+    pub name: String,
+    pub success: bool,
+    pub message: String,
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct CustomLaunchReport {
     pub config: config::CustomOptimizationConfig,
@@ -983,6 +997,258 @@ impl OptimizerCore {
 
         Ok(report)
     }
+
+    pub fn optimize_running_cs2(
+        &self,
+        pid: Option<u32>,
+        config_path: Option<&Path>,
+    ) -> Result<Vec<TweakExecutionResult>, CoreError> {
+        let (_resolved_path, mut cfg) = self.load_or_create_custom_config(config_path)?;
+        let mut results = Vec::new();
+
+        if let Ok((hw_info, _)) = self.get_hardware_profile() {
+            let blocked = enforce_hardware_restrictions_for_info(&mut cfg, &hw_info);
+            for b in blocked {
+                results.push(TweakExecutionResult {
+                    id: "hardware_restriction".to_string(),
+                    name: b.clone(),
+                    success: false,
+                    message: format!("Tweak '{b}' bloqueado devido a restrições de hardware."),
+                });
+            }
+        }
+
+        if cfg.empty_standby_list {
+            match self.empty_standby_list() {
+                Ok(_) => results.push(TweakExecutionResult {
+                    id: "empty_standby_list".into(),
+                    name: "Limpeza da Standby List (RAM)".into(),
+                    success: true,
+                    message: "Memória cache liberada com sucesso.".into(),
+                }),
+                Err(err) => results.push(TweakExecutionResult {
+                    id: "empty_standby_list".into(),
+                    name: "Limpeza da Standby List (RAM)".into(),
+                    success: false,
+                    message: format!("Falha ao limpar Standby List: {err}"),
+                }),
+            }
+        }
+
+        if cfg.disable_gpu_acceleration {
+            match tweaks::is_all_gpu_accel_disabled() {
+                Ok(true) => results.push(TweakExecutionResult {
+                    id: "gpu_accel".into(),
+                    name: "Desativar Aceleração de GPU em Apps".into(),
+                    success: true,
+                    message: "Já desativada em navegadores e apps de suporte.".into(),
+                }),
+                _ => {
+                    let res = self.disable_all_gpu_acceleration();
+                    results.push(TweakExecutionResult {
+                        id: "gpu_accel".into(),
+                        name: "Desativar Aceleração de GPU em Apps".into(),
+                        success: res.is_ok(),
+                        message: if res.is_ok() {
+                            "Aceleração de GPU desativada em apps secundários.".into()
+                        } else {
+                            "Não foi possível desativar aceleração de GPU em todos os apps.".into()
+                        },
+                    });
+                }
+            }
+        }
+
+        if cfg.apply_dpi_optimization {
+            let res = self.apply_dpi_optimization();
+            results.push(TweakExecutionResult {
+                id: "dpi_optimization".into(),
+                name: "Otimização de DPI e Modo Janela".into(),
+                success: res.is_ok(),
+                message: if res.is_ok() {
+                    "Otimizações de tela cheia e DPI aplicadas.".into()
+                } else {
+                    "Falha ao aplicar otimização de DPI.".into()
+                },
+            });
+        }
+
+        if cfg.disable_memory_compression {
+            let res = self.disable_memory_compression();
+            results.push(TweakExecutionResult {
+                id: "memory_compression".into(),
+                name: "Desativação da Compactação de Memória".into(),
+                success: res.is_ok(),
+                message: if res.is_ok() {
+                    "Compactação de memória desativada.".into()
+                } else {
+                    "Falha ou permissão insuficiente para compactação de memória.".into()
+                },
+            });
+        }
+
+        if cfg.apply_timer_resolution {
+            let res = self.apply_timer_resolution();
+            results.push(TweakExecutionResult {
+                id: "timer_resolution".into(),
+                name: "Resolução do Temporizador do Sistema (0.5ms)".into(),
+                success: res.is_ok(),
+                message: if res.is_ok() {
+                    "Resolução do temporizador configurada para 0.5ms.".into()
+                } else {
+                    "Falha ao ajustar resolução do temporizador.".into()
+                },
+            });
+        }
+
+        if cfg.apply_mmcss {
+            let res = self.apply_all_mmcss();
+            results.push(TweakExecutionResult {
+                id: "mmcss".into(),
+                name: "Otimização do Agendador Multimídia (MMCSS)".into(),
+                success: res.is_ok(),
+                message: if res.is_ok() {
+                    "Prioridade MMCSS configurada para jogos.".into()
+                } else {
+                    "Falha ao ajustar MMCSS.".into()
+                },
+            });
+        }
+
+        if cfg.disable_hpet {
+            let res = self.disable_hpet();
+            results.push(TweakExecutionResult {
+                id: "hpet".into(),
+                name: "Desativação do HPET".into(),
+                success: res.is_ok(),
+                message: if res.is_ok() {
+                    "HPET desativado com sucesso.".into()
+                } else {
+                    "Falha ao desativar HPET.".into()
+                },
+            });
+        }
+
+        if cfg.disable_game_bar {
+            let res = self.disable_all_game_bar_features();
+            results.push(TweakExecutionResult {
+                id: "game_bar".into(),
+                name: "Desativação do Xbox Game Bar e GameDVR".into(),
+                success: res.is_ok(),
+                message: if res.is_ok() {
+                    "Xbox Game Bar e GameDVR desativados.".into()
+                } else {
+                    "Falha ao desativar Xbox Game Bar.".into()
+                },
+            });
+        }
+
+        if cfg.enable_msi {
+            let res = self.enable_all_msi();
+            results.push(TweakExecutionResult {
+                id: "msi".into(),
+                name: "Ativação do Modo MSI".into(),
+                success: res.is_ok(),
+                message: if res.is_ok() {
+                    "Modo MSI ativado para dispositivos compatíveis.".into()
+                } else {
+                    "Falha ao configurar Modo MSI.".into()
+                },
+            });
+        }
+
+        if cfg.disable_power_saving {
+            let res = self.disable_all_power_saving();
+            results.push(TweakExecutionResult {
+                id: "power_saving".into(),
+                name: "Desativação de Economia de Energia PCIe e USB".into(),
+                success: res.is_ok(),
+                message: if res.is_ok() {
+                    "Economia de energia PCIe e USB desativada.".into()
+                } else {
+                    "Falha ao desativar economia de energia.".into()
+                },
+            });
+        }
+
+        if cfg.apply_render_queue {
+            let res = self.apply_render_queue();
+            results.push(TweakExecutionResult {
+                id: "render_queue".into(),
+                name: "Fila de Quadros Renderizados (Render Queue)".into(),
+                success: res.is_ok(),
+                message: if res.is_ok() {
+                    "Fila de quadros otimizada para baixa latência.".into()
+                } else {
+                    "Falha ao configurar fila de renderização.".into()
+                },
+            });
+        }
+
+        let is_running = if let Some(p) = pid {
+            windows_api::is_pid_alive(p)
+        } else {
+            windows_api::is_cs2_process_running_win32().unwrap_or(false)
+        };
+
+        if is_running {
+            if cfg.cs2_priority {
+                let res = tweaks::Cs2PriorityTweak.apply();
+                results.push(TweakExecutionResult {
+                    id: "cs2_priority".into(),
+                    name: "Prioridade em Tempo Real do CS2".into(),
+                    success: res.is_ok(),
+                    message: if res.is_ok() {
+                        "Prioridade do processo definida para Tempo Real.".into()
+                    } else {
+                        "Falha ao definir prioridade do processo.".into()
+                    },
+                });
+            }
+
+            if cfg.cs2_affinity {
+                let res = tweaks::Cs2AffinityTweak.apply();
+                results.push(TweakExecutionResult {
+                    id: "cs2_affinity".into(),
+                    name: "Afinidade de Processador do CS2".into(),
+                    success: res.is_ok(),
+                    message: if res.is_ok() {
+                        "Afinidade configurada (Core 0 liberado para o SO).".into()
+                    } else {
+                        "Falha ao configurar afinidade de CPU.".into()
+                    },
+                });
+            }
+        }
+
+        Ok(results)
+    }
+}
+
+/// Reconcilia os flags de inicialização com o sistema e auto-otimização Steam.
+///
+/// Ligar a inicialização com o Windows não ativa a auto-otimização Steam automaticamente;
+/// por outro lado, sem inicialização com o sistema ativa, a auto-otimização permanece desligada.
+pub fn reconcile_startup_flags(
+    startup_task_active: bool,
+    optimize_on_steam_launch: bool,
+) -> (bool, bool) {
+    let effective_startup = startup_task_active;
+    let effective_steam_auto = effective_startup && optimize_on_steam_launch;
+    (effective_startup, effective_steam_auto)
+}
+
+/// Seleciona o nome do perfil ativo priorizando `saved_active_preset` quando ainda existir.
+pub fn resolve_selected_preset_name<'a>(
+    saved_active_preset: Option<&str>,
+    available_names: &[&'a str],
+) -> Option<&'a str> {
+    if available_names.is_empty() {
+        return None;
+    }
+    saved_active_preset
+        .and_then(|saved| available_names.iter().copied().find(|name| *name == saved))
+        .or_else(|| available_names.first().copied())
 }
 
 pub fn get_default_launch_args_for_category(category: PcCategory) -> Vec<String> {
@@ -1805,5 +2071,56 @@ mod tests {
     fn test_core_set_clipboard() {
         let res = set_clipboard("CounterRush Core Test Clipboard");
         assert!(res.is_ok(), "set_clipboard em core deve retornar Ok: {:?}", res.err());
+    }
+
+    #[test]
+    fn test_optimize_running_cs2_respects_explicit_config_path() {
+        let temp_dir = tempfile::tempdir().expect("Falha ao criar diretório temporário");
+        let custom_path = temp_dir.path().join("MeuPerfilCustomizado.json");
+        let cfg = config::CustomOptimizationConfig::all_disabled();
+        cfg.save_to_file(&custom_path)
+            .expect("Falha ao salvar perfil customizado em disco");
+
+        let core = OptimizerCore::default();
+        let results = core
+            .optimize_running_cs2(None, Some(&custom_path))
+            .expect("optimize_running_cs2 deve carregar o arquivo customizado sem falhar");
+
+        assert!(
+            results.is_empty(),
+            "Com todas as flags desativadas no perfil explicitamente passado, nenhum tweak deve rodar: {:?}",
+            results
+        );
+    }
+
+    #[test]
+    fn test_reconcile_startup_flags_truth_table() {
+        assert_eq!(reconcile_startup_flags(false, false), (false, false));
+        assert_eq!(
+            reconcile_startup_flags(true, false),
+            (true, false),
+            "Ativar inicialização com o sistema não deve ativar auto-otimização Steam"
+        );
+        assert_eq!(reconcile_startup_flags(true, true), (true, true));
+        assert_eq!(
+            reconcile_startup_flags(false, true),
+            (false, false),
+            "Sem inicialização com o sistema, auto-otimização Steam deve ficar desativada"
+        );
+    }
+
+    #[test]
+    fn test_resolve_selected_preset_name() {
+        let presets = ["AutoDetect", "Competitivo", "Streaming"];
+        assert_eq!(
+            resolve_selected_preset_name(Some("Competitivo"), &presets),
+            Some("Competitivo")
+        );
+        assert_eq!(
+            resolve_selected_preset_name(Some("Inexistente"), &presets),
+            Some("AutoDetect")
+        );
+        assert_eq!(resolve_selected_preset_name(None, &presets), Some("AutoDetect"));
+        assert_eq!(resolve_selected_preset_name(Some("Competitivo"), &[]), None);
     }
 }

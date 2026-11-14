@@ -198,6 +198,7 @@ fn main() {
         optimize_on_steam_launch: false,
         initial_optimization_done: true,
         minimize_to_tray: true,
+        ..Default::default()
     };
     initial.save_to_file(&settings_file).expect("Falha ao gravar settings inicial");
 

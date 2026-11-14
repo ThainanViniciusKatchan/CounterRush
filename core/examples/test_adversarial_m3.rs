@@ -119,6 +119,7 @@ fn main() {
         optimize_on_steam_launch: true,
         initial_optimization_done: false,
         minimize_to_tray: false,
+        ..Default::default()
     };
     let save_res = custom_settings.save_to_file(&roundtrip_file);
     check!("Save normal", save_res.is_ok(), format!("{:?}", save_res));
@@ -254,6 +255,7 @@ fn main() {
             optimize_on_steam_launch: i % 5 == 0,
             initial_optimization_done: false,
             minimize_to_tray: false,
+            ..Default::default()
         };
         if cfg.save_to_file(&stress_file).is_err() {
             stress_ok = false;

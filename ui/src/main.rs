@@ -241,7 +241,7 @@ fn apply_bulk_action(
     let _ = config.save_to_file(&target_path);
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 enum AppliedSessionTweak {
     Timer,
     Mmcss,
@@ -640,6 +640,7 @@ fn run_auto_optimize_flow(
     let settings_path = counterrush_core::resolve_app_settings_path();
     if let Ok(mut settings) = counterrush_core::config::AppSettings::load_or_create(&settings_path) {
         settings.initial_optimization_done = true;
+        settings.active_preset = Some("AutoDetect".to_string());
         let _ = settings.save_to_file(&settings_path);
     }
 
@@ -670,6 +671,305 @@ fn run_auto_optimize_flow(
         ui.set_auto_optimize_progress(1.0);
         ui.set_auto_optimize_step_name("Sistema otimizado com sucesso!".into());
         ui.set_auto_optimize_finished(true);
+    });
+}
+
+fn save_active_preset_setting(preset_name: Option<String>) {
+    let settings_path = counterrush_core::resolve_app_settings_path();
+    if let Ok(mut settings) = counterrush_core::config::AppSettings::load_or_create(&settings_path) {
+        settings.active_preset = preset_name;
+        let _ = settings.save_to_file(&settings_path);
+    }
+}
+
+fn execute_configured_tweaks_with_modal(
+    ui: &slint::Weak<MainWindow>,
+    core: &counterrush_core::OptimizerCore,
+    config: &counterrush_core::config::CustomOptimizationConfig,
+    token: &std::sync::atomic::AtomicBool,
+    step_duration: std::time::Duration,
+    cancel_msg: &str,
+) -> Option<Vec<AppliedSessionTweak>> {
+    let mut applied_tweaks = Vec::new();
+    let cancel_and_rollback = |applied: Vec<AppliedSessionTweak>| -> Option<Vec<AppliedSessionTweak>> {
+        rollback_applied_tweaks(core, applied);
+        let msg = cancel_msg.to_string();
+        post_ui(ui, move |ui| {
+            ui.set_show_auto_optimize_modal(false);
+            ui.set_is_launching(false);
+            ui.set_status_message(msg.into());
+        });
+        None
+    };
+
+    if token.load(std::sync::atomic::Ordering::SeqCst) {
+        return cancel_and_rollback(applied_tweaks);
+    }
+    update_auto_optimize_ui(ui, 0.08, "Verificando perfil e compatibilidade do hardware...");
+    if !sleep_with_cancellation(step_duration, token) {
+        return cancel_and_rollback(applied_tweaks);
+    }
+
+    let steps: [(
+        bool,
+        f32,
+        &str,
+        Option<AppliedSessionTweak>,
+        fn(&counterrush_core::OptimizerCore) -> bool,
+    ); 11] = [
+        (
+            config.empty_standby_list,
+            0.16,
+            "Liberando cache de memória RAM em Standby...",
+            None,
+            |c| c.empty_standby_list().is_ok(),
+        ),
+        (
+            config.apply_timer_resolution,
+            0.24,
+            "Otimizando resolução do temporizador (0.5ms)...",
+            Some(AppliedSessionTweak::Timer),
+            |c| c.apply_timer_resolution().is_ok(),
+        ),
+        (
+            config.apply_mmcss,
+            0.32,
+            "Configurando agendador multimídia e rede (MMCSS)...",
+            Some(AppliedSessionTweak::Mmcss),
+            |c| c.apply_all_mmcss().is_ok(),
+        ),
+        (
+            config.apply_dpi_optimization,
+            0.40,
+            "Ajustando DPI e compatibilidade de tela inteira CS2...",
+            Some(AppliedSessionTweak::Dpi),
+            |c| c.apply_dpi_optimization().is_ok(),
+        ),
+        (
+            config.disable_gpu_acceleration,
+            0.48,
+            "Desativando aceleração de GPU em aplicativos secundários...",
+            Some(AppliedSessionTweak::GpuAccel),
+            |c| c.disable_all_gpu_acceleration().is_ok(),
+        ),
+        (
+            config.disable_memory_compression,
+            0.56,
+            "Calibrando compactação de memória do Windows...",
+            Some(AppliedSessionTweak::MemCompression),
+            |c| c.disable_memory_compression().is_ok(),
+        ),
+        (
+            config.disable_hpet,
+            0.64,
+            "Desativando HPET (temporizador de alta precisão)...",
+            Some(AppliedSessionTweak::Hpet),
+            |c| c.disable_hpet().is_ok(),
+        ),
+        (
+            config.disable_game_bar,
+            0.72,
+            "Desativando Xbox Game Bar e capturas GameDVR...",
+            Some(AppliedSessionTweak::GameBar),
+            |c| c.disable_all_game_bar_features().is_ok(),
+        ),
+        (
+            config.enable_msi,
+            0.80,
+            "Ativando Modo MSI para GPU e periféricos...",
+            Some(AppliedSessionTweak::Msi),
+            |c| c.enable_all_msi().is_ok(),
+        ),
+        (
+            config.disable_power_saving,
+            0.86,
+            "Desativando suspensão de energia PCIe e USB...",
+            Some(AppliedSessionTweak::PowerSaving),
+            |c| c.disable_all_power_saving().is_ok(),
+        ),
+        (
+            config.apply_render_queue,
+            0.92,
+            "Configurando fila de renderização (Render Queue)...",
+            Some(AppliedSessionTweak::RenderQueue),
+            |c| c.apply_render_queue().is_ok(),
+        ),
+    ];
+
+    for (enabled, progress, label, session_tweak, apply_fn) in steps {
+        if token.load(std::sync::atomic::Ordering::SeqCst) {
+            return cancel_and_rollback(applied_tweaks);
+        }
+        if enabled {
+            update_auto_optimize_ui(ui, progress, label);
+            if apply_fn(core) {
+                if let Some(t) = session_tweak {
+                    applied_tweaks.push(t);
+                }
+            }
+            if !sleep_with_cancellation(step_duration, token) {
+                return cancel_and_rollback(applied_tweaks);
+            }
+        }
+    }
+
+    Some(applied_tweaks)
+}
+
+fn run_steam_auto_optimize_flow(
+    ui: &slint::Weak<MainWindow>,
+    config_path: &std::sync::Arc<std::sync::RwLock<std::path::PathBuf>>,
+    pid: u32,
+    token: &std::sync::Arc<std::sync::atomic::AtomicBool>,
+    monitor_weak: &std::sync::Weak<counterrush_core::GameMonitorService>,
+) {
+    token.store(false, std::sync::atomic::Ordering::SeqCst);
+
+    post_ui(ui, move |ui| {
+        let lang = ui.get_active_language();
+        let status_msg = match lang.as_str() {
+            "en" | "en_US" | "en-US" | "en-EUA" => {
+                format!("CS2 detected via Steam (PID: {pid}). Applying optimizations...")
+            }
+            "ru" | "ru_RU" | "ru-RU" => {
+                format!("CS2 обнаружен через Steam (PID: {pid}). Применение оптимизаций...")
+            }
+            _ => format!("CS2 detectado via Steam (PID: {pid}). Aplicando otimizações..."),
+        };
+        ui.set_is_launching(true);
+        ui.set_auto_optimize_is_launch(true);
+        ui.set_auto_optimize_progress(0.0);
+        ui.set_auto_optimize_step_name("CS2 detectado via Steam. Iniciando otimizações...".into());
+        ui.set_auto_optimize_stage_title("".into());
+        ui.set_auto_optimize_stage_subtitle("".into());
+        ui.set_auto_optimize_finished(false);
+        ui.set_show_auto_optimize_modal(true);
+        ui.set_status_message(status_msg.into());
+        ui.window().set_minimized(false);
+        let _ = ui.show();
+        tray::focus_counterrush_window();
+    });
+
+    let target_cfg_path = config_path.read().map(|p| p.clone()).unwrap_or_default();
+    let effective_path = if target_cfg_path.as_os_str().is_empty() {
+        let presets = scan_presets();
+        if let Some(first) = presets.first() {
+            let resolved = counterrush_core::resolve_optimization_file_path(first.name.as_str());
+            if let Ok(mut guard) = config_path.write() {
+                *guard = resolved.clone();
+            }
+            resolved
+        } else {
+            post_ui(ui, |ui| {
+                ui.set_is_launching(false);
+                ui.set_show_auto_optimize_modal(false);
+                ui.set_show_no_profile_modal(true);
+                ui.set_status_message(
+                    "Nenhum perfil de otimização selecionado para auto-otimização Steam.".into(),
+                );
+            });
+            return;
+        }
+    } else {
+        target_cfg_path
+    };
+
+    let core = counterrush_core::OptimizerCore::default();
+    let (resolved_cfg_path, mut config) =
+        match core.load_or_create_custom_config(Some(&effective_path)) {
+            Ok(res) => res,
+            Err(err) => {
+                let err_msg = format!("Erro na configuração: {err}");
+                post_ui(ui, move |ui| {
+                    ui.set_show_auto_optimize_modal(false);
+                    ui.set_is_launching(false);
+                    ui.set_status_message(err_msg.into());
+                });
+                return;
+            }
+        };
+
+    if let Ok((hw_info, _)) = core.get_hardware_profile() {
+        let _ = counterrush_core::enforce_hardware_restrictions_for_info(&mut config, &hw_info);
+    }
+
+    if execute_configured_tweaks_with_modal(
+        ui,
+        &core,
+        &config,
+        token,
+        std::time::Duration::from_millis(120),
+        "Auto-otimização Steam cancelada pelo usuário. Alterações revertidas.",
+    )
+    .is_none()
+    {
+        return;
+    }
+
+    if config.cs2_priority || config.cs2_affinity {
+        update_auto_optimize_ui(ui, 0.96, "Aplicando prioridade e afinidade no processo CS2...");
+        let is_running = counterrush_core::windows_api::is_pid_alive(pid)
+            || counterrush_core::windows_api::is_cs2_process_running_win32().unwrap_or(false);
+        if is_running {
+            use counterrush_core::tweaks::Tweak;
+            if config.cs2_priority {
+                let _ = counterrush_core::tweaks::Cs2PriorityTweak.apply();
+            }
+            if config.cs2_affinity {
+                let _ = counterrush_core::tweaks::Cs2AffinityTweak.apply();
+            }
+        }
+    }
+
+    let profile_label = resolved_cfg_path
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("selecionado")
+        .to_string();
+
+    post_ui(ui, move |ui| {
+        let lang = ui.get_active_language();
+        let msg = match lang.as_str() {
+            "en" | "en_US" | "en-US" | "en-EUA" => {
+                format!("CS2 optimized with profile '{profile_label}'! Waiting for game focus...")
+            }
+            "ru" | "ru_RU" | "ru-RU" => {
+                format!("CS2 оптимизирован с профилем '{profile_label}'! Ожидание фокуса игры...")
+            }
+            _ => format!(
+                "CS2 otimizado com o perfil '{profile_label}'! Aguardando foco do jogo..."
+            ),
+        };
+        ui.set_auto_optimize_stage_title("".into());
+        ui.set_auto_optimize_stage_subtitle("".into());
+        ui.set_auto_optimize_progress(1.0);
+        ui.set_auto_optimize_step_name("CS2 OTIMIZADO COM SUCESSO".into());
+        ui.set_auto_optimize_finished(true);
+        ui.set_is_launching(false);
+        ui.set_status_message(msg.into());
+    });
+
+    let start = std::time::Instant::now();
+    let max_wait = std::time::Duration::from_secs(45);
+    while start.elapsed() < max_wait {
+        if let Some(m) = monitor_weak.upgrade() {
+            if !m.is_running() {
+                break;
+            }
+        }
+        if !counterrush_core::windows_api::is_pid_alive(pid) {
+            break;
+        }
+        if counterrush_core::windows_api::get_foreground_process_id() == Some(pid) {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(250));
+    }
+
+    post_ui(ui, |ui| {
+        ui.set_show_auto_optimize_modal(false);
+        ui.set_is_launching(false);
+        let _ = ui.hide();
     });
 }
 
@@ -718,307 +1018,17 @@ fn run_launch_flow(
         let _ = counterrush_core::enforce_hardware_restrictions_for_info(&mut config, &hw_info);
     }
 
-    let mut applied_tweaks = Vec::new();
-    let step_duration = std::time::Duration::from_millis(180);
-
-    // Etapa 1: Hardware & Perfil
-    if token.load(std::sync::atomic::Ordering::SeqCst) {
-        return;
-    }
-    update_auto_optimize_ui(ui, 0.08, "Verificando perfil e compatibilidade do hardware...");
-    if !sleep_with_cancellation(step_duration, &token) {
-        rollback_applied_tweaks(&core, applied_tweaks);
-        post_ui(ui, |ui| {
-            ui.set_show_auto_optimize_modal(false);
-            ui.set_is_launching(false);
-            ui.set_status_message("Inicialização cancelada pelo usuário.".into());
-        });
-        return;
-    }
-
-    // Etapa 2: Standby List (RAM)
-    if token.load(std::sync::atomic::Ordering::SeqCst) {
-        rollback_applied_tweaks(&core, applied_tweaks);
-        post_ui(ui, |ui| {
-            ui.set_show_auto_optimize_modal(false);
-            ui.set_is_launching(false);
-            ui.set_status_message("Inicialização cancelada pelo usuário.".into());
-        });
-        return;
-    }
-    if config.empty_standby_list {
-        update_auto_optimize_ui(ui, 0.16, "Liberando cache de memória RAM em Standby...");
-        let _ = core.empty_standby_list();
-        if !sleep_with_cancellation(step_duration, &token) {
-            rollback_applied_tweaks(&core, applied_tweaks);
-            post_ui(ui, |ui| {
-                ui.set_show_auto_optimize_modal(false);
-                ui.set_is_launching(false);
-                ui.set_status_message("Inicialização cancelada pelo usuário.".into());
-            });
-            return;
-        }
-    }
-
-    // Etapa 3: Temporizador (0.5ms)
-    if token.load(std::sync::atomic::Ordering::SeqCst) {
-        rollback_applied_tweaks(&core, applied_tweaks);
-        post_ui(ui, |ui| {
-            ui.set_show_auto_optimize_modal(false);
-            ui.set_is_launching(false);
-            ui.set_status_message("Inicialização cancelada pelo usuário. Alterações revertidas.".into());
-        });
-        return;
-    }
-    if config.apply_timer_resolution {
-        update_auto_optimize_ui(ui, 0.24, "Otimizando resolução do temporizador (0.5ms)...");
-        if core.apply_timer_resolution().is_ok() {
-            applied_tweaks.push(AppliedSessionTweak::Timer);
-        }
-        if !sleep_with_cancellation(step_duration, &token) {
-            rollback_applied_tweaks(&core, applied_tweaks);
-            post_ui(ui, |ui| {
-                ui.set_show_auto_optimize_modal(false);
-                ui.set_is_launching(false);
-                ui.set_status_message("Inicialização cancelada pelo usuário. Alterações revertidas.".into());
-            });
-            return;
-        }
-    }
-
-    // Etapa 4: MMCSS
-    if token.load(std::sync::atomic::Ordering::SeqCst) {
-        rollback_applied_tweaks(&core, applied_tweaks);
-        post_ui(ui, |ui| {
-            ui.set_show_auto_optimize_modal(false);
-            ui.set_is_launching(false);
-            ui.set_status_message("Inicialização cancelada pelo usuário. Alterações revertidas.".into());
-        });
-        return;
-    }
-    if config.apply_mmcss {
-        update_auto_optimize_ui(ui, 0.32, "Configurando agendador multimídia e rede (MMCSS)...");
-        if core.apply_all_mmcss().is_ok() {
-            applied_tweaks.push(AppliedSessionTweak::Mmcss);
-        }
-        if !sleep_with_cancellation(step_duration, &token) {
-            rollback_applied_tweaks(&core, applied_tweaks);
-            post_ui(ui, |ui| {
-                ui.set_show_auto_optimize_modal(false);
-                ui.set_is_launching(false);
-                ui.set_status_message("Inicialização cancelada pelo usuário. Alterações revertidas.".into());
-            });
-            return;
-        }
-    }
-
-    // Etapa 5: DPI
-    if token.load(std::sync::atomic::Ordering::SeqCst) {
-        rollback_applied_tweaks(&core, applied_tweaks);
-        post_ui(ui, |ui| {
-            ui.set_show_auto_optimize_modal(false);
-            ui.set_is_launching(false);
-            ui.set_status_message("Inicialização cancelada pelo usuário. Alterações revertidas.".into());
-        });
-        return;
-    }
-    if config.apply_dpi_optimization {
-        update_auto_optimize_ui(ui, 0.40, "Ajustando DPI e compatibilidade de tela inteira CS2...");
-        if core.apply_dpi_optimization().is_ok() {
-            applied_tweaks.push(AppliedSessionTweak::Dpi);
-        }
-        if !sleep_with_cancellation(step_duration, &token) {
-            rollback_applied_tweaks(&core, applied_tweaks);
-            post_ui(ui, |ui| {
-                ui.set_show_auto_optimize_modal(false);
-                ui.set_is_launching(false);
-                ui.set_status_message("Inicialização cancelada pelo usuário. Alterações revertidas.".into());
-            });
-            return;
-        }
-    }
-
-    // Etapa 6: GPU Accel
-    if token.load(std::sync::atomic::Ordering::SeqCst) {
-        rollback_applied_tweaks(&core, applied_tweaks);
-        post_ui(ui, |ui| {
-            ui.set_show_auto_optimize_modal(false);
-            ui.set_is_launching(false);
-            ui.set_status_message("Inicialização cancelada pelo usuário. Alterações revertidas.".into());
-        });
-        return;
-    }
-    if config.disable_gpu_acceleration {
-        update_auto_optimize_ui(ui, 0.48, "Desativando aceleração de GPU em aplicativos secundários...");
-        if core.disable_all_gpu_acceleration().is_ok() {
-            applied_tweaks.push(AppliedSessionTweak::GpuAccel);
-        }
-        if !sleep_with_cancellation(step_duration, &token) {
-            rollback_applied_tweaks(&core, applied_tweaks);
-            post_ui(ui, |ui| {
-                ui.set_show_auto_optimize_modal(false);
-                ui.set_is_launching(false);
-                ui.set_status_message("Inicialização cancelada pelo usuário. Alterações revertidas.".into());
-            });
-            return;
-        }
-    }
-
-    // Etapa 7: Compactação de Memória
-    if token.load(std::sync::atomic::Ordering::SeqCst) {
-        rollback_applied_tweaks(&core, applied_tweaks);
-        post_ui(ui, |ui| {
-            ui.set_show_auto_optimize_modal(false);
-            ui.set_is_launching(false);
-            ui.set_status_message("Inicialização cancelada pelo usuário. Alterações revertidas.".into());
-        });
-        return;
-    }
-    if config.disable_memory_compression {
-        update_auto_optimize_ui(ui, 0.56, "Calibrando compactação de memória do Windows...");
-        if core.disable_memory_compression().is_ok() {
-            applied_tweaks.push(AppliedSessionTweak::MemCompression);
-        }
-        if !sleep_with_cancellation(step_duration, &token) {
-            rollback_applied_tweaks(&core, applied_tweaks);
-            post_ui(ui, |ui| {
-                ui.set_show_auto_optimize_modal(false);
-                ui.set_is_launching(false);
-                ui.set_status_message("Inicialização cancelada pelo usuário. Alterações revertidas.".into());
-            });
-            return;
-        }
-    }
-
-    // Etapa 8: HPET
-    if token.load(std::sync::atomic::Ordering::SeqCst) {
-        rollback_applied_tweaks(&core, applied_tweaks);
-        post_ui(ui, |ui| {
-            ui.set_show_auto_optimize_modal(false);
-            ui.set_is_launching(false);
-            ui.set_status_message("Inicialização cancelada pelo usuário. Alterações revertidas.".into());
-        });
-        return;
-    }
-    if config.disable_hpet {
-        update_auto_optimize_ui(ui, 0.64, "Desativando HPET (temporizador de alta precisão)...");
-        if core.disable_hpet().is_ok() {
-            applied_tweaks.push(AppliedSessionTweak::Hpet);
-        }
-        if !sleep_with_cancellation(step_duration, &token) {
-            rollback_applied_tweaks(&core, applied_tweaks);
-            post_ui(ui, |ui| {
-                ui.set_show_auto_optimize_modal(false);
-                ui.set_is_launching(false);
-                ui.set_status_message("Inicialização cancelada pelo usuário. Alterações revertidas.".into());
-            });
-            return;
-        }
-    }
-
-    // Etapa 9: Game Bar & GameDVR
-    if token.load(std::sync::atomic::Ordering::SeqCst) {
-        rollback_applied_tweaks(&core, applied_tweaks);
-        post_ui(ui, |ui| {
-            ui.set_show_auto_optimize_modal(false);
-            ui.set_is_launching(false);
-            ui.set_status_message("Inicialização cancelada pelo usuário. Alterações revertidas.".into());
-        });
-        return;
-    }
-    if config.disable_game_bar {
-        update_auto_optimize_ui(ui, 0.72, "Desativando Xbox Game Bar e capturas GameDVR...");
-        if core.disable_all_game_bar_features().is_ok() {
-            applied_tweaks.push(AppliedSessionTweak::GameBar);
-        }
-        if !sleep_with_cancellation(step_duration, &token) {
-            rollback_applied_tweaks(&core, applied_tweaks);
-            post_ui(ui, |ui| {
-                ui.set_show_auto_optimize_modal(false);
-                ui.set_is_launching(false);
-                ui.set_status_message("Inicialização cancelada pelo usuário. Alterações revertidas.".into());
-            });
-            return;
-        }
-    }
-
-    // Etapa 10: MSI Mode
-    if token.load(std::sync::atomic::Ordering::SeqCst) {
-        rollback_applied_tweaks(&core, applied_tweaks);
-        post_ui(ui, |ui| {
-            ui.set_show_auto_optimize_modal(false);
-            ui.set_is_launching(false);
-            ui.set_status_message("Inicialização cancelada pelo usuário. Alterações revertidas.".into());
-        });
-        return;
-    }
-    if config.enable_msi {
-        update_auto_optimize_ui(ui, 0.80, "Ativando Modo MSI para GPU e periféricos...");
-        if core.enable_all_msi().is_ok() {
-            applied_tweaks.push(AppliedSessionTweak::Msi);
-        }
-        if !sleep_with_cancellation(step_duration, &token) {
-            rollback_applied_tweaks(&core, applied_tweaks);
-            post_ui(ui, |ui| {
-                ui.set_show_auto_optimize_modal(false);
-                ui.set_is_launching(false);
-                ui.set_status_message("Inicialização cancelada pelo usuário. Alterações revertidas.".into());
-            });
-            return;
-        }
-    }
-
-    // Etapa 11: Economia de Energia PCIe e USB
-    if token.load(std::sync::atomic::Ordering::SeqCst) {
-        rollback_applied_tweaks(&core, applied_tweaks);
-        post_ui(ui, |ui| {
-            ui.set_show_auto_optimize_modal(false);
-            ui.set_is_launching(false);
-            ui.set_status_message("Inicialização cancelada pelo usuário. Alterações revertidas.".into());
-        });
-        return;
-    }
-    if config.disable_power_saving {
-        update_auto_optimize_ui(ui, 0.86, "Desativando suspensão de energia PCIe e USB...");
-        if core.disable_all_power_saving().is_ok() {
-            applied_tweaks.push(AppliedSessionTweak::PowerSaving);
-        }
-        if !sleep_with_cancellation(step_duration, &token) {
-            rollback_applied_tweaks(&core, applied_tweaks);
-            post_ui(ui, |ui| {
-                ui.set_show_auto_optimize_modal(false);
-                ui.set_is_launching(false);
-                ui.set_status_message("Inicialização cancelada pelo usuário. Alterações revertidas.".into());
-            });
-            return;
-        }
-    }
-
-    // Etapa 12: Fila de Renderização (Render Queue)
-    if token.load(std::sync::atomic::Ordering::SeqCst) {
-        rollback_applied_tweaks(&core, applied_tweaks);
-        post_ui(ui, |ui| {
-            ui.set_show_auto_optimize_modal(false);
-            ui.set_is_launching(false);
-            ui.set_status_message("Inicialização cancelada pelo usuário. Alterações revertidas.".into());
-        });
-        return;
-    }
-    if config.apply_render_queue {
-        update_auto_optimize_ui(ui, 0.92, "Configurando fila de renderização (Render Queue)...");
-        if core.apply_render_queue().is_ok() {
-            applied_tweaks.push(AppliedSessionTweak::RenderQueue);
-        }
-        if !sleep_with_cancellation(step_duration, &token) {
-            rollback_applied_tweaks(&core, applied_tweaks);
-            post_ui(ui, |ui| {
-                ui.set_show_auto_optimize_modal(false);
-                ui.set_is_launching(false);
-                ui.set_status_message("Inicialização cancelada pelo usuário. Alterações revertidas.".into());
-            });
-            return;
-        }
-    }
+    let applied_tweaks = match execute_configured_tweaks_with_modal(
+        ui,
+        &core,
+        &config,
+        &token,
+        std::time::Duration::from_millis(180),
+        "Inicialização cancelada pelo usuário. Alterações revertidas.",
+    ) {
+        Some(tweaks) => tweaks,
+        None => return,
+    };
 
     // Etapa 13: Verificação de Download/Atualização Ativa da Steam e Inicialização
     if token.load(std::sync::atomic::Ordering::SeqCst) {
@@ -1151,6 +1161,7 @@ fn select_preset(
 
     match counterrush_core::config::CustomOptimizationConfig::load_from_file(&target_path) {
         Ok(cfg) => {
+            save_active_preset_setting(Some(preset_name.clone()));
             let tweaks = Tweaks::from_config(&cfg);
             let args_text = cfg.launch_args.join(" ");
             let msg = format!(
@@ -1200,6 +1211,7 @@ fn create_profile(
             if let Ok(mut current) = config_path.write() {
                 *current = target_path.clone();
             }
+            save_active_preset_setting(Some(clean_name.clone()));
 
             let updated_presets = scan_presets();
             let args_text = new_config.launch_args.join(" ");
@@ -1273,6 +1285,7 @@ fn delete_profile(
                 if let Ok(mut cur) = config_path.write() {
                     *cur = std::path::PathBuf::new();
                 }
+                save_active_preset_setting(None);
                 post_ui(ui, move |ui| {
                     ui.set_presets(slint::ModelRc::new(slint::VecModel::from(updated_presets)));
                     ui.set_active_preset("".into());
@@ -1290,6 +1303,7 @@ fn delete_profile(
                 if let Ok(mut cur) = config_path.write() {
                     *cur = target.clone();
                 }
+                save_active_preset_setting(Some(first_preset_name.clone()));
                 let cfg = counterrush_core::config::CustomOptimizationConfig::load_from_file(&target)
                     .unwrap_or_default();
                 let tweaks = Tweaks::from_config(&cfg);
@@ -1351,14 +1365,23 @@ fn main() -> Result<(), slint::PlatformError> {
     let app_settings = counterrush_core::config::AppSettings::load_or_create(&settings_path)
         .unwrap_or_default();
 
-    // Reconciliação do estado de inicialização com o Task Scheduler do Windows
-    let startup_status = counterrush_core::is_system_startup_enabled().unwrap_or(app_settings.start_with_system);
-    if startup_status != app_settings.start_with_system {
+    // Reconciliação do estado de inicialização e auto-otimização Steam
+    let startup_task_active =
+        counterrush_core::is_system_startup_enabled().unwrap_or(app_settings.start_with_system);
+    let (effective_startup, effective_steam_auto) = counterrush_core::reconcile_startup_flags(
+        startup_task_active,
+        app_settings.optimize_on_steam_launch,
+    );
+    if app_settings.start_with_system != effective_startup
+        || app_settings.optimize_on_steam_launch != effective_steam_auto
+    {
         let mut reconciled = app_settings.clone();
-        reconciled.start_with_system = startup_status;
+        reconciled.start_with_system = effective_startup;
+        reconciled.optimize_on_steam_launch = effective_steam_auto;
         let _ = reconciled.save_to_file(&settings_path);
     }
-    main_window.set_start_with_system(startup_status);
+    main_window.set_start_with_system(effective_startup);
+    main_window.set_optimize_on_steam_launch(effective_steam_auto);
 
     main_window.set_minimize_to_tray(app_settings.minimize_to_tray);
     let _minimize_to_tray_flag = tray::setup_tray(
@@ -1420,17 +1443,19 @@ fn main() -> Result<(), slint::PlatformError> {
         main_window.set_render_queue_tweak_active(false);
         (std::path::PathBuf::new(), counterrush_core::config::CustomOptimizationConfig::all_disabled())
     } else {
-
-        let first_preset_name = &initial_presets[0].name;
-        let p = counterrush_core::resolve_optimization_file_path(first_preset_name.as_str());
+        let preset_names: Vec<&str> = initial_presets.iter().map(|p| p.name.as_str()).collect();
+        let selected_preset_name = counterrush_core::resolve_selected_preset_name(
+            app_settings.active_preset.as_deref(),
+            &preset_names,
+        )
+        .unwrap_or_else(|| initial_presets[0].name.as_str())
+        .to_string();
+        let p = counterrush_core::resolve_optimization_file_path(&selected_preset_name);
         let c = match counterrush_core::config::CustomOptimizationConfig::load_from_file(&p) {
             Ok(res) => res,
             Err(e) => {
                 eprintln!("Erro ao carregar configuração: {e}");
                 counterrush_core::config::CustomOptimizationConfig::default()
-
-
-
             }
         };
 
@@ -1458,6 +1483,43 @@ fn main() -> Result<(), slint::PlatformError> {
     };
 
     let active_config_path = std::sync::Arc::new(std::sync::RwLock::new(resolved_path.clone()));
+    let auto_optimize_cancel_token =
+        std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+
+    let game_monitor = std::sync::Arc::new(counterrush_core::GameMonitorService::new());
+    let monitor_ui = main_window.as_weak();
+    let monitor_cfg_path = std::sync::Arc::clone(&active_config_path);
+    let monitor_cancel_token = std::sync::Arc::clone(&auto_optimize_cancel_token);
+    let monitor_weak = std::sync::Arc::downgrade(&game_monitor);
+    game_monitor.set_on_launch(move |pid| {
+        run_steam_auto_optimize_flow(
+            &monitor_ui,
+            &monitor_cfg_path,
+            pid,
+            &monitor_cancel_token,
+            &monitor_weak,
+        );
+    });
+
+    let monitor_ui_exit = main_window.as_weak();
+    game_monitor.set_on_exit(move |pid| {
+        let ui_weak = monitor_ui_exit.clone();
+        let _ = slint::invoke_from_event_loop(move || {
+            if let Some(ui) = ui_weak.upgrade() {
+                let lang = ui.get_active_language();
+                let msg = match lang.as_str() {
+                    "en" | "en_US" | "en-US" | "en-EUA" => format!("CS2 closed (PID: {pid}). Monitoring active."),
+                    "ru" | "ru_RU" | "ru-RU" => format!("CS2 закрыт (PID: {pid}). Мониторинг активен."),
+                    _ => format!("CS2 encerrado (PID: {pid}). Monitoramento ativo."),
+                };
+                ui.set_status_message(msg.into());
+            }
+        });
+    });
+
+    if effective_steam_auto {
+        game_monitor.start();
+    }
 
     // Sincronização em tempo real (Arquivo JSON no disco -> UI)
     let sync_window_handle = main_window.as_weak();
@@ -1492,6 +1554,7 @@ fn main() -> Result<(), slint::PlatformError> {
                                     if let Ok(mut cur) = sync_active_ref.write() {
                                         *cur = std::path::PathBuf::new();
                                     }
+                                    std::thread::spawn(|| save_active_preset_setting(None));
                                 } else {
                                     let current_active = ui.get_active_preset().to_string();
                                     if !names_clone.contains(&current_active) {
@@ -1500,6 +1563,10 @@ fn main() -> Result<(), slint::PlatformError> {
                                         if let Ok(mut cur) = sync_active_ref.write() {
                                             *cur = target.clone();
                                         }
+                                        let saved_name = first_preset.clone();
+                                        std::thread::spawn(move || {
+                                            save_active_preset_setting(Some(saved_name));
+                                        });
                                         ui.set_active_preset(first_preset.as_str().into());
                                         if let Ok(cfg) = counterrush_core::config::CustomOptimizationConfig::load_from_file(&target) {
                                             ui.set_launch_args_text(cfg.launch_args.join(" ").into());
@@ -1599,8 +1666,6 @@ fn main() -> Result<(), slint::PlatformError> {
     // Thread executora única: leitura/gravação de perfis é serializada nela,
     // deixando a thread da janela apenas no loop de eventos.
     let command_sender = spawn_command_worker(main_window.as_weak(), active_config_path.clone());
-
-    let auto_optimize_cancel_token = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
 
     // Callback para Lançamento do CS2 com Otimizações Personalizadas (test_custom_launch)
     let window_handle = main_window.as_weak();
@@ -1837,13 +1902,19 @@ fn main() -> Result<(), slint::PlatformError> {
     // Callback para alternância de Inicialização com o Windows (schtasks ONLOGON /RL HIGHEST)
     let window_handle = main_window.as_weak();
     let startup_settings_path = settings_path.clone();
+    let monitor_ref1 = std::sync::Arc::clone(&game_monitor);
     main_window.on_start_with_system_toggled(move |enabled| {
         let ui_weak = window_handle.clone();
         let target_path = startup_settings_path.clone();
+        let monitor = std::sync::Arc::clone(&monitor_ref1);
         std::thread::spawn(move || {
+            let prev_steam_auto = counterrush_core::config::AppSettings::load_or_create(&target_path)
+                .map(|s| s.optimize_on_steam_launch)
+                .unwrap_or(false);
             let result = if enabled {
                 counterrush_core::enable_system_startup()
             } else {
+                monitor.stop();
                 counterrush_core::disable_system_startup()
             };
 
@@ -1852,26 +1923,142 @@ fn main() -> Result<(), slint::PlatformError> {
                     let lang = ui.get_active_language();
                     match result {
                         Ok(()) => {
-                            if let Ok(mut settings) = counterrush_core::config::AppSettings::load_or_create(&target_path) {
+                            if let Ok(mut settings) =
+                                counterrush_core::config::AppSettings::load_or_create(&target_path)
+                            {
                                 settings.start_with_system = enabled;
+                                if !enabled {
+                                    settings.optimize_on_steam_launch = false;
+                                }
                                 let _ = settings.save_to_file(&target_path);
                             }
-                            let msg = match (lang.as_str(), enabled) {
-                                ("en" | "en_US" | "en-US" | "en-EUA", true) => "Start with Windows enabled (Highest privileges).",
-                                ("en" | "en_US" | "en-US" | "en-EUA", false) => "Start with Windows disabled.",
-                                ("ru" | "ru_RU" | "ru-RU", true) => "Автозапуск с Windows включен (Наивысшие права).",
-                                ("ru" | "ru_RU" | "ru-RU", false) => "Автозапуск с Windows отключен.",
-                                (_, true) => "Inicialização com o Windows ativada com privilégios máximos.",
-                                (_, false) => "Inicialização com o Windows desativada.",
+                            ui.set_start_with_system(enabled);
+                            if !enabled {
+                                ui.set_optimize_on_steam_launch(false);
+                            }
+                            let msg = match (lang.as_str(), enabled, prev_steam_auto) {
+                                ("en" | "en_US" | "en-US" | "en-EUA", true, _) => {
+                                    "Start with Windows enabled (Highest privileges)."
+                                }
+                                ("en" | "en_US" | "en-US" | "en-EUA", false, true) => {
+                                    "Start with Windows and Steam Auto-Optimization disabled."
+                                }
+                                ("en" | "en_US" | "en-US" | "en-EUA", false, false) => {
+                                    "Start with Windows disabled."
+                                }
+                                ("ru" | "ru_RU" | "ru-RU", true, _) => {
+                                    "Автозапуск с Windows включен (Наивысшие права)."
+                                }
+                                ("ru" | "ru_RU" | "ru-RU", false, true) => {
+                                    "Автозапуск с Windows и автооптимизация Steam отключены."
+                                }
+                                ("ru" | "ru_RU" | "ru-RU", false, false) => {
+                                    "Автозапуск с Windows отключен."
+                                }
+                                (_, true, _) => {
+                                    "Inicialização com o Windows ativada com privilégios máximos."
+                                }
+                                (_, false, true) => {
+                                    "Inicialização com o Windows e Auto-Otimização Steam desativadas."
+                                }
+                                (_, false, false) => "Inicialização com o Windows desativada.",
                             };
                             ui.set_status_message(msg.into());
                         }
                         Err(err) => {
                             ui.set_start_with_system(!enabled);
+                            if !enabled && prev_steam_auto {
+                                ui.set_optimize_on_steam_launch(true);
+                                monitor.start();
+                            }
                             let err_prefix = match lang.as_str() {
-                                "en" | "en_US" | "en-US" | "en-EUA" => "Failed to configure Windows startup",
+                                "en" | "en_US" | "en-US" | "en-EUA" => {
+                                    "Failed to configure Windows startup"
+                                }
                                 "ru" | "ru_RU" | "ru-RU" => "Ошибка настройки автозапуска Windows",
                                 _ => "Falha ao configurar inicialização com o Windows",
+                            };
+                            ui.set_status_message(format!("{err_prefix}: {err}").into());
+                        }
+                    }
+                }
+            });
+        });
+    });
+
+    // Callback para alternância de Auto-Otimização Steam
+    let window_handle_steam = main_window.as_weak();
+    let steam_settings_path = settings_path.clone();
+    let monitor_ref2 = std::sync::Arc::clone(&game_monitor);
+    main_window.on_optimize_on_steam_launch_toggled(move |enabled| {
+        let ui_weak = window_handle_steam.clone();
+        let target_path = steam_settings_path.clone();
+        let monitor = std::sync::Arc::clone(&monitor_ref2);
+        std::thread::spawn(move || {
+            let result = if enabled {
+                let startup_res = counterrush_core::enable_system_startup();
+                if startup_res.is_ok() {
+                    monitor.start();
+                }
+                startup_res
+            } else {
+                monitor.stop();
+                Ok(())
+            };
+
+            let _ = slint::invoke_from_event_loop(move || {
+                if let Some(ui) = ui_weak.upgrade() {
+                    let lang = ui.get_active_language();
+                    match result {
+                        Ok(()) => {
+                            if let Ok(mut settings) =
+                                counterrush_core::config::AppSettings::load_or_create(&target_path)
+                            {
+                                settings.optimize_on_steam_launch = enabled;
+                                if enabled {
+                                    settings.start_with_system = true;
+                                }
+                                let _ = settings.save_to_file(&target_path);
+                            }
+                            ui.set_optimize_on_steam_launch(enabled);
+                            if enabled {
+                                ui.set_start_with_system(true);
+                            }
+                            let msg = match (lang.as_str(), enabled) {
+                                ("en" | "en_US" | "en-US" | "en-EUA", true) => {
+                                    "Steam Auto-Optimization and Startup enabled."
+                                }
+                                ("en" | "en_US" | "en-US" | "en-EUA", false) => {
+                                    "Steam Auto-Optimization disabled."
+                                }
+                                ("ru" | "ru_RU" | "ru-RU", true) => {
+                                    "Автооптимизация Steam и автозапуск включены."
+                                }
+                                ("ru" | "ru_RU" | "ru-RU", false) => {
+                                    "Автооптимизация Steam отключена."
+                                }
+                                (_, true) => {
+                                    "Auto-Otimização Steam e Inicialização com o Windows ativadas."
+                                }
+                                (_, false) => "Auto-Otimização Steam desativada.",
+                            };
+                            ui.set_status_message(msg.into());
+                        }
+                        Err(err) => {
+                            ui.set_optimize_on_steam_launch(!enabled);
+                            if enabled {
+                                let actual_startup =
+                                    counterrush_core::is_system_startup_enabled().unwrap_or(false);
+                                ui.set_start_with_system(actual_startup);
+                            }
+                            let err_prefix = match lang.as_str() {
+                                "en" | "en_US" | "en-US" | "en-EUA" => {
+                                    "Failed to configure Steam Auto-Optimization"
+                                }
+                                "ru" | "ru_RU" | "ru-RU" => {
+                                    "Ошибка настройки автооптимизации Steam"
+                                }
+                                _ => "Falha ao configurar Auto-Otimização Steam",
                             };
                             ui.set_status_message(format!("{err_prefix}: {err}").into());
                         }
