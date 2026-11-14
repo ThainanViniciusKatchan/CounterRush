@@ -33,22 +33,24 @@
 - [x] Launch the game with custom optimizations read from a JSON configuration.
 - [x] System to identify what is enabled and disabled on the user's computer.
 - [x] Control active optimizations JSON file directly through the interface.
+- [x] Modern graphical interface (Slint) with modular switches and controls.
+- [x] Initialize the optimizer alongside the system
+- [x] Create a background system that optimizes the game as soon as it is launched via Steam, ensuring it is optimized for play on servers such as GC and Faceit.
 
 ### What is currently in progress:
 
-- [ ] Modern graphical interface (Slint) with modular switches and controls.
-- [ ] Initialize the optimizer alongside the system
-- [ ] Create a background system that optimizes the game as soon as it is launched via Steam, ensuring it is optimized for play on servers such as GC and Faceit.
+- [ ] System for creating binds directly in autoexec.cfg
+
+- [ ] System for downloading pro players' settings.
+
+- [ ] System for downloading and running community maps directly from the interface.
+
+- [ ] Valve ranking updated live (if possible).
 
 ### What is planned:
 
-- Feature to create keybinds (in-game shortcuts) for all commands allowed in official and practice servers.
 - Hardware verification the first time the user opens the software.
 - Create a theme system for the software layout.
-- Modern graphical interface (Slint) with modular switches and controls.
-- Feature to configure a custom `autoexec.cfg` or download pro players' configs.
-- Ability to open and, potentially, download Workshop maps directly through the software.
-- View Valve Ranking directly in the software interface.
 
 <p align="center">
   <a href="https://feitonobrasil.dev.br"><img src="https://selo.feitonobrasil.dev.br/en/branco-colorido/1x.svg" alt="Made in Brazil" height="56"></a>

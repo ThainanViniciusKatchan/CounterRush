@@ -33,22 +33,24 @@
 - [x] Função para lançamento do CS com otimizações personalizadas salvas em arquivo JSON.
 - [x] Sistema para idêntificar o que está ativado e desativado no computador do usuário.
 - [x] Controle do arquivo .json de otmizações ativas diretamente pela interface.
+- [x] Interface gráfica moderna (Slint) com switches e controles modulares.
+- [x] Inicialização do otimizador junto ao sistema
+- [x] Criar sistema para que rode em segundo plano para otimizar o game assim que ele for aberto diretamente pela steam, dessa forma ele será otimizado para jogar em servidores como GC e Faceit.
 
 ### O que está sendo feito:
 
-- [ ] Interface gráfica moderna (Slint) com switches e controles modulares.
-- [ ] Inicialização do otimizador junto ao sistema
-- [ ] Criar sistema para que rode em segundo plano para otimizar o game assim que ele for aberto diretamente pela steam, dessa forma ele será otimizado para jogar em servidores como GC e Faceit.
+- [ ] Sistema para criar binds diretamente no autoexec.cfg
+
+- [ ] Sistema para baixar configurações dos pros.
+
+- [ ] Sistema para baixar e executar mapas da comunidade diretamente da interface.
+
+- [ ] Ranking Valve atualizado ao vivo(Se possível).
 
 ### O que ainda vai ser feito:
 
-- Função para criar binds (atalhos dentro do game) para todos os comandos permitidos em servidores oficiais e comandos de treino.
 - Criar sistema de temas para o layout do software.
 - Verificação de hardware na primeira vez que o usuário abrir o software.
-- Interface gráfica moderna (Slint) com switches e controles modulares.
-- Função para configurar o próprio `autoexec.cfg` ou baixar a configuração de algum profissional.
-- Possibilidade de abrir e, talvez, baixar mapas da Oficina diretamente pelo software.
-- Vizualização do Ranking valve diretamente na interface do software.
 
 <p align="center">
   <a href="https://feitonobrasil.dev.br"><img src="https://selo.feitonobrasil.dev.br/en/branco-colorido/1x.svg" alt="Made in Brazil" height="56"></a>
