@@ -10,10 +10,10 @@ use std::os::windows::ffi::OsStrExt;
 
 #[cfg(windows)]
 #[allow(clippy::upper_case_acronyms)]
-type HANDLE = *mut c_void;
+pub(crate) type HANDLE = *mut c_void;
 #[cfg(windows)]
 #[allow(clippy::upper_case_acronyms)]
-type BOOL = i32;
+pub(crate) type BOOL = i32;
 
 #[cfg(windows)]
 const FALSE: BOOL = 0;
@@ -44,13 +44,16 @@ extern "system" {
         token_information_length: u32,
         return_length: *mut u32,
     ) -> BOOL;
+
+    fn ConvertSidToStringSidW(sid: *const c_void, string_sid: *mut *mut u16) -> BOOL;
 }
 
 #[cfg(windows)]
 #[link(name = "kernel32")]
 extern "system" {
     fn GetCurrentProcess() -> HANDLE;
-    fn CloseHandle(handle: HANDLE) -> BOOL;
+    pub(crate) fn CloseHandle(handle: HANDLE) -> BOOL;
+    pub(crate) fn LocalFree(hMem: *mut c_void) -> *mut c_void;
 }
 
 #[cfg(windows)]
@@ -67,7 +70,7 @@ extern "system" {
 }
 
 #[cfg(windows)]
-struct AutoCloseHandle(HANDLE);
+pub(crate) struct AutoCloseHandle(pub(crate) HANDLE);
 
 #[cfg(windows)]
 impl Drop for AutoCloseHandle {
@@ -81,8 +84,59 @@ impl Drop for AutoCloseHandle {
 }
 
 #[cfg(windows)]
-fn to_wide(s: &str) -> Vec<u16> {
+pub(crate) fn to_wide(s: &str) -> Vec<u16> {
     OsStr::new(s).encode_wide().chain(std::iter::once(0)).collect()
+}
+
+/// Retorna o SID do usuário dono do token do processo atual (ex.: `"S-1-5-21-..."`).
+#[cfg(windows)]
+pub(crate) fn current_user_sid_string() -> Option<String> {
+    const TOKEN_USER_CLASS: i32 = 1;
+
+    unsafe {
+        let mut token: HANDLE = null_mut();
+        if OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &mut token) == FALSE {
+            return None;
+        }
+        let _guard = AutoCloseHandle(token);
+
+        let mut needed: u32 = 0;
+        GetTokenInformation(token, TOKEN_USER_CLASS, null_mut(), 0, &mut needed);
+        if needed == 0 {
+            return None;
+        }
+
+        let mut buffer = vec![0u8; needed as usize];
+        if GetTokenInformation(
+            token,
+            TOKEN_USER_CLASS,
+            buffer.as_mut_ptr() as *mut c_void,
+            needed,
+            &mut needed,
+        ) == FALSE
+        {
+            return None;
+        }
+
+        let sid_ptr = *(buffer.as_ptr() as *const *const c_void);
+        if sid_ptr.is_null() {
+            return None;
+        }
+
+        let mut wide_sid: *mut u16 = null_mut();
+        if ConvertSidToStringSidW(sid_ptr, &mut wide_sid) == FALSE || wide_sid.is_null() {
+            return None;
+        }
+
+        let mut len = 0usize;
+        while *wide_sid.add(len) != 0 {
+            len += 1;
+        }
+        let slice = std::slice::from_raw_parts(wide_sid, len);
+        let sid_string = String::from_utf16_lossy(slice);
+        LocalFree(wide_sid as *mut c_void);
+        Some(sid_string)
+    }
 }
 
 /// Verifica se o processo atual está executando com privilégios de Administrador (Token elevado).
@@ -174,5 +228,12 @@ mod tests {
     fn test_is_elevated_callable() {
         // Confirma que a chamada ao Win32 TokenElevation retorna sem erro/pânico
         let _ = is_elevated();
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn test_current_user_sid_string() {
+        let sid = current_user_sid_string().expect("Deve resolver o SID do usuário atual");
+        assert!(sid.starts_with("S-1-"), "SID inesperado: {sid}");
     }
 }

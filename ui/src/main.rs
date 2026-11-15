@@ -845,9 +845,7 @@ fn run_steam_auto_optimize_flow(
         ui.set_auto_optimize_finished(false);
         ui.set_show_auto_optimize_modal(true);
         ui.set_status_message(status_msg.into());
-        ui.window().set_minimized(false);
-        let _ = ui.show();
-        tray::focus_counterrush_window();
+        tray::restore_and_focus_window(&ui);
     });
 
     let target_cfg_path = config_path.read().map(|p| p.clone()).unwrap_or_default();
@@ -1338,11 +1336,23 @@ fn delete_profile(
 fn main() -> Result<(), slint::PlatformError> {
     #[cfg(windows)]
     if !counterrush_core::windows_api::is_elevated() {
+        if counterrush_core::try_notify_running_instance() {
+            return Ok(());
+        }
         if let Ok(()) = counterrush_core::windows_api::relaunch_as_admin() {
             return Ok(());
         }
         eprintln!("Aviso: Não foi possível obter privilégios de Administrador automaticamente.");
     }
+
+    let mut single_instance_guard = match counterrush_core::acquire_single_instance() {
+        Ok(counterrush_core::SingleInstanceOutcome::Primary(guard)) => Some(guard),
+        Ok(counterrush_core::SingleInstanceOutcome::SecondaryNotified) => return Ok(()),
+        Err(err) => {
+            eprintln!("Aviso: falha ao inicializar controle de instância única: {err}");
+            None
+        }
+    };
 
     if std::env::var("LANG").is_err() && std::env::var("LC_ALL").is_err() {
         std::env::set_var("LANG", "pt_BR.UTF-8");
@@ -1359,6 +1369,20 @@ fn main() -> Result<(), slint::PlatformError> {
 
     let main_window = MainWindow::new()?;
     let app_tray = AppTray::new()?;
+
+    if let Some(guard) = single_instance_guard.as_mut() {
+        let single_instance_ui = main_window.as_weak();
+        if let Err(err) = guard.start_activation_listener(move || {
+            let ui_weak = single_instance_ui.clone();
+            let _ = slint::invoke_from_event_loop(move || {
+                if let Some(ui) = ui_weak.upgrade() {
+                    tray::restore_and_focus_window(&ui);
+                }
+            });
+        }) {
+            eprintln!("Aviso: falha ao iniciar listener de instância única: {err}");
+        }
+    }
 
     // Inicialização de AppSettings e seleção dinâmica de idiomas
     let settings_path = counterrush_core::resolve_app_settings_path();

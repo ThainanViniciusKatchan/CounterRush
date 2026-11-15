@@ -13,43 +13,102 @@ pub fn focus_counterrush_window() {
 
     #[link(name = "user32")]
     extern "system" {
+        fn EnumWindows(lpEnumFunc: unsafe extern "system" fn(isize, isize) -> i32, lParam: isize) -> i32;
         fn FindWindowW(lpClassName: *const u16, lpWindowName: *const u16) -> isize;
-        fn SetForegroundWindow(hWnd: isize) -> i32;
+        fn GetWindowThreadProcessId(hWnd: isize, lpdwProcessId: *mut u32) -> u32;
+        fn GetWindowTextW(hWnd: isize, lpString: *mut u16, nMaxCount: i32) -> i32;
+        fn IsIconic(hWnd: isize) -> i32;
         fn ShowWindow(hWnd: isize, nCmdShow: i32) -> i32;
+        fn BringWindowToTop(hWnd: isize) -> i32;
+        fn SetForegroundWindow(hWnd: isize) -> i32;
         fn keybd_event(bVk: u8, bScan: u8, dwFlags: u32, dwExtraInfo: usize);
     }
 
+    #[link(name = "kernel32")]
+    extern "system" {
+        fn GetCurrentProcessId() -> u32;
+    }
+
+    const SW_SHOW: i32 = 5;
     const SW_RESTORE: i32 = 9;
     const VK_MENU: u8 = 0x12;
     const KEYEVENTF_KEYUP: u32 = 0x0002;
 
-    let titles = [
+    const KNOWN_TITLES: [&str; 3] = [
         "CounterRush - CS2 Performance",
         "CounterRush - Desempenho CS2",
         "CounterRush - Производительность CS2",
     ];
 
-    unsafe {
-        for title_str in titles {
-            let title: Vec<u16> = OsStr::new(title_str)
-                .encode_wide()
-                .chain(std::iter::once(0))
-                .collect();
+    struct EnumSearch {
+        target_pid: u32,
+        found_hwnd: isize,
+    }
 
-            let hwnd = FindWindowW(std::ptr::null(), title.as_ptr());
-            if hwnd != 0 {
-                ShowWindow(hwnd, SW_RESTORE);
-                keybd_event(VK_MENU, 0, 0, 0);
-                keybd_event(VK_MENU, 0, KEYEVENTF_KEYUP, 0);
-                SetForegroundWindow(hwnd);
-                break;
+    unsafe extern "system" fn enum_windows_cb(hwnd: isize, lparam: isize) -> i32 {
+        let search = &mut *(lparam as *mut EnumSearch);
+        let mut pid: u32 = 0;
+        GetWindowThreadProcessId(hwnd, &mut pid);
+        if pid != search.target_pid {
+            return 1;
+        }
+
+        let mut buf = [0u16; 256];
+        let len = GetWindowTextW(hwnd, buf.as_mut_ptr(), buf.len() as i32);
+        if len > 0 {
+            let title = String::from_utf16_lossy(&buf[..len as usize]);
+            if KNOWN_TITLES.iter().any(|known| title == *known) || title.starts_with("CounterRush - ") {
+                search.found_hwnd = hwnd;
+                return 0;
             }
+        }
+        1
+    }
+
+    unsafe {
+        let mut search = EnumSearch {
+            target_pid: GetCurrentProcessId(),
+            found_hwnd: 0,
+        };
+        EnumWindows(enum_windows_cb, &mut search as *mut EnumSearch as isize);
+
+        let mut hwnd = search.found_hwnd;
+        if hwnd == 0 {
+            for title_str in KNOWN_TITLES {
+                let title: Vec<u16> = OsStr::new(title_str)
+                    .encode_wide()
+                    .chain(std::iter::once(0))
+                    .collect();
+
+                hwnd = FindWindowW(std::ptr::null(), title.as_ptr());
+                if hwnd != 0 {
+                    break;
+                }
+            }
+        }
+
+        if hwnd != 0 {
+            if IsIconic(hwnd) != 0 {
+                ShowWindow(hwnd, SW_RESTORE);
+            } else {
+                ShowWindow(hwnd, SW_SHOW);
+            }
+            BringWindowToTop(hwnd);
+            keybd_event(VK_MENU, 0, 0, 0);
+            keybd_event(VK_MENU, 0, KEYEVENTF_KEYUP, 0);
+            SetForegroundWindow(hwnd);
         }
     }
 }
 
 #[cfg(not(target_os = "windows"))]
 pub fn focus_counterrush_window() {}
+
+pub fn restore_and_focus_window(ui: &MainWindow) {
+    ui.window().set_minimized(false);
+    let _ = ui.show();
+    focus_counterrush_window();
+}
 
 pub fn decide_close_request(minimize_to_tray: bool) -> slint::CloseRequestResponse {
     if minimize_to_tray {
@@ -81,9 +140,7 @@ pub fn setup_tray(
     let main_window_weak = main_window.as_weak();
     app_tray.on_tray_clicked(move || {
         if let Some(ui) = main_window_weak.upgrade() {
-            ui.window().set_minimized(false);
-            let _ = ui.show();
-            focus_counterrush_window();
+            restore_and_focus_window(&ui);
         }
     });
 
@@ -109,9 +166,7 @@ pub fn setup_tray(
                 _ => "CounterRush",
             };
             ui.set_status_message(localized_msg.into());
-            ui.window().set_minimized(false);
-            let _ = ui.show();
-            focus_counterrush_window();
+            restore_and_focus_window(&ui);
         }
     });
 

@@ -59,3 +59,9 @@ pub use steam_monitor::{
     resolve_steam_install_path_from_registry, RegistryWatcher, SteamGameLaunchEvent,
     SteamGameProcessLogWatcher,
 };
+
+pub mod single_instance;
+pub use single_instance::{
+    acquire_single_instance, notify_existing_instance, SingleInstanceGuard, SingleInstanceOutcome,
+    DEFAULT_SINGLE_INSTANCE_ID,
+};

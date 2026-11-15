@@ -35,6 +35,7 @@ pub use steam_monitor::{
     GameMonitorService, MonitorState, ProcessQuery, SteamLogDetector, SteamRegistryDetector,
     Win32ProcessQuery, Win32SteamLogDetector, Win32SteamRegistryDetector, CS2_STEAM_APP_ID,
 };
+pub use windows_api::{SingleInstanceGuard, SingleInstanceOutcome, DEFAULT_SINGLE_INSTANCE_ID};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TweakExecutionResult {
@@ -1238,6 +1239,24 @@ pub fn reconcile_startup_flags(
     (effective_startup, effective_steam_auto)
 }
 
+/// Tenta adquirir o bloqueio de instância única do CounterRush ou notifica a instância ativa.
+pub fn acquire_single_instance() -> Result<SingleInstanceOutcome, CoreError> {
+    acquire_single_instance_with_id(DEFAULT_SINGLE_INSTANCE_ID)
+}
+
+pub fn acquire_single_instance_with_id(instance_id: &str) -> Result<SingleInstanceOutcome, CoreError> {
+    windows_api::acquire_single_instance(instance_id).map_err(CoreError::from)
+}
+
+/// Notifica uma instância já em execução (se existir) para trazê-la ao primeiro plano sem reter posse.
+pub fn try_notify_running_instance() -> bool {
+    try_notify_running_instance_with_id(DEFAULT_SINGLE_INSTANCE_ID)
+}
+
+pub fn try_notify_running_instance_with_id(instance_id: &str) -> bool {
+    windows_api::notify_existing_instance(instance_id).unwrap_or(false)
+}
+
 /// Seleciona o nome do perfil ativo priorizando `saved_active_preset` quando ainda existir.
 pub fn resolve_selected_preset_name<'a>(
     saved_active_preset: Option<&str>,
@@ -2122,5 +2141,41 @@ mod tests {
         );
         assert_eq!(resolve_selected_preset_name(None, &presets), Some("AutoDetect"));
         assert_eq!(resolve_selected_preset_name(Some("Competitivo"), &[]), None);
+    }
+
+    #[test]
+    fn test_core_single_instance_facade_blocks_second_and_notifies() {
+        let test_id = format!("CounterRush_Core_Test_{}", std::process::id());
+        assert!(!try_notify_running_instance_with_id(&test_id));
+
+        let mut guard = match acquire_single_instance_with_id(&test_id)
+            .expect("Aquisição primária via core deve funcionar")
+        {
+            SingleInstanceOutcome::Primary(g) => g,
+            SingleInstanceOutcome::SecondaryNotified => panic!("Não deveria existir instância prévia"),
+        };
+
+        let notified = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let notified_cb = std::sync::Arc::clone(&notified);
+        guard
+            .start_activation_listener(move || {
+                notified_cb.store(true, std::sync::atomic::Ordering::SeqCst);
+            })
+            .expect("Listener deve iniciar");
+
+        let outcome = acquire_single_instance_with_id(&test_id)
+            .expect("Segunda chamada deve notificar instância existente");
+        assert!(matches!(outcome, SingleInstanceOutcome::SecondaryNotified));
+
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
+        while !notified.load(std::sync::atomic::Ordering::SeqCst)
+            && std::time::Instant::now() < deadline
+        {
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
+        assert!(
+            notified.load(std::sync::atomic::Ordering::SeqCst),
+            "Segunda chamada deve despertar o listener da instância primária"
+        );
     }
 }
