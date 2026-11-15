@@ -96,6 +96,54 @@ impl Tweaks {
     }
 }
 
+fn neutral_status_message(lang: &str) -> &'static str {
+    match lang {
+        "en" | "en_US" | "en-US" | "en-EUA" => {
+            "No active optimization profile. Create or detect a profile to begin."
+        }
+        "ru" | "ru_RU" | "ru-RU" => {
+            "Нет активного профиля оптимизации. Создайте или определите профиль для начала."
+        }
+        _ => "Nenhum perfil de otimização ativo. Crie ou detecte um perfil para começar.",
+    }
+}
+
+fn ready_status_message(lang: &str) -> &'static str {
+    match lang {
+        "en" | "en_US" | "en-US" | "en-EUA" => {
+            "Ready to launch CS2 with 0.5ms polling rate and optimized CPU affinity."
+        }
+        "ru" | "ru_RU" | "ru-RU" => {
+            "Готово к запуску CS2 с частотой опроса 0.5 мс и оптимизированной привязкой ЦП."
+        }
+        _ => "Pronto para iniciar o CS2 com taxa de polling de 0.5ms e afinidade de CPU otimizada.",
+    }
+}
+
+fn profile_required_status_message(lang: &str) -> &'static str {
+    match lang {
+        "en" | "en_US" | "en-US" | "en-EUA" => {
+            "Create or select a profile to enable optimizations."
+        }
+        "ru" | "ru_RU" | "ru-RU" => {
+            "Создайте или выберите профиль для включения оптимизаций."
+        }
+        _ => "Crie ou selecione um perfil para ativar otimizações.",
+    }
+}
+
+fn enforce_neutral_no_profile_state(ui: &MainWindow, status_msg: &str) {
+    Tweaks::default().apply_to_ui(ui);
+    ui.set_status_message(status_msg.into());
+}
+
+fn reject_tweak_without_profile(ui: &slint::Weak<MainWindow>) {
+    post_ui(ui, |ui| {
+        let lang = ui.get_active_language();
+        enforce_neutral_no_profile_state(ui, profile_required_status_message(lang.as_str()));
+    });
+}
+
 /// Comandos enfileirados pela thread da janela e executados pela thread executora.
 enum Command {
     TweakToggled { name: String, active: bool },
@@ -155,9 +203,7 @@ fn apply_tweak(
 ) {
     let target_path = config_path.read().map(|p| p.clone()).unwrap_or_default();
     if target_path.as_os_str().is_empty() {
-        post_ui(ui, |ui| {
-            ui.set_status_message("Crie ou selecione um perfil para salvar alterações.".into())
-        });
+        reject_tweak_without_profile(ui);
         return;
     }
 
@@ -205,12 +251,13 @@ fn apply_tweak(
 }
 
 fn apply_bulk_action(
-    _ui: &slint::Weak<MainWindow>,
+    ui: &slint::Weak<MainWindow>,
     config_path: &std::sync::Arc<std::sync::RwLock<std::path::PathBuf>>,
     action: String,
 ) {
     let target_path = config_path.read().map(|p| p.clone()).unwrap_or_default();
     if target_path.as_os_str().is_empty() {
+        reject_tweak_without_profile(ui);
         return;
     }
 
@@ -1239,9 +1286,7 @@ fn save_launch_args(
 ) {
     let target_path = config_path.read().map(|p| p.clone()).unwrap_or_default();
     if target_path.as_os_str().is_empty() {
-        post_ui(ui, |ui| {
-            ui.set_status_message("Crie ou selecione um perfil para salvar alterações.".into())
-        });
+        reject_tweak_without_profile(ui);
         return;
     }
 
@@ -1368,6 +1413,7 @@ fn main() -> Result<(), slint::PlatformError> {
     slint::init_translations!(locale_dir);
 
     let main_window = MainWindow::new()?;
+    main_window.set_app_version(env!("CARGO_PKG_VERSION").into());
     let app_tray = AppTray::new()?;
 
     if let Some(guard) = single_instance_guard.as_mut() {
@@ -1452,19 +1498,7 @@ fn main() -> Result<(), slint::PlatformError> {
         main_window.set_active_preset("".into());
         main_window.set_launch_args_text("".into());
         main_window.set_is_editing_launch_args(false);
-        main_window.set_cpu_tweak_active(false);
-        main_window.set_timer_tweak_active(false);
-        main_window.set_priority_tweak_active(false);
-        main_window.set_ram_tweak_active(false);
-        main_window.set_gpu_accel_tweak_active(false);
-        main_window.set_dpi_tweak_active(false);
-        main_window.set_mem_compression_tweak_active(false);
-        main_window.set_mmcss_tweak_active(false);
-        main_window.set_hpet_tweak_active(false);
-        main_window.set_game_bar_tweak_active(false);
-        main_window.set_msi_tweak_active(false);
-        main_window.set_power_saving_tweak_active(false);
-        main_window.set_render_queue_tweak_active(false);
+        enforce_neutral_no_profile_state(&main_window, neutral_status_message(target_lang));
         (std::path::PathBuf::new(), counterrush_core::config::CustomOptimizationConfig::all_disabled())
     } else {
         let preset_names: Vec<&str> = initial_presets.iter().map(|p| p.name.as_str()).collect();
@@ -1490,19 +1524,8 @@ fn main() -> Result<(), slint::PlatformError> {
 
         main_window.set_launch_args_text(c.launch_args.join(" ").into());
         main_window.set_is_editing_launch_args(false);
-        main_window.set_cpu_tweak_active(c.cs2_affinity);
-        main_window.set_timer_tweak_active(c.apply_timer_resolution);
-        main_window.set_priority_tweak_active(c.cs2_priority);
-        main_window.set_ram_tweak_active(c.empty_standby_list);
-        main_window.set_gpu_accel_tweak_active(c.disable_gpu_acceleration);
-        main_window.set_dpi_tweak_active(c.apply_dpi_optimization);
-        main_window.set_mem_compression_tweak_active(c.disable_memory_compression);
-        main_window.set_mmcss_tweak_active(c.apply_mmcss);
-        main_window.set_hpet_tweak_active(c.disable_hpet);
-        main_window.set_game_bar_tweak_active(c.disable_game_bar);
-        main_window.set_msi_tweak_active(c.enable_msi);
-        main_window.set_power_saving_tweak_active(c.disable_power_saving);
-        main_window.set_render_queue_tweak_active(c.apply_render_queue);
+        Tweaks::from_config(&c).apply_to_ui(&main_window);
+        main_window.set_status_message(ready_status_message(target_lang).into());
         (p, c)
     };
 
@@ -1575,6 +1598,11 @@ fn main() -> Result<(), slint::PlatformError> {
                                     ui.set_active_preset("".into());
                                     ui.set_launch_args_text("".into());
                                     ui.set_is_editing_launch_args(false);
+                                    let lang = ui.get_active_language();
+                                    enforce_neutral_no_profile_state(
+                                        &ui,
+                                        neutral_status_message(lang.as_str()),
+                                    );
                                     if let Ok(mut cur) = sync_active_ref.write() {
                                         *cur = std::path::PathBuf::new();
                                     }
@@ -1750,6 +1778,17 @@ fn main() -> Result<(), slint::PlatformError> {
             name: tweak_name.to_string(),
             active,
         });
+    });
+
+    let blocked_tweak_ui = main_window.as_weak();
+    main_window.on_tweak_requires_profile(move || {
+        if let Some(ui) = blocked_tweak_ui.upgrade() {
+            let lang = ui.get_active_language();
+            enforce_neutral_no_profile_state(
+                &ui,
+                profile_required_status_message(lang.as_str()),
+            );
+        }
     });
 
     // Callback para ações em lote dos tweaks (UI -> fila de comandos)

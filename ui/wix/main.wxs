@@ -121,18 +121,16 @@
 
                     <Directory Id='ConfigDir' Name='config'>
                         <Directory Id='OptimizationsDir' Name='optimzations'>
-                            <Component Id='AutoDetectPreset' Guid='*'>
-                                <File Id='AutoDetectJson'
-                                    Name='AutoDetect.json'
-                                    DiskId='1'
-                                    Source='../config/optimzations/AutoDetect.json'
-                                    KeyPath='yes'/>
-                            </Component>
-                            <Component Id='CustomPreset' Guid='*'>
-                                <File Id='CustomOptimizationJson'
-                                    Name='custom_optimization.json'
-                                    DiskId='1'
-                                    Source='../config/optimzations/custom_optimization.json'
+                            <Component Id='OptimizationsEmptyDir' Guid='*'>
+                                <CreateFolder/>
+                                <RemoveFolder Id='RemoveOptimizationsDir' Directory='OptimizationsDir' On='uninstall'/>
+                                <RemoveFolder Id='RemoveConfigDir' Directory='ConfigDir' On='uninstall'/>
+                                <RegistryValue
+                                    Root='HKCU'
+                                    Key='Software\CounterRush\CounterRush'
+                                    Name='config_dirs_initialized'
+                                    Type='integer'
+                                    Value='1'
                                     KeyPath='yes'/>
                             </Component>
                         </Directory>
@@ -175,7 +173,7 @@
         <Feature
             Id='Binaries'
             Title='CounterRush'
-            Description='Installs the application, the translations and the default optimization profiles.'
+            Description='Installs the application and the translations.'
             Level='1'
             AllowAdvertise='no'
             Display='expand'
@@ -188,8 +186,7 @@
             <ComponentRef Id='LocalePtBr'/>
             <ComponentRef Id='LocaleRu'/>
             <ComponentRef Id='LocaleRuRu'/>
-            <ComponentRef Id='AutoDetectPreset'/>
-            <ComponentRef Id='CustomPreset'/>
+            <ComponentRef Id='OptimizationsEmptyDir'/>
             <ComponentRef Id='SteamCmdInstallerScript'/>
         </Feature>
 

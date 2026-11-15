@@ -35,8 +35,9 @@ export component MainWindow inherits Window {
     background: CS2Theme.bg-main;
 
     // Propriedades e estados reativos
+    in-out property <string> app-version: "0.19.2";
     in-out property <int> active-tab: 0;
-    in-out property <string> status-message: @tr("Pronto para iniciar o CS2 com taxa de polling de 0.5ms e afinidade de CPU otimizada.");
+    in-out property <string> status-message: @tr("Nenhum perfil de otimização ativo. Crie ou detecte um perfil para começar.");
     in-out property <bool> is-launching: false;
     in-out property <bool> cpu-tweak-active: false;
     in-out property <bool> timer-tweak-active: false;
@@ -79,6 +80,9 @@ export component MainWindow inherits Window {
     in-out property <bool> start-with-system: false;
     in-out property <bool> optimize-on-steam-launch: false;
 
+    // Indica se existe um perfil selecionado pronto para edição de tweaks
+    property <bool> has-active-profile: root.presets.length > 0 && root.active-preset != "";
+
     // Estado reativo geral para o botão mestre
     property <bool> is-all-tweaks-active: 
         root.cpu-tweak-active &&
@@ -99,6 +103,7 @@ export component MainWindow inherits Window {
     callback launch-cs2-clicked();
     callback card-action-clicked(string);
     callback tweak-toggled(string, bool);
+    callback tweak-requires-profile();
     callback bulk-tweaks-action(string);
     callback auto-optimize-clicked();
     callback preset-selected(string);
@@ -113,10 +118,16 @@ export component MainWindow inherits Window {
     callback start-with-system-toggled(bool);
     callback optimize-on-steam-launch-toggled(bool);
 
+    function handle-tweak-without-profile() {
+        root.status-message = @tr("Crie ou selecione um perfil para ativar otimizações.");
+        root.tweak-requires-profile();
+    }
+
     HorizontalLayout {
         // 1. Barra Lateral Tática Sólida (Sem Bordas)
         Sidebar {
             active-tab <=> root.active-tab;
+            app-version: root.app-version;
             tab-selected(idx) => {
                 if idx == 0 {
                     root.status-message = @tr("Visualizando Painel Geral");
@@ -171,10 +182,14 @@ export component MainWindow inherits Window {
                         info: @tr("Afinidade de CPU");
                         accent-color: CS2Theme.accent-orange;
                         hover-color: #ff771a;
+                        enabled: root.has-active-profile;
                         checked <=> root.cpu-tweak-active;
                         toggled(val) => {
                             root.status-message = val ? @tr("Afinidade: Núcleo 0 desativado para o CS2.") : @tr("Afinidade: Restaurada ao padrão.");
                             root.tweak-toggled("cpu_core_0", val);
+                        }
+                        blocked-click => {
+                            root.handle-tweak-without-profile();
                         }
                     }
 
@@ -183,10 +198,14 @@ export component MainWindow inherits Window {
                         info: @tr("Temporizador");
                         accent-color: CS2Theme.status-success;
                         hover-color: #059669;
+                        enabled: root.has-active-profile;
                         checked <=> root.timer-tweak-active;
                         toggled(val) => {
                             root.status-message = val ? @tr("Timer: Definido para 0.5ms de alta precisão.") : @tr("Timer: Restaurado.");
                             root.tweak-toggled("timer_resolution", val);
+                        }
+                        blocked-click => {
+                            root.handle-tweak-without-profile();
                         }
                     }
 
@@ -195,10 +214,14 @@ export component MainWindow inherits Window {
                         info: @tr("Processo CS2");
                         accent-color: CS2Theme.accent-orange;
                         hover-color: #ff771a;
+                        enabled: root.has-active-profile;
                         checked <=> root.priority-tweak-active;
                         toggled(val) => {
                             root.status-message = val ? @tr("Prioridade de processo definida para Alta.") : @tr("Prioridade de processo: Normal.");
                             root.tweak-toggled("process_priority", val);
+                        }
+                        blocked-click => {
+                            root.handle-tweak-without-profile();
                         }
                     }
 
@@ -207,10 +230,14 @@ export component MainWindow inherits Window {
                         info: @tr("Empty Standby");
                         accent-color: CS2Theme.accent-ct-blue;
                         hover-color: #0284c7;
+                        enabled: root.has-active-profile;
                         checked <=> root.ram-tweak-active;
                         toggled(val) => {
                             root.status-message = val ? @tr("Memória: Páginas em standby liberadas.") : @tr("Limpeza de RAM desativada.");
                             root.tweak-toggled("empty_standby", val);
+                        }
+                        blocked-click => {
+                            root.handle-tweak-without-profile();
                         }
                     }
                 }
@@ -513,10 +540,14 @@ export component MainWindow inherits Window {
                         tooltip-text: @tr("Afinidade de CPU: Desativa o Núcleo 0 para o CS2 mitigando interrupções do SO.");
                         accent-color: CS2Theme.accent-orange;
                         hover-color: #ff771a;
+                        enabled: root.has-active-profile;
                         checked <=> root.cpu-tweak-active;
                         toggled(val) => {
                             root.status-message = val ? @tr("Afinidade: Núcleo 0 desativado para o CS2.") : @tr("Afinidade: Restaurada ao padrão.");
                             root.tweak-toggled("cpu_core_0", val);
+                        }
+                        blocked-click => {
+                            root.handle-tweak-without-profile();
                         }
                     }
 
@@ -528,10 +559,14 @@ export component MainWindow inherits Window {
                         tooltip-text: @tr("Temporizador do Sistema: Define resolução de alta precisão de 0.5ms.");
                         accent-color: CS2Theme.status-success;
                         hover-color: #059669;
+                        enabled: root.has-active-profile;
                         checked <=> root.timer-tweak-active;
                         toggled(val) => {
                             root.status-message = val ? @tr("Timer: Definido para 0.5ms de alta precisão.") : @tr("Timer: Restaurado ao padrão do Windows.");
                             root.tweak-toggled("timer_resolution", val);
+                        }
+                        blocked-click => {
+                            root.handle-tweak-without-profile();
                         }
                     }
 
@@ -543,10 +578,14 @@ export component MainWindow inherits Window {
                         tooltip-text: @tr("Prioridade de Processo: Eleva a prioridade do executável cs2.exe para Tempo Real.");
                         accent-color: CS2Theme.accent-orange;
                         hover-color: #ff771a;
+                        enabled: root.has-active-profile;
                         checked <=> root.priority-tweak-active;
                         toggled(val) => {
                             root.status-message = val ? @tr("Prioridade de processo definida para Alta.") : @tr("Prioridade de processo: Normal.");
                             root.tweak-toggled("process_priority", val);
+                        }
+                        blocked-click => {
+                            root.handle-tweak-without-profile();
                         }
                     }
 
@@ -558,10 +597,14 @@ export component MainWindow inherits Window {
                         tooltip-text: @tr("Empty Standby List: Libera páginas de cache em standby na memória RAM.");
                         accent-color: CS2Theme.accent-ct-blue;
                         hover-color: #0284c7;
+                        enabled: root.has-active-profile;
                         checked <=> root.ram-tweak-active;
                         toggled(val) => {
                             root.status-message = val ? @tr("Memória: Páginas em standby liberadas.") : @tr("Limpeza de RAM desativada.");
                             root.tweak-toggled("empty_standby", val);
+                        }
+                        blocked-click => {
+                            root.handle-tweak-without-profile();
                         }
                     }
                 }
@@ -578,10 +621,14 @@ export component MainWindow inherits Window {
                         tooltip-text: @tr("Aceleração GPU: Desativa aceleração de hardware em Discord, Steam e navegadores.");
                         accent-color: CS2Theme.accent-orange;
                         hover-color: #ff771a;
+                        enabled: root.has-active-profile;
                         checked <=> root.gpu-accel-tweak-active;
                         toggled(val) => {
                             root.status-message = val ? @tr("GPU em apps desativada (mais VRAM para CS2).") : @tr("GPU em apps reativada.");
                             root.tweak-toggled("gpu_acceleration", val);
+                        }
+                        blocked-click => {
+                            root.handle-tweak-without-profile();
                         }
                     }
 
@@ -593,10 +640,14 @@ export component MainWindow inherits Window {
                         tooltip-text: @tr("Otimização DPI: Aplica flags de tela cheia exclusiva e reduz input lag no CS2.");
                         accent-color: CS2Theme.accent-ct-cyan;
                         hover-color: #0284c7;
+                        enabled: root.has-active-profile;
                         checked <=> root.dpi-tweak-active;
                         toggled(val) => {
                             root.status-message = val ? @tr("DPI & Tela cheia: Flags de baixa latência aplicadas.") : @tr("DPI: Configuração de compatibilidade removida.");
                             root.tweak-toggled("dpi_optimization", val);
+                        }
+                        blocked-click => {
+                            root.handle-tweak-without-profile();
                         }
                     }
 
@@ -608,10 +659,14 @@ export component MainWindow inherits Window {
                         tooltip-text: @tr("Compactação de Memória: Desativa compressão de páginas do Windows (>16GB RAM).");
                         accent-color: CS2Theme.accent-ct-blue;
                         hover-color: #0284c7;
+                        enabled: root.has-active-profile;
                         checked <=> root.mem-compression-tweak-active;
                         toggled(val) => {
                             root.status-message = val ? @tr("Compactação de RAM desativada (menor latência de CPU).") : @tr("Compactação de RAM reativada.");
                             root.tweak-toggled("memory_compression", val);
+                        }
+                        blocked-click => {
+                            root.handle-tweak-without-profile();
                         }
                     }
 
@@ -623,10 +678,14 @@ export component MainWindow inherits Window {
                         tooltip-text: @tr("MMCSS Games: Otimiza prioridade de rede, áudio e GPU para perfis de jogos.");
                         accent-color: CS2Theme.accent-t-gold;
                         hover-color: #b45309;
+                        enabled: root.has-active-profile;
                         checked <=> root.mmcss-tweak-active;
                         toggled(val) => {
                             root.status-message = val ? @tr("MMCSS: Perfil de jogos otimizado no registro do Windows.") : @tr("MMCSS: Restaurado ao padrão do Windows.");
                             root.tweak-toggled("mmcss", val);
+                        }
+                        blocked-click => {
+                            root.handle-tweak-without-profile();
                         }
                     }
                 }
@@ -643,10 +702,14 @@ export component MainWindow inherits Window {
                         tooltip-text: @tr("Desativar HPET: Desativa o relógio de plataforma no BCD priorizando o TSC da CPU.");
                         accent-color: CS2Theme.status-success;
                         hover-color: #059669;
+                        enabled: root.has-active-profile;
                         checked <=> root.hpet-tweak-active;
                         toggled(val) => {
                             root.status-message = val ? @tr("HPET desativado no BCD (usando TSC da CPU).") : @tr("HPET restaurado ao padrão de boot.");
                             root.tweak-toggled("hpet", val);
+                        }
+                        blocked-click => {
+                            root.handle-tweak-without-profile();
                         }
                     }
 
@@ -658,10 +721,14 @@ export component MainWindow inherits Window {
                         tooltip-text: @tr("Xbox Game Bar: Desativa sobreposições, modo Xbox e gravações de fundo GameDVR.");
                         accent-color: CS2Theme.accent-orange;
                         hover-color: #ff771a;
+                        enabled: root.has-active-profile;
                         checked <=> root.game-bar-tweak-active;
                         toggled(val) => {
                             root.status-message = val ? @tr("Xbox Game Bar, GameDVR e capturas desativados.") : @tr("Xbox Game Bar e capturas restaurados.");
                             root.tweak-toggled("game_bar", val);
+                        }
+                        blocked-click => {
+                            root.handle-tweak-without-profile();
                         }
                     }
 
@@ -673,10 +740,14 @@ export component MainWindow inherits Window {
                         tooltip-text: @tr("Modo MSI: Ativa interrupções baseadas em mensagens para GPU, Rede e portas USB.");
                         accent-color: CS2Theme.accent-ct-cyan;
                         hover-color: #0284c7;
+                        enabled: root.has-active-profile;
                         checked <=> root.msi-tweak-active;
                         toggled(val) => {
                             root.status-message = val ? @tr("Modo MSI ativado para GPU (Alta prioridade), Rede e USB.") : @tr("Modo MSI desativado (retornado para INTx).");
                             root.tweak-toggled("msi", val);
+                        }
+                        blocked-click => {
+                            root.handle-tweak-without-profile();
                         }
                     }
 
@@ -688,10 +759,14 @@ export component MainWindow inherits Window {
                         tooltip-text: @tr("Economia de Energia: Desativa PCIe ASPM e suspensão seletiva de portas USB.");
                         accent-color: CS2Theme.accent-t-gold;
                         hover-color: #b45309;
+                        enabled: root.has-active-profile;
                         checked <=> root.power-saving-tweak-active;
                         toggled(val) => {
                             root.status-message = val ? @tr("Economia de energia desativada (PCIe ASPM e Suspensão USB).") : @tr("Economia de energia restaurada ao padrão.");
                             root.tweak-toggled("power_saving", val);
+                        }
+                        blocked-click => {
+                            root.handle-tweak-without-profile();
                         }
                     }
                 }
@@ -708,16 +783,21 @@ export component MainWindow inherits Window {
                         tooltip-text: @tr("Fila de Renderização: FlipQueue AMD = 1 e Persistence Mode em placas NVIDIA.");
                         accent-color: CS2Theme.status-success;
                         hover-color: #059669;
+                        enabled: root.has-active-profile;
                         checked <=> root.render-queue-tweak-active;
                         toggled(val) => {
                             root.status-message = val ? @tr("Render Queue: FlipQueue AMD definido para 1 / NVIDIA PM ativo.") : @tr("Render Queue restaurada ao padrão de fábrica.");
                             root.tweak-toggled("render_queue", val);
+                        }
+                        blocked-click => {
+                            root.handle-tweak-without-profile();
                         }
                     }
 
                     MasterToggleSwitch {
                         button-width: 188px;
                         tooltip-width: 240px;
+                        enabled: root.has-active-profile;
                         all-active: root.is-all-tweaks-active;
                         toggled(val) => {
                             root.cpu-tweak-active = val;
@@ -735,6 +815,9 @@ export component MainWindow inherits Window {
                             root.render-queue-tweak-active = val;
                             root.status-message = val ? @tr("Todos os 13 módulos de otimização ativados.") : @tr("Todos os módulos desativados (Modo Padrão Windows).");
                             root.bulk-tweaks-action(val ? "activate_all" : "deactivate_all");
+                        }
+                        blocked-click => {
+                            root.handle-tweak-without-profile();
                         }
                     }
 

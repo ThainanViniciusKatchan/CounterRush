@@ -637,3 +637,9 @@ msgstr "GAME DOWNLOADING OR UPDATING"
 
 msgid "Aguardando finalização para continuar"
 msgstr "Waiting for completion to continue"
+
+msgid "Nenhum perfil de otimização ativo. Crie ou detecte um perfil para começar."
+msgstr "No active optimization profile. Create or detect a profile to begin."
+
+msgid "Crie ou selecione um perfil para ativar otimizações."
+msgstr "Create or select a profile to enable optimizations."

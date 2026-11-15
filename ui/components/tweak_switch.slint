@@ -8,18 +8,24 @@ export component TweakSwitch inherits Rectangle {
     in property <color> accent-color: CS2Theme.accent-orange;
     in property <color> hover-color: #ff771a;
     in-out property <bool> checked: false;
+    in property <bool> enabled: true;
     in property <length> button-width: 0px;
     callback toggled(bool);
+    callback blocked-click();
 
     height: 50px;
     min-width: root.button-width > 0px ? root.button-width : 0px;
     max-width: root.button-width > 0px ? root.button-width : 10000px;
     horizontal-stretch: root.button-width > 0px ? 0 : 1;
-    background: root.checked 
-        ? (touch.has-hover ? root.hover-color : root.accent-color) 
-        : (touch.has-hover ? CS2Theme.bg-card-hover : CS2Theme.bg-card);
+    opacity: root.enabled ? 1.0 : 0.65;
+    background: !root.enabled
+        ? CS2Theme.bg-card
+        : (root.checked
+            ? (touch.has-hover ? root.hover-color : root.accent-color)
+            : (touch.has-hover ? CS2Theme.bg-card-hover : CS2Theme.bg-card));
     border-radius: CS2Theme.radius-sm;
     animate background { duration: 120ms; }
+    animate opacity { duration: 150ms; }
 
     HorizontalLayout {
         padding-left: 12px;
@@ -119,23 +125,31 @@ export component TweakSwitch inherits Rectangle {
     }
 
     touch := TouchArea {
+        mouse-cursor: root.enabled ? pointer : default;
         clicked => {
-            root.checked = !root.checked;
-            root.toggled(root.checked);
+            if root.enabled {
+                root.checked = !root.checked;
+                root.toggled(root.checked);
+            } else {
+                root.blocked-click();
+            }
         }
     }
 }
 
 export component MasterToggleSwitch inherits Rectangle {
     in-out property <bool> all-active: false;
+    in property <bool> enabled: true;
     in property <length> button-width: 188px;
     in property <length> tooltip-width: 220px;
     callback toggled(bool);
+    callback blocked-click();
 
     height: 50px;
     min-width: root.button-width;
     max-width: root.button-width;
     horizontal-stretch: 0;
+    opacity: root.enabled ? 1.0 : 0.65;
 
     // Alternância de cor conforme o status
     property <color> active-color: CS2Theme.status-success;
@@ -143,11 +157,14 @@ export component MasterToggleSwitch inherits Rectangle {
     property <color> inactive-color: CS2Theme.accent-orange;
     property <color> inactive-hover: #ff771a;
 
-    background: root.all-active
-        ? (touch.has-hover ? root.active-hover : root.active-color)
-        : (touch.has-hover ? root.inactive-hover : root.inactive-color);
+    background: !root.enabled
+        ? root.inactive-color
+        : (root.all-active
+            ? (touch.has-hover ? root.active-hover : root.active-color)
+            : (touch.has-hover ? root.inactive-hover : root.inactive-color));
     border-radius: CS2Theme.radius-sm;
     animate background { duration: 150ms; }
+    animate opacity { duration: 150ms; }
 
     HorizontalLayout {
         padding-left: 12px;
@@ -247,9 +264,14 @@ export component MasterToggleSwitch inherits Rectangle {
     }
 
     touch := TouchArea {
+        mouse-cursor: root.enabled ? pointer : default;
         clicked => {
-            root.all-active = !root.all-active;
-            root.toggled(root.all-active);
+            if root.enabled {
+                root.all-active = !root.all-active;
+                root.toggled(root.all-active);
+            } else {
+                root.blocked-click();
+            }
         }
     }
 }

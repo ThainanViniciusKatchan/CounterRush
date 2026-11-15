@@ -637,3 +637,9 @@ msgstr "ИГРА В ПРОЦЕССЕ ЗАГРУЗКИ ИЛИ ОБНОВЛЕНИ�
 
 msgid "Aguardando finalização para continuar"
 msgstr "Ожидание завершения для продолжения"
+
+msgid "Nenhum perfil de otimização ativo. Crie ou detecte um perfil para começar."
+msgstr "Нет активного профиля оптимизации. Создайте или определите профиль для начала."
+
+msgid "Crie ou selecione um perfil para ativar otimizações."
+msgstr "Создайте или выберите профиль для включения оптимизаций."

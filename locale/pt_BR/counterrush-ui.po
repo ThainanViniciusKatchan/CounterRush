@@ -635,3 +635,9 @@ msgstr "JOGO EM PROCESSO DE DOWNLOAD OU ATUALIZAÇÃO"
 
 msgid "Aguardando finalização para continuar"
 msgstr "Aguardando finalização para continuar"
+
+msgid "Nenhum perfil de otimização ativo. Crie ou detecte um perfil para começar."
+msgstr "Nenhum perfil de otimização ativo. Crie ou detecte um perfil para começar."
+
+msgid "Crie ou selecione um perfil para ativar otimizações."
+msgstr "Crie ou selecione um perfil para ativar otimizações."

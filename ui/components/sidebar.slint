@@ -43,6 +43,7 @@ export component NavButton inherits Rectangle {
 
 export component Sidebar inherits Rectangle {
     in-out property <int> active-tab: 0;
+    in property <string> app-version: "0.19.2";
     callback tab-selected(int);
 
     width: 148px;
@@ -115,7 +116,7 @@ export component Sidebar inherits Rectangle {
         
 
         Text {
-            text: @tr("CounterRush v0.8.0");
+            text: "CounterRush v" + root.app-version;
             font-size: 8px;
             color: CS2Theme.text-dim;
         }

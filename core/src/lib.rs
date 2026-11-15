@@ -1302,28 +1302,52 @@ pub fn get_default_launch_args_for_category(category: PcCategory) -> Vec<String>
     }
 }
 
+fn current_exe_dir() -> Option<PathBuf> {
+    std::env::current_exe()
+        .ok()
+        .and_then(|exe_path| exe_path.parent().map(|dir| dir.to_path_buf()))
+}
+
+fn is_workspace_cwd(cwd: &Path) -> bool {
+    cwd.join("Cargo.toml").is_file()
+}
+
+fn join_dir(base: &Path, segments: &[&str]) -> PathBuf {
+    let mut out = if base == Path::new(".") {
+        PathBuf::new()
+    } else {
+        base.to_path_buf()
+    };
+    for segment in segments {
+        out.push(segment);
+    }
+    out
+}
+
+fn resolve_optimizations_dir_with(exe_dir: Option<&Path>, cwd: &Path) -> PathBuf {
+    if let Some(dir) = exe_dir {
+        let candidate = join_dir(dir, &["config", "optimzations"]);
+        if candidate.is_dir() {
+            return candidate;
+        }
+    }
+
+    if is_workspace_cwd(cwd) {
+        let direct = join_dir(cwd, &["config", "optimzations"]);
+        if direct.is_dir() {
+            return direct;
+        }
+    }
+
+    if let Some(dir) = exe_dir {
+        return join_dir(dir, &["config", "optimzations"]);
+    }
+
+    join_dir(cwd, &["config", "optimzations"])
+}
+
 pub fn resolve_optimizations_dir() -> PathBuf {
-    if let Ok(exe_path) = std::env::current_exe() {
-        if let Some(exe_dir) = exe_path.parent() {
-            let candidate = exe_dir.join("config").join("optimzations");
-            if candidate.is_dir() {
-                return candidate;
-            }
-        }
-    }
-
-    let direct = PathBuf::from("config/optimzations");
-    if direct.is_dir() {
-        return direct;
-    }
-
-    if let Ok(exe_path) = std::env::current_exe() {
-        if let Some(exe_dir) = exe_path.parent() {
-            return exe_dir.join("config").join("optimzations");
-        }
-    }
-
-    direct
+    resolve_optimizations_dir_with(current_exe_dir().as_deref(), Path::new("."))
 }
 
 pub fn list_optimization_configs_in_dir<P: AsRef<Path>>(dir: P) -> Vec<PathBuf> {
@@ -1360,31 +1384,30 @@ pub fn resolve_optimization_file_path(name: &str) -> PathBuf {
     opt_dir.join(&filename)
 }
 
+fn resolve_app_settings_path_with(exe_dir: Option<&Path>, cwd: &Path) -> PathBuf {
+    if let Some(dir) = exe_dir {
+        let candidate = join_dir(dir, &["config", "settings.json"]);
+        if candidate.exists() {
+            return candidate;
+        }
+    }
+
+    if is_workspace_cwd(cwd) {
+        let direct = join_dir(cwd, &["config", "settings.json"]);
+        if direct.exists() {
+            return direct;
+        }
+    }
+
+    if let Some(dir) = exe_dir {
+        return join_dir(dir, &["config", "settings.json"]);
+    }
+
+    join_dir(cwd, &["config", "settings.json"])
+}
+
 pub fn resolve_app_settings_path() -> PathBuf {
-    if let Ok(exe_path) = std::env::current_exe() {
-        if let Some(exe_dir) = exe_path.parent() {
-            let candidate = exe_dir.join("config").join("settings.json");
-            if candidate.exists() {
-                return candidate;
-            }
-        }
-    }
-
-    let direct = PathBuf::from("config/settings.json");
-    if direct.exists() {
-        return direct;
-    }
-
-    if let Ok(exe_path) = std::env::current_exe() {
-        if let Some(exe_dir) = exe_path.parent() {
-            let config_dir = exe_dir.join("config");
-            if config_dir.is_dir() {
-                return config_dir.join("settings.json");
-            }
-        }
-    }
-
-    direct
+    resolve_app_settings_path_with(current_exe_dir().as_deref(), Path::new("."))
 }
 
 pub fn resolve_locale_dir() -> PathBuf {
@@ -1588,7 +1611,11 @@ pub fn resolve_autodetect_config_path(custom: Option<&Path>) -> PathBuf {
     opt_dir.join("AutoDetect.json")
 }
 
-pub fn resolve_hardware_config_path(custom: Option<&Path>) -> PathBuf {
+fn resolve_hardware_config_path_with(
+    custom: Option<&Path>,
+    exe_dir: Option<&Path>,
+    cwd: &Path,
+) -> PathBuf {
     if let Some(p) = custom {
         if p.exists() {
             return p.to_path_buf();
@@ -1596,51 +1623,51 @@ pub fn resolve_hardware_config_path(custom: Option<&Path>) -> PathBuf {
         if p.starts_with("config") || p.starts_with("../config") {
             return p.to_path_buf();
         }
-        if let Ok(exe_path) = std::env::current_exe() {
-            if let Some(exe_dir) = exe_path.parent() {
-                let in_exe_hw = exe_dir.join("config").join("hardware").join(p);
-                if in_exe_hw.exists() {
-                    return in_exe_hw;
-                }
+        if let Some(dir) = exe_dir {
+            let in_exe_hw = join_dir(dir, &["config", "hardware"]).join(p);
+            if in_exe_hw.exists() {
+                return in_exe_hw;
             }
         }
-        let in_hardware = Path::new("config").join("hardware").join(p);
-        if in_hardware.exists() {
-            return in_hardware;
-        }
-        let in_config = Path::new("config").join(p);
-        if in_config.exists() {
-            return in_config;
-        }
-        if let Ok(exe_path) = std::env::current_exe() {
-            if let Some(exe_dir) = exe_path.parent() {
-                return exe_dir.join("config").join("hardware").join(p);
+        if is_workspace_cwd(cwd) {
+            let in_hardware = join_dir(cwd, &["config", "hardware"]).join(p);
+            if in_hardware.exists() {
+                return in_hardware;
+            }
+            let in_config = join_dir(cwd, &["config"]).join(p);
+            if in_config.exists() {
+                return in_config;
             }
         }
-        return in_hardware;
+        if let Some(dir) = exe_dir {
+            return join_dir(dir, &["config", "hardware"]).join(p);
+        }
+        return join_dir(cwd, &["config", "hardware"]).join(p);
     }
 
-    if let Ok(exe_path) = std::env::current_exe() {
-        if let Some(exe_dir) = exe_path.parent() {
-            let candidate = exe_dir.join("config").join("hardware").join("Hardware.json");
-            if candidate.exists() {
-                return candidate;
-            }
+    if let Some(dir) = exe_dir {
+        let candidate = join_dir(dir, &["config", "hardware", "Hardware.json"]);
+        if candidate.exists() {
+            return candidate;
         }
     }
 
-    let direct = PathBuf::from("config/hardware/Hardware.json");
-    if direct.exists() || Path::new("config/hardware").is_dir() {
-        return direct;
-    }
-
-    if let Ok(exe_path) = std::env::current_exe() {
-        if let Some(exe_dir) = exe_path.parent() {
-            return exe_dir.join("config").join("hardware").join("Hardware.json");
+    if is_workspace_cwd(cwd) {
+        let direct = join_dir(cwd, &["config", "hardware", "Hardware.json"]);
+        if direct.exists() || join_dir(cwd, &["config", "hardware"]).is_dir() {
+            return direct;
         }
     }
 
-    direct
+    if let Some(dir) = exe_dir {
+        return join_dir(dir, &["config", "hardware", "Hardware.json"]);
+    }
+
+    join_dir(cwd, &["config", "hardware", "Hardware.json"])
+}
+
+pub fn resolve_hardware_config_path(custom: Option<&Path>) -> PathBuf {
+    resolve_hardware_config_path_with(custom, current_exe_dir().as_deref(), Path::new("."))
 }
 
 pub fn save_hardware_info<P: AsRef<Path>>(path: P, info: &windows_api::HardwareInfo) -> Result<(), CoreError> {
@@ -2176,6 +2203,65 @@ mod tests {
         assert!(
             notified.load(std::sync::atomic::Ordering::SeqCst),
             "Segunda chamada deve despertar o listener da instância primária"
+        );
+    }
+
+    #[test]
+    fn test_resolve_paths_ignore_non_workspace_cwd_and_start_empty() {
+        let exe_temp = tempfile::tempdir().expect("Falha ao criar pasta exe temporária");
+        let sys_cwd = tempfile::tempdir().expect("Falha ao criar pasta CWD tipo System32");
+
+        // Simula diretório C:\Windows\System32\config existente sem Cargo.toml na raiz do CWD
+        std::fs::create_dir_all(sys_cwd.path().join("config").join("optimzations")).unwrap();
+        std::fs::write(
+            sys_cwd.path().join("config").join("settings.json"),
+            r#"{"active_preset":"Invasivo"}"#,
+        )
+        .unwrap();
+        std::fs::write(
+            sys_cwd.path().join("config").join("optimzations").join("AutoDetect.json"),
+            "{}",
+        )
+        .unwrap();
+
+        let opt_dir = resolve_optimizations_dir_with(Some(exe_temp.path()), sys_cwd.path());
+        assert_eq!(opt_dir, exe_temp.path().join("config").join("optimzations"));
+        assert!(
+            list_optimization_configs_in_dir(&opt_dir).is_empty(),
+            "Instalação limpa não deve listar perfis pré-existentes"
+        );
+
+        let settings = resolve_app_settings_path_with(Some(exe_temp.path()), sys_cwd.path());
+        assert_eq!(settings, exe_temp.path().join("config").join("settings.json"));
+
+        let hw = resolve_hardware_config_path_with(None, Some(exe_temp.path()), sys_cwd.path());
+        assert_eq!(
+            hw,
+            exe_temp.path().join("config").join("hardware").join("Hardware.json")
+        );
+    }
+
+    #[test]
+    fn test_resolve_paths_use_workspace_when_cargo_toml_exists() {
+        let exe_temp = tempfile::tempdir().expect("Falha ao criar pasta exe temporária");
+        let ws_cwd = tempfile::tempdir().expect("Falha ao criar pasta workspace");
+
+        std::fs::write(ws_cwd.path().join("Cargo.toml"), "[workspace]\n").unwrap();
+        std::fs::create_dir_all(ws_cwd.path().join("config").join("optimzations")).unwrap();
+        std::fs::create_dir_all(ws_cwd.path().join("config").join("hardware")).unwrap();
+        std::fs::write(ws_cwd.path().join("config").join("settings.json"), "{}").unwrap();
+
+        assert_eq!(
+            resolve_optimizations_dir_with(Some(exe_temp.path()), ws_cwd.path()),
+            ws_cwd.path().join("config").join("optimzations")
+        );
+        assert_eq!(
+            resolve_app_settings_path_with(Some(exe_temp.path()), ws_cwd.path()),
+            ws_cwd.path().join("config").join("settings.json")
+        );
+        assert_eq!(
+            resolve_hardware_config_path_with(None, Some(exe_temp.path()), ws_cwd.path()),
+            ws_cwd.path().join("config").join("hardware").join("Hardware.json")
         );
     }
 }

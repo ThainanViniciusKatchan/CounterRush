@@ -103,6 +103,25 @@ fn main() {
     main_window.set_auto_optimize_stage_title("".into());
     main_window.set_auto_optimize_stage_subtitle("".into());
 
+    // 1.6 Versão na sidebar vinculada ao Cargo.toml
+    check!(
+        "app-version inicial não é vazio e acompanha CARGO_PKG_VERSION",
+        !main_window.get_app_version().is_empty()
+            && main_window.get_app_version() == env!("CARGO_PKG_VERSION"),
+        format!(
+            "app_version = '{}', CARGO_PKG_VERSION = '{}'",
+            main_window.get_app_version(),
+            env!("CARGO_PKG_VERSION")
+        )
+    );
+    main_window.set_app_version("9.9.9".into());
+    check!(
+        "set_app_version atualiza dinamicamente a propriedade reativa",
+        main_window.get_app_version() == "9.9.9",
+        format!("app_version = '{}'", main_window.get_app_version())
+    );
+    main_window.set_app_version(env!("CARGO_PKG_VERSION").into());
+
     // -------------------------------------------------------------------------
     // [2] CONTRATO REATIVO DO MODAL DE DESENVOLVIMENTO (SETTERS, GETTERS, RESET)
     // -------------------------------------------------------------------------
@@ -474,6 +493,29 @@ fn main() {
             "Indicador de idioma ativo usa VerticalLayout com alignment: center nativo",
             normalized_main_slint.contains("if is-selected : VerticalLayout {\n                                    alignment: center;"),
             "Alinhamento centralizado nativo validado para o indicador de seleção"
+        );
+
+        // 7.4 Contrato de versão dinâmica sincronizada com Cargo.toml
+        let sidebar_src = fs::read_to_string("ui/components/sidebar.slint")
+            .expect("Falha ao ler ui/components/sidebar.slint");
+        let ui_main_rs_src = fs::read_to_string("ui/src/main.rs")
+            .expect("Falha ao ler ui/src/main.rs");
+        check!(
+            "Sidebar exibe versão dinâmica via propriedade app-version",
+            sidebar_src.contains("in property <string> app-version")
+                && sidebar_src.contains("\"CounterRush v\" + root.app-version")
+                && !sidebar_src.contains("0.8.0"),
+            "Sidebar configurada com versão dinâmica"
+        );
+        check!(
+            "main.slint propaga app-version para Sidebar",
+            main_slint_src.contains("app-version: root.app-version;"),
+            "Binding app-version validado em MainWindow -> Sidebar"
+        );
+        check!(
+            "ui/src/main.rs injeta env!(\"CARGO_PKG_VERSION\") na inicialização",
+            ui_main_rs_src.contains("set_app_version(env!(\"CARGO_PKG_VERSION\").into())"),
+            "Injeção automática de CARGO_PKG_VERSION validada"
         );
     }
 
