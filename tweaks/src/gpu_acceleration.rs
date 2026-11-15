@@ -44,34 +44,29 @@ impl Tweak for DiscordGpuAccelTweak {
     }
 }
 
-pub fn disable_discord_gpu_accel() -> Result<(), TweakError> {
-    let script = r#"
+fn set_discord_gpu_accel(enable: bool) -> Result<(), TweakError> {
+    let ps_bool = if enable { "$true" } else { "$false" };
+    let script = format!(
+        r#"
         Get-Process -Name "Discord" -ErrorAction SilentlyContinue | Stop-Process -Force
         $config = "$env:APPDATA\discord\settings.json"
-        if (Test-Path $config) {
+        if (Test-Path $config) {{
             $json = Get-Content $config -Raw | ConvertFrom-Json
-            $json | Add-Member -NotePropertyName "enableHardwareAcceleration" -NotePropertyValue $false -Force
+            $json | Add-Member -NotePropertyName "enableHardwareAcceleration" -NotePropertyValue {ps_bool} -Force
             $json | ConvertTo-Json | Set-Content $config
-        }
-        Start-Process "$env:LOCALAPPDATA\Discord\Update.exe" -ArgumentList "--processStart Discord.exe"
-    "#;
-    run_powershell(script)?;
+        }}
+    "#
+    );
+    run_powershell(&script)?;
     Ok(())
 }
 
+pub fn disable_discord_gpu_accel() -> Result<(), TweakError> {
+    set_discord_gpu_accel(false)
+}
+
 pub fn enable_discord_gpu_accel() -> Result<(), TweakError> {
-    let script = r#"
-        Get-Process -Name "Discord" -ErrorAction SilentlyContinue | Stop-Process -Force
-        $config = "$env:APPDATA\discord\settings.json"
-        if (Test-Path $config) {
-            $json = Get-Content $config -Raw | ConvertFrom-Json
-            $json | Add-Member -NotePropertyName "enableHardwareAcceleration" -NotePropertyValue $true -Force
-            $json | ConvertTo-Json | Set-Content $config
-        }
-        Start-Process "$env:LOCALAPPDATA\Discord\Update.exe" -ArgumentList "--processStart Discord.exe"
-    "#;
-    run_powershell(script)?;
-    Ok(())
+    set_discord_gpu_accel(true)
 }
 
 // -----------------------------------------------------------------------------
@@ -95,11 +90,14 @@ impl Tweak for SteamGpuAccelTweak {
 
     fn status(&self) -> Result<TweakStatus, TweakError> {
         let script = r#"
-            $val = (Get-ItemProperty -Path "HKCU:\Software\Valve\Steam" -Name "GPUAccelWebViewsV3" -ErrorAction SilentlyContinue).GPUAccelWebViewsV3
-            if ($val -eq 0) { "Applied" } else { "Default" }
+            if (-not (Test-Path "HKCU:\Software\Valve\Steam")) { "Unknown" } else {
+                $val = (Get-ItemProperty -Path "HKCU:\Software\Valve\Steam" -Name "GPUAccelWebViewsV3" -ErrorAction SilentlyContinue).GPUAccelWebViewsV3
+                if ($val -eq 0) { "Applied" } else { "Default" }
+            }
         "#;
         match run_powershell(script) {
             Ok(output) if output.contains("Applied") => Ok(TweakStatus::Applied),
+            Ok(output) if output.contains("Unknown") => Ok(TweakStatus::Unknown),
             _ => Ok(TweakStatus::Default),
         }
     }
@@ -137,12 +135,6 @@ pub fn disable_steam_gpu_accel() -> Result<(), TweakError> {
                 Set-Content -Path $_.FullName -Value $content
             }
         }
-        $steamExe = (Get-ItemProperty -Path $regPath -Name "SteamExe" -ErrorAction SilentlyContinue).SteamExe
-        if ($steamExe -and (Test-Path $steamExe)) {
-            Start-Process $steamExe
-        } else {
-            Start-Process "steam://open/main"
-        }
     "#;
     run_powershell(script)?;
     Ok(())
@@ -171,12 +163,6 @@ pub fn enable_steam_gpu_accel() -> Result<(), TweakError> {
                 $content = $content -replace '"GPUAccelWebViews"\s+"[01]"', '"GPUAccelWebViews" "1"'
                 Set-Content -Path $_.FullName -Value $content
             }
-        }
-        $steamExe = (Get-ItemProperty -Path $regPath -Name "SteamExe" -ErrorAction SilentlyContinue).SteamExe
-        if ($steamExe -and (Test-Path $steamExe)) {
-            Start-Process $steamExe
-        } else {
-            Start-Process "steam://open/main"
         }
     "#;
     run_powershell(script)?;
@@ -393,17 +379,19 @@ pub fn enable_all_gpu_accel() -> Result<(), TweakError> {
 }
 
 pub fn is_all_gpu_accel_disabled() -> Result<bool, TweakError> {
-    if DiscordGpuAccelTweak.status()? == TweakStatus::Default {
-        return Ok(false);
+    let statuses = [
+        DiscordGpuAccelTweak.status()?,
+        SteamGpuAccelTweak.status()?,
+        ChromiumGpuAccelTweak.status()?,
+        FirefoxGpuAccelTweak.status()?,
+    ];
+    let mut has_any_applied = false;
+    for status in statuses {
+        match status {
+            TweakStatus::Default => return Ok(false),
+            TweakStatus::Applied => has_any_applied = true,
+            TweakStatus::Unknown => {}
+        }
     }
-    if SteamGpuAccelTweak.status()? == TweakStatus::Default {
-        return Ok(false);
-    }
-    if ChromiumGpuAccelTweak.status()? == TweakStatus::Default {
-        return Ok(false);
-    }
-    if FirefoxGpuAccelTweak.status()? == TweakStatus::Default {
-        return Ok(false);
-    }
-    Ok(true)
+    Ok(has_any_applied)
 }

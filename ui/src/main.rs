@@ -371,39 +371,72 @@ fn update_auto_optimize_ui(
     });
 }
 
+struct AutoTweakStep {
+    progress: f32,
+    tweak_id: &'static str,
+    enabled_in_config: bool,
+    applying_label: &'static str,
+    already_label: &'static str,
+    skipped_label: &'static str,
+    session_tweak: Option<AppliedSessionTweak>,
+    apply_fn: fn(&counterrush_core::OptimizerCore) -> bool,
+}
+
+fn check_auto_optimize_cancelled(
+    ui: &slint::Weak<MainWindow>,
+    token: &std::sync::atomic::AtomicBool,
+    core: &counterrush_core::OptimizerCore,
+    applied_tweaks: &mut Vec<AppliedSessionTweak>,
+    sleep_duration: Option<std::time::Duration>,
+    reverted_msg: &str,
+) -> bool {
+    let cancelled = match sleep_duration {
+        Some(dur) => !sleep_with_cancellation(dur, token),
+        None => token.load(std::sync::atomic::Ordering::SeqCst),
+    };
+    if !cancelled {
+        return false;
+    }
+
+    let to_revert = std::mem::take(applied_tweaks);
+    rollback_applied_tweaks(core, to_revert);
+    let msg = reverted_msg.to_string();
+    post_ui(ui, move |ui| {
+        ui.set_show_auto_optimize_modal(false);
+        ui.set_status_message(msg.into());
+    });
+    true
+}
+
 fn run_auto_optimize_flow(
     ui: &slint::Weak<MainWindow>,
     config_path: &std::sync::Arc<std::sync::RwLock<std::path::PathBuf>>,
     token: std::sync::Arc<std::sync::atomic::AtomicBool>,
 ) {
-    let step_duration = std::time::Duration::from_millis(220);
+    let step_duration = std::time::Duration::from_millis(200);
     let core = counterrush_core::OptimizerCore::default();
     let mut applied_tweaks = Vec::new();
+    let mut applied_count = 0usize;
+    let mut already_count = 0usize;
 
     // Etapa 0: Detecção de Hardware
     if token.load(std::sync::atomic::Ordering::SeqCst) {
         return;
     }
     update_auto_optimize_ui(ui, 0.08, "Detectando hardware e configurações do sistema...");
-    if !sleep_with_cancellation(step_duration, &token) {
-        rollback_applied_tweaks(&core, applied_tweaks);
-        post_ui(ui, |ui| {
-            ui.set_show_auto_optimize_modal(false);
-            ui.set_status_message("Calibração automática cancelada pelo usuário.".into());
-        });
+    if check_auto_optimize_cancelled(
+        ui,
+        &token,
+        &core,
+        &mut applied_tweaks,
+        Some(step_duration),
+        "Calibração automática cancelada pelo usuário.",
+    ) {
         return;
     }
 
-    // Etapa 1: Geração e Calibração de Perfil
-    if token.load(std::sync::atomic::Ordering::SeqCst) {
-        rollback_applied_tweaks(&core, applied_tweaks);
-        post_ui(ui, |ui| {
-            ui.set_show_auto_optimize_modal(false);
-            ui.set_status_message("Calibração automática cancelada pelo usuário.".into());
-        });
-        return;
-    }
-    update_auto_optimize_ui(ui, 0.16, "Calibrando perfil recomendado de baixa latência...");
+    // Etapa 1: Avaliação Combinada (Hardware + Status atual do SO)
+    update_auto_optimize_ui(ui, 0.16, "Analisando hardware e otimizações existentes...");
     let (config, report) = match core.generate_autodetect_config() {
         Ok(res) => res,
         Err(e) => {
@@ -414,260 +447,179 @@ fn run_auto_optimize_flow(
             return;
         }
     };
-    if !sleep_with_cancellation(step_duration, &token) {
-        rollback_applied_tweaks(&core, applied_tweaks);
-        post_ui(ui, |ui| {
-            ui.set_show_auto_optimize_modal(false);
-            ui.set_status_message("Calibração automática cancelada pelo usuário.".into());
-        });
+    if check_auto_optimize_cancelled(
+        ui,
+        &token,
+        &core,
+        &mut applied_tweaks,
+        Some(step_duration),
+        "Calibração automática cancelada pelo usuário.",
+    ) {
         return;
     }
 
-    // Etapa 2: Temporizador do Sistema (0.5ms)
-    if token.load(std::sync::atomic::Ordering::SeqCst) {
-        rollback_applied_tweaks(&core, applied_tweaks);
-        post_ui(ui, |ui| {
-            ui.set_show_auto_optimize_modal(false);
-            ui.set_status_message("Calibração automática cancelada pelo usuário.".into());
-        });
-        return;
-    }
-    update_auto_optimize_ui(ui, 0.25, "Otimizando resolução do temporizador (0.5ms)...");
-    if config.apply_timer_resolution {
-        if core.apply_timer_resolution().is_ok() {
-            applied_tweaks.push(AppliedSessionTweak::Timer);
+    let steps = [
+        AutoTweakStep {
+            progress: 0.23,
+            tweak_id: "apply_timer_resolution",
+            enabled_in_config: config.apply_timer_resolution,
+            applying_label: "Otimizando resolução do temporizador (0.5ms)...",
+            already_label: "Resolução do temporizador (0.5ms) já configurada — preservada.",
+            skipped_label: "Resolução do temporizador mantida padrão.",
+            session_tweak: Some(AppliedSessionTweak::Timer),
+            apply_fn: |c| c.apply_timer_resolution().is_ok(),
+        },
+        AutoTweakStep {
+            progress: 0.31,
+            tweak_id: "apply_mmcss",
+            enabled_in_config: config.apply_mmcss,
+            applying_label: "Configurando agendador multimídia e rede (MMCSS)...",
+            already_label: "Agendador multimídia (MMCSS) já otimizado — preservado.",
+            skipped_label: "Agendador multimídia (MMCSS) ignorado.",
+            session_tweak: Some(AppliedSessionTweak::Mmcss),
+            apply_fn: |c| c.apply_all_mmcss().is_ok(),
+        },
+        AutoTweakStep {
+            progress: 0.39,
+            tweak_id: "apply_dpi_optimization",
+            enabled_in_config: config.apply_dpi_optimization,
+            applying_label: "Ajustando DPI e compatibilidade de tela inteira CS2...",
+            already_label: "Otimização de DPI já configurada — preservada.",
+            skipped_label: "Otimização de DPI ignorada.",
+            session_tweak: Some(AppliedSessionTweak::Dpi),
+            apply_fn: |c| c.apply_dpi_optimization().is_ok(),
+        },
+        AutoTweakStep {
+            progress: 0.47,
+            tweak_id: "disable_gpu_acceleration",
+            enabled_in_config: config.disable_gpu_acceleration,
+            applying_label: "Desativando aceleração de GPU em aplicativos secundários...",
+            already_label: "Aceleração de GPU em apps já desativada — preservada.",
+            skipped_label: "Aceleração de GPU em apps mantida para perfil Potente.",
+            session_tweak: Some(AppliedSessionTweak::GpuAccel),
+            apply_fn: |c| c.disable_all_gpu_acceleration().is_ok(),
+        },
+        AutoTweakStep {
+            progress: 0.55,
+            tweak_id: "disable_memory_compression",
+            enabled_in_config: config.disable_memory_compression,
+            applying_label: "Desativando compactação de memória do Windows...",
+            already_label: "Compactação de memória já desativada — preservada.",
+            skipped_label: "Compactação de memória mantida (RAM <= 16 GB).",
+            session_tweak: Some(AppliedSessionTweak::MemCompression),
+            apply_fn: |c| c.disable_memory_compression().is_ok(),
+        },
+        AutoTweakStep {
+            progress: 0.62,
+            tweak_id: "empty_standby_list",
+            enabled_in_config: config.empty_standby_list,
+            applying_label: "Liberando cache de memória RAM em Standby...",
+            already_label: "Standby List já verificada.",
+            skipped_label: "Limpeza da Standby List ignorada.",
+            session_tweak: None,
+            apply_fn: |c| c.empty_standby_list().is_ok(),
+        },
+        AutoTweakStep {
+            progress: 0.69,
+            tweak_id: "disable_hpet",
+            enabled_in_config: config.disable_hpet,
+            applying_label: "Desativando HPET no BCD do Windows...",
+            already_label: "HPET já desativado no sistema — preservado.",
+            skipped_label: "Configuração HPET mantida.",
+            session_tweak: Some(AppliedSessionTweak::Hpet),
+            apply_fn: |c| c.disable_hpet().is_ok(),
+        },
+        AutoTweakStep {
+            progress: 0.76,
+            tweak_id: "disable_game_bar",
+            enabled_in_config: config.disable_game_bar,
+            applying_label: "Desativando Xbox Game Bar e capturas GameDVR...",
+            already_label: "Xbox Game Bar / GameDVR já desativados — preservados.",
+            skipped_label: "Xbox Game Bar mantido.",
+            session_tweak: Some(AppliedSessionTweak::GameBar),
+            apply_fn: |c| c.disable_all_game_bar_features().is_ok(),
+        },
+        AutoTweakStep {
+            progress: 0.83,
+            tweak_id: "enable_msi",
+            enabled_in_config: config.enable_msi,
+            applying_label: "Ativando Modo MSI para GPU e periféricos...",
+            already_label: "Modo MSI já habilitado nos dispositivos — preservado.",
+            skipped_label: "Modo MSI ignorado.",
+            session_tweak: Some(AppliedSessionTweak::Msi),
+            apply_fn: |c| c.enable_all_msi().is_ok(),
+        },
+        AutoTweakStep {
+            progress: 0.90,
+            tweak_id: "disable_power_saving",
+            enabled_in_config: config.disable_power_saving,
+            applying_label: "Desativando suspensão de energia PCIe e USB...",
+            already_label: "Economia de energia PCIe/USB já desativada — preservada.",
+            skipped_label: "Economia de energia PCIe/USB mantida.",
+            session_tweak: Some(AppliedSessionTweak::PowerSaving),
+            apply_fn: |c| c.disable_all_power_saving().is_ok(),
+        },
+        AutoTweakStep {
+            progress: 0.97,
+            tweak_id: "apply_render_queue",
+            enabled_in_config: config.apply_render_queue,
+            applying_label: "Configurando fila de renderização (Render Queue)...",
+            already_label: "Fila de renderização já configurada — preservada.",
+            skipped_label: "Fila de renderização não aplicável ao adaptador atual.",
+            session_tweak: Some(AppliedSessionTweak::RenderQueue),
+            apply_fn: |c| c.apply_render_queue().is_ok(),
+        },
+    ];
+
+    let cancel_reverted_msg = "Calibração automática cancelada pelo usuário. Alterações revertidas.";
+    for step in steps {
+        if check_auto_optimize_cancelled(
+            ui,
+            &token,
+            &core,
+            &mut applied_tweaks,
+            None,
+            cancel_reverted_msg,
+        ) {
+            return;
+        }
+
+        if !step.enabled_in_config {
+            update_auto_optimize_ui(ui, step.progress, step.skipped_label);
+        } else if report.is_already_applied(step.tweak_id) {
+            update_auto_optimize_ui(ui, step.progress, step.already_label);
+            already_count += 1;
+        } else {
+            update_auto_optimize_ui(ui, step.progress, step.applying_label);
+            if (step.apply_fn)(&core) {
+                applied_count += 1;
+                if let Some(session_tweak) = step.session_tweak {
+                    applied_tweaks.push(session_tweak);
+                }
+            }
+        }
+
+        if check_auto_optimize_cancelled(
+            ui,
+            &token,
+            &core,
+            &mut applied_tweaks,
+            Some(step_duration),
+            cancel_reverted_msg,
+        ) {
+            return;
         }
     }
-    if !sleep_with_cancellation(step_duration, &token) {
-        rollback_applied_tweaks(&core, applied_tweaks);
-        post_ui(ui, |ui| {
-            ui.set_show_auto_optimize_modal(false);
-            ui.set_status_message("Calibração automática cancelada pelo usuário. Alterações revertidas.".into());
-        });
-        return;
-    }
 
-    // Etapa 3: Agendador Multimídia (MMCSS)
-    if token.load(std::sync::atomic::Ordering::SeqCst) {
-        rollback_applied_tweaks(&core, applied_tweaks);
-        post_ui(ui, |ui| {
-            ui.set_show_auto_optimize_modal(false);
-            ui.set_status_message("Calibração automática cancelada pelo usuário. Alterações revertidas.".into());
-        });
-        return;
-    }
-    update_auto_optimize_ui(ui, 0.35, "Configurando agendador multimídia e rede (MMCSS)...");
-    if config.apply_mmcss {
-        if core.apply_all_mmcss().is_ok() {
-            applied_tweaks.push(AppliedSessionTweak::Mmcss);
-        }
-    }
-    if !sleep_with_cancellation(step_duration, &token) {
-        rollback_applied_tweaks(&core, applied_tweaks);
-        post_ui(ui, |ui| {
-            ui.set_show_auto_optimize_modal(false);
-            ui.set_status_message("Calibração automática cancelada pelo usuário. Alterações revertidas.".into());
-        });
-        return;
-    }
-
-    // Etapa 4: DPI e Otimizações de Tela Inteira
-    if token.load(std::sync::atomic::Ordering::SeqCst) {
-        rollback_applied_tweaks(&core, applied_tweaks);
-        post_ui(ui, |ui| {
-            ui.set_show_auto_optimize_modal(false);
-            ui.set_status_message("Calibração automática cancelada pelo usuário. Alterações revertidas.".into());
-        });
-        return;
-    }
-    update_auto_optimize_ui(ui, 0.45, "Ajustando DPI e compatibilidade de tela inteira CS2...");
-    if config.apply_dpi_optimization {
-        if core.apply_dpi_optimization().is_ok() {
-            applied_tweaks.push(AppliedSessionTweak::Dpi);
-        }
-    }
-    if !sleep_with_cancellation(step_duration, &token) {
-        rollback_applied_tweaks(&core, applied_tweaks);
-        post_ui(ui, |ui| {
-            ui.set_show_auto_optimize_modal(false);
-            ui.set_status_message("Calibração automática cancelada pelo usuário. Alterações revertidas.".into());
-        });
-        return;
-    }
-
-    // Etapa 5: Desativação de aceleração de GPU em Apps em Segundo Plano
-    if token.load(std::sync::atomic::Ordering::SeqCst) {
-        rollback_applied_tweaks(&core, applied_tweaks);
-        post_ui(ui, |ui| {
-            ui.set_show_auto_optimize_modal(false);
-            ui.set_status_message("Calibração automática cancelada pelo usuário. Alterações revertidas.".into());
-        });
-        return;
-    }
-    update_auto_optimize_ui(ui, 0.55, "Desativando aceleração de GPU em aplicativos secundários...");
-    if config.disable_gpu_acceleration {
-        if core.disable_all_gpu_acceleration().is_ok() {
-            applied_tweaks.push(AppliedSessionTweak::GpuAccel);
-        }
-    }
-    if !sleep_with_cancellation(step_duration, &token) {
-        rollback_applied_tweaks(&core, applied_tweaks);
-        post_ui(ui, |ui| {
-            ui.set_show_auto_optimize_modal(false);
-            ui.set_status_message("Calibração automática cancelada pelo usuário. Alterações revertidas.".into());
-        });
-        return;
-    }
-
-    // Etapa 6: Compactação de Memória RAM
-    if token.load(std::sync::atomic::Ordering::SeqCst) {
-        rollback_applied_tweaks(&core, applied_tweaks);
-        post_ui(ui, |ui| {
-            ui.set_show_auto_optimize_modal(false);
-            ui.set_status_message("Calibração automática cancelada pelo usuário. Alterações revertidas.".into());
-        });
-        return;
-    }
-    update_auto_optimize_ui(ui, 0.65, "Calibrando compactação de memória do Windows...");
-    if config.disable_memory_compression {
-        if core.disable_memory_compression().is_ok() {
-            applied_tweaks.push(AppliedSessionTweak::MemCompression);
-        }
-    }
-    if !sleep_with_cancellation(step_duration, &token) {
-        rollback_applied_tweaks(&core, applied_tweaks);
-        post_ui(ui, |ui| {
-            ui.set_show_auto_optimize_modal(false);
-            ui.set_status_message("Calibração automática cancelada pelo usuário. Alterações revertidas.".into());
-        });
-        return;
-    }
-
-    // Etapa 7: Standby List (RAM Cache)
-    if token.load(std::sync::atomic::Ordering::SeqCst) {
-        rollback_applied_tweaks(&core, applied_tweaks);
-        post_ui(ui, |ui| {
-            ui.set_show_auto_optimize_modal(false);
-            ui.set_status_message("Calibração automática cancelada pelo usuário. Alterações revertidas.".into());
-        });
-        return;
-    }
-    update_auto_optimize_ui(ui, 0.73, "Liberando cache de memória RAM em Standby...");
-    if config.empty_standby_list {
-        let _ = core.empty_standby_list();
-    }
-    if !sleep_with_cancellation(step_duration, &token) {
-        rollback_applied_tweaks(&core, applied_tweaks);
-        post_ui(ui, |ui| {
-            ui.set_show_auto_optimize_modal(false);
-            ui.set_status_message("Calibração automática cancelada pelo usuário. Alterações revertidas.".into());
-        });
-        return;
-    }
-
-    // Etapa 8: Xbox Game Bar e GameDVR
-    if token.load(std::sync::atomic::Ordering::SeqCst) {
-        rollback_applied_tweaks(&core, applied_tweaks);
-        post_ui(ui, |ui| {
-            ui.set_show_auto_optimize_modal(false);
-            ui.set_status_message("Calibração automática cancelada pelo usuário. Alterações revertidas.".into());
-        });
-        return;
-    }
-    update_auto_optimize_ui(ui, 0.81, "Desativando Xbox Game Bar e capturas GameDVR...");
-    if config.disable_game_bar {
-        if core.disable_all_game_bar_features().is_ok() {
-            applied_tweaks.push(AppliedSessionTweak::GameBar);
-        }
-    }
-    if !sleep_with_cancellation(step_duration, &token) {
-        rollback_applied_tweaks(&core, applied_tweaks);
-        post_ui(ui, |ui| {
-            ui.set_show_auto_optimize_modal(false);
-            ui.set_status_message("Calibração automática cancelada pelo usuário. Alterações revertidas.".into());
-        });
-        return;
-    }
-
-    // Etapa 9: Modo MSI
-    if token.load(std::sync::atomic::Ordering::SeqCst) {
-        rollback_applied_tweaks(&core, applied_tweaks);
-        post_ui(ui, |ui| {
-            ui.set_show_auto_optimize_modal(false);
-            ui.set_status_message("Calibração automática cancelada pelo usuário. Alterações revertidas.".into());
-        });
-        return;
-    }
-    update_auto_optimize_ui(ui, 0.89, "Ativando Modo MSI para GPU e periféricos...");
-    if config.enable_msi {
-        if core.enable_all_msi().is_ok() {
-            applied_tweaks.push(AppliedSessionTweak::Msi);
-        }
-    }
-    if !sleep_with_cancellation(step_duration, &token) {
-        rollback_applied_tweaks(&core, applied_tweaks);
-        post_ui(ui, |ui| {
-            ui.set_show_auto_optimize_modal(false);
-            ui.set_status_message("Calibração automática cancelada pelo usuário. Alterações revertidas.".into());
-        });
-        return;
-    }
-
-    // Etapa 10: Economia de energia PCIe e USB
-    if token.load(std::sync::atomic::Ordering::SeqCst) {
-        rollback_applied_tweaks(&core, applied_tweaks);
-        post_ui(ui, |ui| {
-            ui.set_show_auto_optimize_modal(false);
-            ui.set_status_message("Calibração automática cancelada pelo usuário. Alterações revertidas.".into());
-        });
-        return;
-    }
-    update_auto_optimize_ui(ui, 0.94, "Desativando suspensão de energia PCIe e USB...");
-    if config.disable_power_saving {
-        if core.disable_all_power_saving().is_ok() {
-            applied_tweaks.push(AppliedSessionTweak::PowerSaving);
-        }
-    }
-    if !sleep_with_cancellation(step_duration, &token) {
-        rollback_applied_tweaks(&core, applied_tweaks);
-        post_ui(ui, |ui| {
-            ui.set_show_auto_optimize_modal(false);
-            ui.set_status_message("Calibração automática cancelada pelo usuário. Alterações revertidas.".into());
-        });
-        return;
-    }
-
-    // Etapa 11: Fila de quadros (Render Queue)
-    if token.load(std::sync::atomic::Ordering::SeqCst) {
-        rollback_applied_tweaks(&core, applied_tweaks);
-        post_ui(ui, |ui| {
-            ui.set_show_auto_optimize_modal(false);
-            ui.set_status_message("Calibração automática cancelada pelo usuário. Alterações revertidas.".into());
-        });
-        return;
-    }
-    update_auto_optimize_ui(ui, 0.98, "Configurando fila de renderização (Render Queue)...");
-    if config.apply_render_queue {
-        if core.apply_render_queue().is_ok() {
-            applied_tweaks.push(AppliedSessionTweak::RenderQueue);
-        }
-    }
-    if !sleep_with_cancellation(step_duration, &token) {
-        rollback_applied_tweaks(&core, applied_tweaks);
-        post_ui(ui, |ui| {
-            ui.set_show_auto_optimize_modal(false);
-            ui.set_status_message("Calibração automática cancelada pelo usuário. Alterações revertidas.".into());
-        });
-        return;
-    }
-
-    // Etapa 12: Gravação e Finalização a 100%
-    if token.load(std::sync::atomic::Ordering::SeqCst) {
-        rollback_applied_tweaks(&core, applied_tweaks);
-        post_ui(ui, |ui| {
-            ui.set_show_auto_optimize_modal(false);
-            ui.set_status_message("Calibração automática cancelada pelo usuário. Alterações revertidas.".into());
-        });
+    // Etapa Final: Gravação de AutoDetect.json e atualização da UI
+    if check_auto_optimize_cancelled(
+        ui,
+        &token,
+        &core,
+        &mut applied_tweaks,
+        None,
+        cancel_reverted_msg,
+    ) {
         return;
     }
 
@@ -696,12 +648,12 @@ fn run_auto_optimize_flow(
     let tweaks = Tweaks::from_config(&config);
     let msg = if report.blocked_tweaks.is_empty() {
         format!(
-            "Hardware detectado ({:?} • {}). Perfil AutoDetect gerado e aplicado!",
+            "Hardware detectado ({:?} • {}). AutoDetect salvo ({applied_count} aplicadas agora, {already_count} já estavam otimizadas).",
             report.category, report.hardware.gpu.model
         )
     } else {
         format!(
-            "Hardware detectado ({:?} • {}). Perfil AutoDetect gerado ({} ajustes calibrados para seu PC).",
+            "Hardware detectado ({:?} • {}). AutoDetect salvo ({applied_count} aplicadas agora, {already_count} já otimizadas, {} não aplicáveis ao hardware).",
             report.category,
             report.hardware.gpu.model,
             report.blocked_tweaks.len()

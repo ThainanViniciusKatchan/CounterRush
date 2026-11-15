@@ -48,29 +48,37 @@ fn main() {
     }
     println!("  - Perfil Classificado: {}", report.category);
 
-    println!("\n[3] Avaliação de Compatibilidade e Restrições por Otimização:");
+    println!("\n[3] Avaliação de Hardware e Status Atual das Otimizações:");
     for eval in &report.evaluations {
         if !eval.supported {
             println!("  [BLOQUEADO POR HARDWARE] {}", eval.name);
-            println!("    ID no JSON:  {}", eval.id);
-            println!("    Estado:      Desativado (false) — Bloqueado até upgrade de hardware");
-            println!("    Motivo:      {}", eval.reason);
-        } else if !eval.active {
-            if eval.optional_default_off {
-                println!("  [OPCIONAL / PADRÃO OFF] {}", eval.name);
-                println!("    ID no JSON:  {}", eval.id);
-                println!("    Estado:      Desativado (false) — Otimização opcional");
-                println!("    Critério:    {}", eval.reason);
-            } else {
-                println!("  [NÃO APLICADO / DESATIVADO] {}", eval.name);
-                println!("    ID no JSON:  {}", eval.id);
-                println!("    Estado:      Desativado (false) — Verificador retornou inativo");
-                println!("    Critério:    {}", eval.reason);
-            }
+            println!("    ID no JSON:  {} (false)", eval.id);
+            println!("    Status SO:   Não aplicável");
+            println!("    Critério:    {}", eval.reason);
+        } else if eval.optional_default_off && !eval.active {
+            println!("  [OPCIONAL / PADRÃO OFF] {}", eval.name);
+            println!("    ID no JSON:  {} (false)", eval.id);
+            println!(
+                "    Status SO:   {}",
+                if eval.already_applied { "Já aplicado" } else { "Inativo" }
+            );
+            println!("    Critério:    {}", eval.reason);
+        } else if eval.already_applied {
+            println!("  [JÁ OTIMIZADO NO SO] {}", eval.name);
+            println!("    ID no JSON:  {} (true)", eval.id);
+            println!("    Status SO:   Já otimizado (preservado sem reaplicar)");
+            println!("    Critério:    {}", eval.reason);
         } else {
-            println!("  [COMPATÍVEL / ATIVADO] {}", eval.name);
-            println!("    ID no JSON:  {}", eval.id);
-            println!("    Estado:      Ativado (true)");
+            println!("  [PENDENTE PARA OTIMIZAR] {}", eval.name);
+            println!("    ID no JSON:  {} (true)", eval.id);
+            println!(
+                "    Status SO:   {}",
+                if eval.needs_optimization {
+                    "Pendente (será aplicado)"
+                } else {
+                    "Verificado"
+                }
+            );
             println!("    Critério:    {}", eval.reason);
         }
         println!();
@@ -96,15 +104,26 @@ fn main() {
     }
 
     let count_active = report.evaluations.iter().filter(|e| e.active).count();
-    let count_optional = report.evaluations.iter().filter(|e| e.optional_default_off).count();
+    let count_already = report.already_optimized_tweaks.len();
+    let count_pending = report.pending_tweaks.len();
+    let count_optional = report.evaluations.iter().filter(|e| e.optional_default_off && !e.active).count();
     let count_blocked = report.blocked_tweaks.len();
 
     println!("\n================================================================================");
     println!("  Resumo da Autodetecção:");
-    println!("    - Otimizações ativadas compatíveis:               {}", count_active);
-    println!("    - Otimizações opcionais mantidas desativadas:      {}", count_optional);
-    println!("    - Otimizações bloqueadas por limite de hardware:  {}", count_blocked);
+    println!("    - Otimizações recomendadas no AutoDetect.json:    {}", count_active);
+    println!("    - Já otimizadas atualmente no sistema:            {}", count_already);
+    println!("    - Pendentes (ainda precisam ser otimizadas):      {}", count_pending);
+    println!("    - Opcionais mantidas desativadas:                 {}", count_optional);
+    println!("    - Bloqueadas por limite de hardware:              {}", count_blocked);
     println!("================================================================================");
+
+    if !report.already_optimized_tweaks.is_empty() {
+        println!("\nJá otimizadas no sistema: {}", report.already_optimized_tweaks.join(", "));
+    }
+    if !report.pending_tweaks.is_empty() {
+        println!("Pendentes para otimizar: {}", report.pending_tweaks.join(", "));
+    }
 
     if count_blocked > 0 {
         println!("\nRestrições Ativas no Sistema:");
@@ -113,5 +132,5 @@ fn main() {
         }
     }
 
-    println!("\n[SUCESSO] Configuração 'AutoDetect.json' gerada em estrita conformidade com seu hardware.");
+    println!("\n[SUCESSO] Configuração 'AutoDetect.json' gerada conforme hardware e estado atual do sistema.");
 }

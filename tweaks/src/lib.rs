@@ -82,9 +82,11 @@ pub use timer_resolution::{
 
 pub mod mmcss;
 pub use mmcss::{
-    apply_all_mmcss, apply_mmcss_with_tier, detect_mmcss_hardware_tier, get_mmcss_status,
-    is_mmcss_applied_for_current_hardware, is_mmcss_applied_for_tier, rollback_all_mmcss,
-    MmcssHardwareTier, MmcssStatus, MmcssTweak, REG_GAMES_PROFILE_KEY, REG_SYSTEM_PROFILE_KEY,
+    apply_all_mmcss, apply_mmcss_with_tier, classify_mmcss_hardware_tier,
+    detect_mmcss_hardware_tier, get_mmcss_status, get_mmcss_status_for_tier,
+    is_mmcss_applied_for_current_hardware, is_mmcss_applied_for_hardware_specs,
+    is_mmcss_applied_for_tier, rollback_all_mmcss, MmcssHardwareTier, MmcssStatus, MmcssTweak,
+    REG_GAMES_PROFILE_KEY, REG_SYSTEM_PROFILE_KEY,
 };
 
 pub mod hpet;

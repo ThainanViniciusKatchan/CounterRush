@@ -59,6 +59,8 @@ pub struct TweakEvaluation {
     pub active: bool,
     pub supported: bool,
     pub optional_default_off: bool,
+    pub already_applied: bool,
+    pub needs_optimization: bool,
     pub reason: String,
 }
 
@@ -68,6 +70,151 @@ pub struct HardwareRestrictionsReport {
     pub category: PcCategory,
     pub evaluations: Vec<TweakEvaluation>,
     pub blocked_tweaks: Vec<String>,
+    pub already_optimized_tweaks: Vec<String>,
+    pub pending_tweaks: Vec<String>,
+}
+
+impl HardwareRestrictionsReport {
+    /// Retorna `true` se a otimização informada já estiver aplicada no sistema operacional.
+    pub fn is_already_applied(&self, id: &str) -> bool {
+        self.evaluations
+            .iter()
+            .find(|e| e.id == id)
+            .map(|e| e.already_applied)
+            .unwrap_or(false)
+    }
+
+    /// Retorna `true` se a otimização estiver recomendada pelo hardware e ainda precisar ser aplicada.
+    pub fn needs_optimization(&self, id: &str) -> bool {
+        self.evaluations
+            .iter()
+            .find(|e| e.id == id)
+            .map(|e| e.needs_optimization)
+            .unwrap_or(false)
+    }
+}
+
+/// Snapshot do estado atual das otimizações no sistema operacional.
+#[derive(Debug, Clone, Default)]
+pub struct SystemTweakStatuses {
+    pub empty_standby_list: bool,
+    pub cs2_priority: bool,
+    pub cs2_affinity: bool,
+    pub disable_gpu_acceleration: bool,
+    pub apply_dpi_optimization: bool,
+    pub disable_memory_compression: bool,
+    pub apply_timer_resolution: bool,
+    pub apply_mmcss: bool,
+    pub disable_hpet: bool,
+    pub disable_game_bar: bool,
+    pub enable_msi: bool,
+    pub disable_power_saving: bool,
+    pub apply_render_queue: bool,
+}
+
+impl SystemTweakStatuses {
+    /// Consulta os verificadores reais do sistema reaproveitando o hardware já detectado.
+    pub fn query_for_hardware(hardware: &windows_api::HardwareInfo) -> Self {
+        let cs2_running = windows_api::is_cs2_process_running_win32().unwrap_or(false);
+        let is_applied = |res: Result<tweaks::TweakStatus, tweaks::TweakError>| {
+            matches!(res, Ok(tweaks::TweakStatus::Applied))
+        };
+
+        Self {
+            empty_standby_list: false,
+            cs2_priority: cs2_running && is_applied(tweaks::Cs2PriorityTweak.status()),
+            cs2_affinity: cs2_running && is_applied(tweaks::Cs2AffinityTweak.status()),
+            disable_gpu_acceleration: tweaks::is_all_gpu_accel_disabled().unwrap_or(false),
+            apply_dpi_optimization: is_applied(tweaks::Cs2DpiOptimizationTweak.status()),
+            disable_memory_compression: is_applied(tweaks::MemoryCompressionTweak.status()),
+            apply_timer_resolution: is_applied(tweaks::TimerResolutionTweak.status()),
+            apply_mmcss: tweaks::is_mmcss_applied_for_hardware_specs(
+                hardware.cpu.physical_cores,
+                hardware.ram.total_gb,
+            )
+            .unwrap_or(false),
+            disable_hpet: is_applied(tweaks::HpetTweak.status()),
+            disable_game_bar: is_applied(tweaks::GameBarTweak.status()),
+            enable_msi: tweaks::is_all_msi_enabled().unwrap_or(false),
+            disable_power_saving: is_applied(tweaks::PcieUsbPowerSavingTweak.status()),
+            apply_render_queue: is_applied(tweaks::RenderQueueTweak.status()),
+        }
+    }
+}
+
+struct EvaluationCollector {
+    evaluations: Vec<TweakEvaluation>,
+    blocked_tweaks: Vec<String>,
+    already_optimized_tweaks: Vec<String>,
+    pending_tweaks: Vec<String>,
+}
+
+impl EvaluationCollector {
+    fn new() -> Self {
+        Self {
+            evaluations: Vec::with_capacity(13),
+            blocked_tweaks: Vec::new(),
+            already_optimized_tweaks: Vec::new(),
+            pending_tweaks: Vec::new(),
+        }
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn push(
+        &mut self,
+        id: &str,
+        name: &str,
+        active: bool,
+        supported: bool,
+        optional_default_off: bool,
+        already_applied: bool,
+        reason: String,
+    ) {
+        let needs_optimization = active && !already_applied;
+        if !supported {
+            self.blocked_tweaks.push(reason.clone());
+        } else if already_applied {
+            self.already_optimized_tweaks.push(id.to_string());
+        } else if needs_optimization {
+            self.pending_tweaks.push(id.to_string());
+        }
+
+        self.evaluations.push(TweakEvaluation {
+            id: id.to_string(),
+            name: name.to_string(),
+            active,
+            supported,
+            optional_default_off,
+            already_applied,
+            needs_optimization,
+            reason,
+        });
+    }
+}
+
+fn format_status_suffix(
+    active: bool,
+    supported: bool,
+    already_applied: bool,
+    is_runtime: bool,
+) -> &'static str {
+    if !supported {
+        return "Status SO: Não aplicável devido à restrição de hardware.";
+    }
+    if is_runtime {
+        return if already_applied {
+            "Status SO: Já aplicada no processo cs2.exe em execução."
+        } else {
+            "Status SO: Otimização de execução (aplicada ao iniciar o CS2)."
+        };
+    }
+    if already_applied {
+        "Status SO: Já otimizado no sistema (será preservado sem reaplicação)."
+    } else if active {
+        "Status SO: Pendente (será aplicado na otimização automática)."
+    } else {
+        "Status SO: Mantido desativado por padrão para este perfil."
+    }
 }
 
 pub struct OptimizerCore {
@@ -373,392 +520,275 @@ impl OptimizerCore {
 
     }
 
+    /// Verifica o hardware atual e o status real das otimizações no sistema para gerar o `AutoDetect.json` e o relatório completo.
     pub fn generate_autodetect_config(
         &self,
     ) -> Result<(config::CustomOptimizationConfig, HardwareRestrictionsReport), CoreError> {
         let (_hw_path, hardware, category, _from_cache) = self.get_or_detect_hardware(None)?;
-        let launch_args = get_default_launch_args_for_category(category);
-
-        // Invoca os verificadores das otimizações existentes
-        let is_priority_applied = matches!(tweaks::Cs2PriorityTweak.status(), Ok(tweaks::TweakStatus::Applied));
-        let _affinity_status = tweaks::Cs2AffinityTweak.status();
-        let _standby_status = tweaks::EmptyStandbyListTweak.status();
-        let _timer_status = tweaks::TimerResolutionTweak.status();
-        let is_gpu_accel_disabled = tweaks::is_all_gpu_accel_disabled().unwrap_or(false);
-        let is_dpi_applied = matches!(tweaks::Cs2DpiOptimizationTweak.status(), Ok(tweaks::TweakStatus::Applied));
-        let is_mem_comp_disabled = matches!(tweaks::MemoryCompressionTweak.status(), Ok(tweaks::TweakStatus::Applied));
-        let is_mmcss_applied = tweaks::is_mmcss_applied_for_current_hardware().unwrap_or(false);
-        let is_hpet_disabled = matches!(tweaks::HpetTweak.status(), Ok(tweaks::TweakStatus::Applied));
-        let is_game_bar_disabled = matches!(tweaks::GameBarTweak.status(), Ok(tweaks::TweakStatus::Applied));
-        let is_msi_enabled = tweaks::is_all_msi_enabled().unwrap_or(false);
-        let is_power_saving_disabled = matches!(tweaks::PcieUsbPowerSavingTweak.status(), Ok(tweaks::TweakStatus::Applied));
-        let is_render_queue_applied = matches!(tweaks::RenderQueueTweak.status(), Ok(tweaks::TweakStatus::Applied));
-
-        let config = config::CustomOptimizationConfig {
-            launch_args,
-            empty_standby_list: true,
-            cs2_priority: is_priority_applied,
-            cs2_affinity: true,
-            disable_gpu_acceleration: is_gpu_accel_disabled,
-            apply_dpi_optimization: is_dpi_applied,
-            disable_memory_compression: is_mem_comp_disabled,
-            apply_timer_resolution: true,
-            apply_mmcss: is_mmcss_applied,
-            disable_hpet: is_hpet_disabled,
-            disable_game_bar: is_game_bar_disabled,
-            enable_msi: is_msi_enabled,
-            disable_power_saving: is_power_saving_disabled,
-            apply_render_queue: is_render_queue_applied,
-        };
-
-        let evaluations = vec![
-            TweakEvaluation {
-                id: "cs2_priority".to_string(),
-                name: "Prioridade em Tempo Real do CS2".to_string(),
-                active: config.cs2_priority,
-                supported: true,
-                optional_default_off: false,
-                reason: if config.cs2_priority {
-                    "Verificado: Prioridade em tempo real ativa no processo.".to_string()
-                } else {
-                    "Verificado: Prioridade em tempo real não está aplicada no processo.".to_string()
-                },
-            },
-            TweakEvaluation {
-                id: "cs2_affinity".to_string(),
-                name: "Afinidade de Processador do CS2 (sem Core 0)".to_string(),
-                active: true,
-                supported: true,
-                optional_default_off: false,
-                reason: "Otimização de tempo de execução (runtime). Configurada como true para aplicação durante a execução do jogo.".to_string(),
-            },
-            TweakEvaluation {
-                id: "disable_memory_compression".to_string(),
-                name: "Desativação da Compactação de Memória".to_string(),
-                active: config.disable_memory_compression,
-                supported: true,
-                optional_default_off: false,
-                reason: if config.disable_memory_compression {
-                    "Verificado: Compactação de memória está desativada no sistema.".to_string()
-                } else {
-                    "Verificado: Compactação de memória está ativa no sistema.".to_string()
-                },
-            },
-            TweakEvaluation {
-                id: "apply_render_queue".to_string(),
-                name: "Fila de Quadros Renderizados (Render Queue)".to_string(),
-                active: config.apply_render_queue,
-                supported: true,
-                optional_default_off: false,
-                reason: if config.apply_render_queue {
-                    "Verificado: Fila de renderização configurada (FlipQueue/Persistência GPU).".to_string()
-                } else {
-                    "Verificado: Fila de renderização não configurada no driver/registro.".to_string()
-                },
-            },
-            TweakEvaluation {
-                id: "disable_gpu_acceleration".to_string(),
-                name: "Desativar Aceleração de GPU em Apps".to_string(),
-                active: config.disable_gpu_acceleration,
-                supported: true,
-                optional_default_off: false,
-                reason: if config.disable_gpu_acceleration {
-                    "Verificado: Aceleração de hardware desativada nos aplicativos secundários.".to_string()
-                } else {
-                    "Verificado: Aceleração de hardware mantida ativa nos aplicativos secundários.".to_string()
-                },
-            },
-            TweakEvaluation {
-                id: "empty_standby_list".to_string(),
-                name: "Limpeza da Standby List (RAM)".to_string(),
-                active: true,
-                supported: true,
-                optional_default_off: false,
-                reason: "Otimização de tempo de execução (runtime). Configurada como true para execução antes da inicialização do jogo.".to_string(),
-            },
-            TweakEvaluation {
-                id: "apply_dpi_optimization".to_string(),
-                name: "Otimização de DPI e Modo Janela".to_string(),
-                active: config.apply_dpi_optimization,
-                supported: true,
-                optional_default_off: false,
-                reason: if config.apply_dpi_optimization {
-                    "Verificado: Flags de compatibilidade e DPI aplicadas no Registro.".to_string()
-                } else {
-                    "Verificado: Flags de compatibilidade e DPI não aplicadas no Registro.".to_string()
-                },
-            },
-            TweakEvaluation {
-                id: "apply_timer_resolution".to_string(),
-                name: "Resolução do Temporizador do Sistema (0.5ms)".to_string(),
-                active: true,
-                supported: true,
-                optional_default_off: false,
-                reason: "Otimização de tempo de execução (runtime). Configurada como true para cravar timer em 0.5ms durante o jogo.".to_string(),
-            },
-            TweakEvaluation {
-                id: "apply_mmcss".to_string(),
-                name: "Otimização do Agendador Multimídia (MMCSS)".to_string(),
-                active: config.apply_mmcss,
-                supported: true,
-                optional_default_off: false,
-                reason: if config.apply_mmcss {
-                    "Verificado: Parâmetros do Multimedia Class Scheduler Service configurados.".to_string()
-                } else {
-                    "Verificado: Parâmetros MMCSS em padrão do Windows.".to_string()
-                },
-            },
-            TweakEvaluation {
-                id: "disable_hpet".to_string(),
-                name: "Desativação do HPET".to_string(),
-                active: config.disable_hpet,
-                supported: true,
-                optional_default_off: false,
-                reason: if config.disable_hpet {
-                    "Verificado: HPET desativado (useplatformclock=false) no BCD.".to_string()
-                } else {
-                    "Verificado: HPET padrão ou ativo no BCD.".to_string()
-                },
-            },
-            TweakEvaluation {
-                id: "disable_game_bar".to_string(),
-                name: "Desativação do Xbox Game Bar e GameDVR".to_string(),
-                active: config.disable_game_bar,
-                supported: true,
-                optional_default_off: false,
-                reason: if config.disable_game_bar {
-                    "Verificado: Xbox Game Bar e gravação GameDVR desativados no Registro.".to_string()
-                } else {
-                    "Verificado: Xbox Game Bar ou GameDVR ativos no Registro.".to_string()
-                },
-            },
-            TweakEvaluation {
-                id: "enable_msi".to_string(),
-                name: "Ativação do Modo MSI".to_string(),
-                active: config.enable_msi,
-                supported: true,
-                optional_default_off: false,
-                reason: if config.enable_msi {
-                    "Verificado: Interrupções baseadas em mensagem ativas nos barramentos PCI.".to_string()
-                } else {
-                    "Verificado: Modo MSI não habilitado nos dispositivos PCI.".to_string()
-                },
-            },
-            TweakEvaluation {
-                id: "disable_power_saving".to_string(),
-                name: "Desativação de Economia de Energia PCIe e USB".to_string(),
-                active: config.disable_power_saving,
-                supported: true,
-                optional_default_off: false,
-                reason: if config.disable_power_saving {
-                    "Verificado: Estados de suspensão PCIe ASPM e USB desativados.".to_string()
-                } else {
-                    "Verificado: Economia de energia PCIe/USB ativa no sistema.".to_string()
-                },
-            },
-        ];
-
-        let report = HardwareRestrictionsReport {
-            hardware,
-            category,
-            evaluations,
-            blocked_tweaks: Vec::new(),
-        };
-
-        Ok((config, report))
+        let statuses = SystemTweakStatuses::query_for_hardware(&hardware);
+        self.evaluate_autodetect_for_hardware_and_status(hardware, category, &statuses)
     }
 
+    /// Gera a configuração recomendada avaliando apenas as capacidades e limites de hardware.
     pub fn generate_autodetect_config_for_hardware(
         &self,
         hardware: windows_api::HardwareInfo,
         category: PcCategory,
     ) -> Result<(config::CustomOptimizationConfig, HardwareRestrictionsReport), CoreError> {
+        self.evaluate_autodetect_for_hardware_and_status(
+            hardware,
+            category,
+            &SystemTweakStatuses::default(),
+        )
+    }
+
+    /// Combina regras de hardware/categoria com o status atual das otimizações no sistema operacional.
+    pub fn evaluate_autodetect_for_hardware_and_status(
+        &self,
+        hardware: windows_api::HardwareInfo,
+        category: PcCategory,
+        statuses: &SystemTweakStatuses,
+    ) -> Result<(config::CustomOptimizationConfig, HardwareRestrictionsReport), CoreError> {
         let launch_args = get_default_launch_args_for_category(category);
+        let mut collector = EvaluationCollector::new();
 
-        let mut evaluations = Vec::new();
-        let mut blocked_tweaks = Vec::new();
-
-        evaluations.push(TweakEvaluation {
-            id: "cs2_priority".to_string(),
-            name: "Prioridade em Tempo Real do CS2".to_string(),
-            active: false,
-            supported: true,
-            optional_default_off: true,
-            reason: "Desativada por padrão conforme diretriz do sistema. Mantida como otimização opcional para controle do usuário.".to_string(),
-        });
+        let priority_reason = format!(
+            "Desativada por padrão conforme diretriz do sistema. Mantida como otimização opcional para controle do usuário. | {}",
+            if statuses.cs2_priority {
+                "Status SO: Já aplicada no processo cs2.exe em execução."
+            } else {
+                "Status SO: Não aplicada."
+            }
+        );
+        collector.push(
+            "cs2_priority",
+            "Prioridade em Tempo Real do CS2",
+            false,
+            true,
+            true,
+            statuses.cs2_priority,
+            priority_reason,
+        );
 
         let affinity_supported = hardware.cpu.physical_cores > 4;
-        let affinity_active = affinity_supported;
-        let affinity_reason = if affinity_supported {
-            format!("Compatível: CPU com {} núcleos físicos permite isolar o Core 0 sem sobrecarregar as threads do CS2.", hardware.cpu.physical_cores)
+        let affinity_base = if affinity_supported {
+            format!(
+                "Compatível: CPU com {} núcleos físicos permite isolar o Core 0 sem sobrecarregar as threads do CS2.",
+                hardware.cpu.physical_cores
+            )
         } else {
-            let msg = format!("Bloqueada por hardware: CPU com {} núcleos físicos (mínimo exigido: mais de 4 núcleos). Isolar o Core 0 causaria perda de desempenho no jogo.", hardware.cpu.physical_cores);
-            blocked_tweaks.push(msg.clone());
-            msg
+            format!(
+                "Bloqueada por hardware: CPU com {} núcleos físicos (mínimo exigido: mais de 4 núcleos). Isolar o Core 0 causaria perda de desempenho no jogo.",
+                hardware.cpu.physical_cores
+            )
         };
-        evaluations.push(TweakEvaluation {
-            id: "cs2_affinity".to_string(),
-            name: "Afinidade de Processador do CS2 (sem Core 0)".to_string(),
-            active: affinity_active,
-            supported: affinity_supported,
-            optional_default_off: false,
-            reason: affinity_reason,
-        });
+        let affinity_reason = format!(
+            "{affinity_base} | {}",
+            format_status_suffix(
+                affinity_supported,
+                affinity_supported,
+                statuses.cs2_affinity,
+                true
+            )
+        );
+        collector.push(
+            "cs2_affinity",
+            "Afinidade de Processador do CS2 (sem Core 0)",
+            affinity_supported,
+            affinity_supported,
+            false,
+            statuses.cs2_affinity,
+            affinity_reason,
+        );
 
         let mem_comp_supported = hardware.ram.total_gb > 16.0;
-        let mem_comp_active = mem_comp_supported;
-        let mem_comp_reason = if mem_comp_supported {
-            format!("Compatível: Sistema possui {:.2} GB de RAM (> 16 GB). Desativar compactação reduz latência de CPU sem risco de exaustão de memória.", hardware.ram.total_gb)
+        let mem_comp_base = if mem_comp_supported {
+            format!(
+                "Compatível: Sistema possui {:.2} GB de RAM (> 16 GB). Desativar compactação reduz latência de CPU sem risco de exaustão de memória.",
+                hardware.ram.total_gb
+            )
         } else {
-            let msg = format!("Bloqueada por hardware: Sistema possui {:.2} GB de RAM (mínimo exigido: mais de 16 GB). A compactação é necessária para evitar esgotamento de RAM.", hardware.ram.total_gb);
-            blocked_tweaks.push(msg.clone());
-            msg
+            format!(
+                "Bloqueada por hardware: Sistema possui {:.2} GB de RAM (mínimo exigido: mais de 16 GB). A compactação é necessária para evitar esgotamento de RAM.",
+                hardware.ram.total_gb
+            )
         };
-        evaluations.push(TweakEvaluation {
-            id: "disable_memory_compression".to_string(),
-            name: "Desativação da Compactação de Memória".to_string(),
-            active: mem_comp_active,
-            supported: mem_comp_supported,
-            optional_default_off: false,
-            reason: mem_comp_reason,
-        });
+        let mem_comp_reason = format!(
+            "{mem_comp_base} | {}",
+            format_status_suffix(
+                mem_comp_supported,
+                mem_comp_supported,
+                statuses.disable_memory_compression,
+                false
+            )
+        );
+        collector.push(
+            "disable_memory_compression",
+            "Desativação da Compactação de Memória",
+            mem_comp_supported,
+            mem_comp_supported,
+            false,
+            statuses.disable_memory_compression,
+            mem_comp_reason,
+        );
 
         let gpu_lower = hardware.gpu.model.to_lowercase();
         let is_nvidia = gpu_lower.contains("nvidia")
             || gpu_lower.contains("geforce")
             || gpu_lower.contains("rtx")
             || gpu_lower.contains("gtx")
-            || tweaks::is_nvidia_smi_available();
+            || (gpu_lower.is_empty() && tweaks::is_nvidia_smi_available());
         let is_amd = gpu_lower.contains("amd") || gpu_lower.contains("radeon");
         let render_queue_supported = is_nvidia || is_amd;
-        let render_queue_active = render_queue_supported;
-        let render_queue_reason = if is_nvidia {
+        let render_queue_already_applied = render_queue_supported && statuses.apply_render_queue;
+        let render_queue_base = if is_nvidia {
             "Compatível: GPU NVIDIA detectada. Modo de persistência do driver suportado para baixa latência.".to_string()
         } else if is_amd {
             "Compatível: GPU AMD detectada. FlipQueueSize = 1 suportado no Registro.".to_string()
         } else {
-            let msg = format!("Bloqueada por hardware: GPU dedicada compatível (AMD/NVIDIA) não identificada (detectado: '{}').", hardware.gpu.model);
-            blocked_tweaks.push(msg.clone());
-            msg
+            format!(
+                "Bloqueada por hardware: GPU dedicada compatível (AMD/NVIDIA) não identificada (detectado: '{}').",
+                hardware.gpu.model
+            )
         };
-        evaluations.push(TweakEvaluation {
-            id: "apply_render_queue".to_string(),
-            name: "Fila de Quadros Renderizados (Render Queue)".to_string(),
-            active: render_queue_active,
-            supported: render_queue_supported,
-            optional_default_off: false,
-            reason: render_queue_reason,
-        });
+        let render_queue_reason = format!(
+            "{render_queue_base} | {}",
+            format_status_suffix(
+                render_queue_supported,
+                render_queue_supported,
+                render_queue_already_applied,
+                false
+            )
+        );
+        collector.push(
+            "apply_render_queue",
+            "Fila de Quadros Renderizados (Render Queue)",
+            render_queue_supported,
+            render_queue_supported,
+            false,
+            render_queue_already_applied,
+            render_queue_reason,
+        );
 
         let gpu_accel_active = category != PcCategory::Potente;
-        let gpu_accel_reason = if gpu_accel_active {
-            format!("Ativado: Recomendado para perfil {} para poupar VRAM dedicada e ciclos de decodificação.", category)
+        let gpu_accel_base = if gpu_accel_active {
+            format!(
+                "Ativado: Recomendado para perfil {} para poupar VRAM dedicada e ciclos de decodificação.",
+                category
+            )
         } else {
             "Desativado: Perfil Potente com VRAM abundante; aceleração de hardware mantida nos aplicativos secundários.".to_string()
         };
-        evaluations.push(TweakEvaluation {
-            id: "disable_gpu_acceleration".to_string(),
-            name: "Desativar Aceleração de GPU em Apps".to_string(),
-            active: gpu_accel_active,
-            supported: true,
-            optional_default_off: category == PcCategory::Potente,
-            reason: gpu_accel_reason,
-        });
+        let gpu_accel_reason = format!(
+            "{gpu_accel_base} | {}",
+            format_status_suffix(
+                gpu_accel_active,
+                true,
+                statuses.disable_gpu_acceleration,
+                false
+            )
+        );
+        collector.push(
+            "disable_gpu_acceleration",
+            "Desativar Aceleração de GPU em Apps",
+            gpu_accel_active,
+            true,
+            category == PcCategory::Potente,
+            statuses.disable_gpu_acceleration,
+            gpu_accel_reason,
+        );
 
-        evaluations.push(TweakEvaluation {
-            id: "empty_standby_list".to_string(),
-            name: "Limpeza da Standby List (RAM)".to_string(),
-            active: true,
-            supported: true,
-            optional_default_off: false,
-            reason: "Compatível: Universalmente suportado. Libera memória cache antes da inicialização.".to_string(),
-        });
+        let universal_tweaks = [
+            (
+                "empty_standby_list",
+                "Limpeza da Standby List (RAM)",
+                "Compatível: Universalmente suportado. Libera memória cache antes da inicialização.",
+                true,
+                statuses.empty_standby_list,
+            ),
+            (
+                "apply_dpi_optimization",
+                "Otimização de DPI e Modo Janela",
+                "Compatível: Universalmente suportado. Elimina latência de composição de janelas do DirectX.",
+                false,
+                statuses.apply_dpi_optimization,
+            ),
+            (
+                "apply_timer_resolution",
+                "Resolução do Temporizador do Sistema (0.5ms)",
+                "Compatível: Universalmente suportado. Crava o timer do kernel em 0.5ms para menor input lag.",
+                false,
+                statuses.apply_timer_resolution,
+            ),
+            (
+                "apply_mmcss",
+                "Otimização do Agendador Multimídia (MMCSS)",
+                "Compatível: Universalmente suportado com calibração automática conforme núcleos e RAM.",
+                false,
+                statuses.apply_mmcss,
+            ),
+            (
+                "disable_hpet",
+                "Desativação do HPET",
+                "Compatível: Universalmente suportado para uso de contadores TSC de alta frequência da CPU.",
+                false,
+                statuses.disable_hpet,
+            ),
+            (
+                "disable_game_bar",
+                "Desativação do Xbox Game Bar e GameDVR",
+                "Compatível: Universalmente suportado. Elimina overlays e gravação em segundo plano.",
+                false,
+                statuses.disable_game_bar,
+            ),
+            (
+                "enable_msi",
+                "Ativação do Modo MSI",
+                "Compatível: Ativa interrupções baseadas em mensagem para barramentos PCI.",
+                false,
+                statuses.enable_msi,
+            ),
+            (
+                "disable_power_saving",
+                "Desativação de Economia de Energia PCIe e USB",
+                "Compatível: Previne estados de suspensão em dispositivos PCIe e USB durante o jogo.",
+                false,
+                statuses.disable_power_saving,
+            ),
+        ];
 
-        evaluations.push(TweakEvaluation {
-            id: "apply_dpi_optimization".to_string(),
-            name: "Otimização de DPI e Modo Janela".to_string(),
-            active: true,
-            supported: true,
-            optional_default_off: false,
-            reason: "Compatível: Universalmente suportado. Elimina latência de composição de janelas do DirectX.".to_string(),
-        });
-
-        evaluations.push(TweakEvaluation {
-            id: "apply_timer_resolution".to_string(),
-            name: "Resolução do Temporizador do Sistema (0.5ms)".to_string(),
-            active: true,
-            supported: true,
-            optional_default_off: false,
-            reason: "Compatível: Universalmente suportado. Crava o timer do kernel em 0.5ms para menor input lag.".to_string(),
-        });
-
-        evaluations.push(TweakEvaluation {
-            id: "apply_mmcss".to_string(),
-            name: "Otimização do Agendador Multimídia (MMCSS)".to_string(),
-            active: true,
-            supported: true,
-            optional_default_off: false,
-            reason: "Compatível: Universalmente suportado com calibração automática conforme núcleos e RAM.".to_string(),
-        });
-
-        evaluations.push(TweakEvaluation {
-            id: "disable_hpet".to_string(),
-            name: "Desativação do HPET".to_string(),
-            active: true,
-            supported: true,
-            optional_default_off: false,
-            reason: "Compatível: Universalmente suportado para uso de contadores TSC de alta frequência da CPU.".to_string(),
-        });
-
-        evaluations.push(TweakEvaluation {
-            id: "disable_game_bar".to_string(),
-            name: "Desativação do Xbox Game Bar e GameDVR".to_string(),
-            active: true,
-            supported: true,
-            optional_default_off: false,
-            reason: "Compatível: Universalmente suportado. Elimina overlays e gravação em segundo plano.".to_string(),
-        });
-
-        evaluations.push(TweakEvaluation {
-            id: "enable_msi".to_string(),
-            name: "Ativação do Modo MSI".to_string(),
-            active: true,
-            supported: true,
-            optional_default_off: false,
-            reason: "Compatível: Ativa interrupções baseadas em mensagem para barramentos PCI.".to_string(),
-        });
-
-        evaluations.push(TweakEvaluation {
-            id: "disable_power_saving".to_string(),
-            name: "Desativação de Economia de Energia PCIe e USB".to_string(),
-            active: true,
-            supported: true,
-            optional_default_off: false,
-            reason: "Compatível: Previne estados de suspensão em dispositivos PCIe e USB durante o jogo.".to_string(),
-        });
+        for (id, name, hardware_reason, is_runtime, already_applied) in universal_tweaks {
+            let reason = format!(
+                "{hardware_reason} | {}",
+                format_status_suffix(true, true, already_applied, is_runtime)
+            );
+            collector.push(id, name, true, true, false, already_applied, reason);
+        }
 
         let config = config::CustomOptimizationConfig {
             launch_args,
             empty_standby_list: true,
             cs2_priority: false,
-            cs2_affinity: affinity_active,
+            cs2_affinity: affinity_supported,
             disable_gpu_acceleration: gpu_accel_active,
             apply_dpi_optimization: true,
-            disable_memory_compression: mem_comp_active,
+            disable_memory_compression: mem_comp_supported,
             apply_timer_resolution: true,
             apply_mmcss: true,
             disable_hpet: true,
             disable_game_bar: true,
             enable_msi: true,
             disable_power_saving: true,
-            apply_render_queue: render_queue_active,
+            apply_render_queue: render_queue_supported,
         };
 
         let report = HardwareRestrictionsReport {
             hardware,
             category,
-            evaluations,
-            blocked_tweaks,
+            evaluations: collector.evaluations,
+            blocked_tweaks: collector.blocked_tweaks,
+            already_optimized_tweaks: collector.already_optimized_tweaks,
+            pending_tweaks: collector.pending_tweaks,
         };
 
         Ok((config, report))
@@ -1911,6 +1941,93 @@ mod tests {
     }
 
     #[test]
+    fn test_evaluate_autodetect_combines_hardware_and_os_statuses() {
+        let core = OptimizerCore::new();
+        let hw = windows_api::HardwareInfo {
+            cpu: windows_api::CpuInfo {
+                model: "Intel Core i5-12400F".to_string(),
+                physical_cores: 6,
+                logical_cores: 12,
+                frequency_mhz: 2500,
+            },
+            gpu: windows_api::GpuInfo {
+                model: "NVIDIA GeForce RTX 3060".to_string(),
+                vram_gb: 12.0,
+            },
+            ram: windows_api::RamInfo {
+                total_gb: 24.0,
+                speed_mhz: Some(3200),
+            },
+        };
+        let statuses = SystemTweakStatuses {
+            apply_dpi_optimization: true,
+            apply_mmcss: true,
+            disable_game_bar: true,
+            enable_msi: true,
+            ..Default::default()
+        };
+
+        let (cfg, report) = core
+            .evaluate_autodetect_for_hardware_and_status(hw, PcCategory::Intermediario, &statuses)
+            .expect("Falha ao avaliar hardware + status");
+
+        // AutoDetect.json deve permanecer ativo para tudo que é recomendado para o hardware
+        assert!(cfg.apply_dpi_optimization);
+        assert!(cfg.apply_mmcss);
+        assert!(cfg.disable_hpet);
+        assert!(cfg.disable_gpu_acceleration);
+        assert!(cfg.apply_render_queue);
+        assert!(!cfg.cs2_priority);
+
+        // Relatório distingue o que já estava otimizado do que ainda precisa ser aplicado
+        assert!(report.is_already_applied("apply_dpi_optimization"));
+        assert!(!report.needs_optimization("apply_dpi_optimization"));
+        assert!(!report.is_already_applied("disable_hpet"));
+        assert!(report.needs_optimization("disable_hpet"));
+        assert!(report.already_optimized_tweaks.contains(&"apply_dpi_optimization".to_string()));
+        assert!(report.already_optimized_tweaks.contains(&"apply_mmcss".to_string()));
+        assert!(report.pending_tweaks.contains(&"disable_hpet".to_string()));
+        assert!(report.pending_tweaks.contains(&"disable_gpu_acceleration".to_string()));
+        assert!(!report.pending_tweaks.contains(&"apply_dpi_optimization".to_string()));
+        assert!(!report.pending_tweaks.contains(&"cs2_priority".to_string()));
+
+        // Hardware incompatível bloqueia mesmo se snapshot externo indicar flag ativa
+        let hw_igpu = windows_api::HardwareInfo {
+            cpu: windows_api::CpuInfo {
+                model: "Intel Core i3-10100".to_string(),
+                physical_cores: 4,
+                logical_cores: 8,
+                frequency_mhz: 3600,
+            },
+            gpu: windows_api::GpuInfo {
+                model: "Intel(R) UHD Graphics 630".to_string(),
+                vram_gb: 1.0,
+            },
+            ram: windows_api::RamInfo {
+                total_gb: 8.0,
+                speed_mhz: Some(2666),
+            },
+        };
+        let statuses_igpu = SystemTweakStatuses {
+            apply_render_queue: true,
+            disable_game_bar: true,
+            ..Default::default()
+        };
+        let (cfg_igpu, report_igpu) = core
+            .evaluate_autodetect_for_hardware_and_status(
+                hw_igpu,
+                PcCategory::Economico,
+                &statuses_igpu,
+            )
+            .expect("Falha ao avaliar hardware com GPU integrada");
+        assert!(!cfg_igpu.apply_render_queue);
+        assert!(!report_igpu.is_already_applied("apply_render_queue"));
+        assert!(!report_igpu.needs_optimization("apply_render_queue"));
+        assert!(!report_igpu.blocked_tweaks.is_empty());
+        assert!(report_igpu.is_already_applied("disable_game_bar"));
+    }
+
+    #[test]
     fn test_autodetect_config_generation_and_no_custom_optimization() {
         let core = OptimizerCore::new();
         let temp_dir = tempfile::tempdir().expect("Falha ao criar diretório temporário");
@@ -1928,7 +2045,6 @@ mod tests {
             "O arquivo custom_optimization.json NÃO deve ser criado sob nenhuma circunstância"
         );
 
-        // Verifica que no diretório de destino unicamente o arquivo AutoDetect.json foi gerado
         let created_files: Vec<String> = std::fs::read_dir(temp_dir.path())
             .expect("Falha ao ler diretório temporário de teste")
             .filter_map(|e| e.ok().map(|entry| entry.file_name().to_string_lossy().to_string()))
@@ -1939,64 +2055,89 @@ mod tests {
             "A execução da função deve resultar exclusivamente na criação de AutoDetect.json"
         );
 
-        // R3: Otimizações de runtime devem ser obrigatoriamente true
-        assert!(config.cs2_affinity, "Afinidade de CS2 deve ser true (runtime)");
-        assert!(config.apply_timer_resolution, "Timer 0.5ms deve ser true (runtime)");
-        assert!(config.empty_standby_list, "Limpeza da Standby List deve ser true (runtime)");
-
-        // R2: Entradas de otimizações com valores booleanos conforme retorno dos verificadores
         let raw_json = std::fs::read_to_string(&autodetect_path).expect("Falha ao ler AutoDetect.json gerado");
         let parsed: serde_json::Value = serde_json::from_str(&raw_json).expect("Falha ao parsear AutoDetect.json");
 
-        assert_eq!(parsed["cs2_affinity"], true);
-        assert_eq!(parsed["apply_timer_resolution"], true);
+        // Regras de hardware definem o AutoDetect.json
+        let expected_affinity = report.hardware.cpu.physical_cores > 4;
+        let expected_mem_comp = report.hardware.ram.total_gb > 16.0;
+        let expected_gpu_accel_flag = report.category != PcCategory::Potente;
+        let gpu_lower = report.hardware.gpu.model.to_lowercase();
+        let expected_render_queue_flag = gpu_lower.contains("nvidia")
+            || gpu_lower.contains("geforce")
+            || gpu_lower.contains("rtx")
+            || gpu_lower.contains("gtx")
+            || gpu_lower.contains("amd")
+            || gpu_lower.contains("radeon")
+            || (gpu_lower.is_empty() && tweaks::is_nvidia_smi_available());
+
+        assert_eq!(config.empty_standby_list, true);
         assert_eq!(parsed["empty_standby_list"], true);
-
-        assert!(parsed["cs2_priority"].is_boolean());
-        assert!(parsed["disable_gpu_acceleration"].is_boolean());
-        assert!(parsed["apply_dpi_optimization"].is_boolean());
-        assert!(parsed["disable_memory_compression"].is_boolean());
-        assert!(parsed["apply_mmcss"].is_boolean());
-        assert!(parsed["disable_hpet"].is_boolean());
-        assert!(parsed["disable_game_bar"].is_boolean());
-        assert!(parsed["enable_msi"].is_boolean());
-        assert!(parsed["disable_power_saving"].is_boolean());
-        assert!(parsed["apply_render_queue"].is_boolean());
-
-        // Confirma correspondência com o retorno dos verificadores
-        let expected_priority = matches!(tweaks::Cs2PriorityTweak.status(), Ok(tweaks::TweakStatus::Applied));
-        let expected_gpu_accel = tweaks::is_all_gpu_accel_disabled().unwrap_or(false);
-        let expected_dpi = matches!(tweaks::Cs2DpiOptimizationTweak.status(), Ok(tweaks::TweakStatus::Applied));
-        let expected_mem_comp = matches!(tweaks::MemoryCompressionTweak.status(), Ok(tweaks::TweakStatus::Applied));
-        let expected_mmcss = tweaks::is_mmcss_applied_for_current_hardware().unwrap_or(false);
-        let expected_hpet = matches!(tweaks::HpetTweak.status(), Ok(tweaks::TweakStatus::Applied));
-        let expected_game_bar = matches!(tweaks::GameBarTweak.status(), Ok(tweaks::TweakStatus::Applied));
-        let expected_msi = tweaks::is_all_msi_enabled().unwrap_or(false);
-        let expected_power_saving = matches!(tweaks::PcieUsbPowerSavingTweak.status(), Ok(tweaks::TweakStatus::Applied));
-        let expected_render_queue = matches!(tweaks::RenderQueueTweak.status(), Ok(tweaks::TweakStatus::Applied));
-
-        assert_eq!(config.cs2_priority, expected_priority);
-        assert_eq!(parsed["cs2_priority"], expected_priority);
-        assert_eq!(config.disable_gpu_acceleration, expected_gpu_accel);
-        assert_eq!(parsed["disable_gpu_acceleration"], expected_gpu_accel);
-        assert_eq!(config.apply_dpi_optimization, expected_dpi);
-        assert_eq!(parsed["apply_dpi_optimization"], expected_dpi);
+        assert_eq!(config.cs2_priority, false);
+        assert_eq!(parsed["cs2_priority"], false);
+        assert_eq!(config.cs2_affinity, expected_affinity);
+        assert_eq!(parsed["cs2_affinity"], expected_affinity);
         assert_eq!(config.disable_memory_compression, expected_mem_comp);
         assert_eq!(parsed["disable_memory_compression"], expected_mem_comp);
-        assert_eq!(config.apply_mmcss, expected_mmcss);
-        assert_eq!(parsed["apply_mmcss"], expected_mmcss);
-        assert_eq!(config.disable_hpet, expected_hpet);
-        assert_eq!(parsed["disable_hpet"], expected_hpet);
-        assert_eq!(config.disable_game_bar, expected_game_bar);
-        assert_eq!(parsed["disable_game_bar"], expected_game_bar);
-        assert_eq!(config.enable_msi, expected_msi);
-        assert_eq!(parsed["enable_msi"], expected_msi);
-        assert_eq!(config.disable_power_saving, expected_power_saving);
-        assert_eq!(parsed["disable_power_saving"], expected_power_saving);
-        assert_eq!(config.apply_render_queue, expected_render_queue);
-        assert_eq!(parsed["apply_render_queue"], expected_render_queue);
+        assert_eq!(config.disable_gpu_acceleration, expected_gpu_accel_flag);
+        assert_eq!(parsed["disable_gpu_acceleration"], expected_gpu_accel_flag);
+        assert_eq!(config.apply_render_queue, expected_render_queue_flag);
+        assert_eq!(parsed["apply_render_queue"], expected_render_queue_flag);
+        assert_eq!(config.apply_timer_resolution, true);
+        assert_eq!(config.apply_dpi_optimization, true);
+        assert_eq!(config.apply_mmcss, true);
+        assert_eq!(config.disable_hpet, true);
+        assert_eq!(config.disable_game_bar, true);
+        assert_eq!(config.enable_msi, true);
+        assert_eq!(config.disable_power_saving, true);
+
+        // Relatório também reflete exatamente os verificadores atuais do SO
+        let cs2_running = windows_api::is_cs2_process_running_win32().unwrap_or(false);
+        let expected_priority_applied = cs2_running
+            && matches!(tweaks::Cs2PriorityTweak.status(), Ok(tweaks::TweakStatus::Applied));
+        let expected_gpu_accel_applied = tweaks::is_all_gpu_accel_disabled().unwrap_or(false);
+        let expected_dpi_applied =
+            matches!(tweaks::Cs2DpiOptimizationTweak.status(), Ok(tweaks::TweakStatus::Applied));
+        let expected_mem_comp_applied =
+            matches!(tweaks::MemoryCompressionTweak.status(), Ok(tweaks::TweakStatus::Applied));
+        let expected_timer_applied =
+            matches!(tweaks::TimerResolutionTweak.status(), Ok(tweaks::TweakStatus::Applied));
+        let expected_mmcss_applied = tweaks::is_mmcss_applied_for_hardware_specs(
+            report.hardware.cpu.physical_cores,
+            report.hardware.ram.total_gb,
+        )
+        .unwrap_or(false);
+        let expected_hpet_applied =
+            matches!(tweaks::HpetTweak.status(), Ok(tweaks::TweakStatus::Applied));
+        let expected_game_bar_applied =
+            matches!(tweaks::GameBarTweak.status(), Ok(tweaks::TweakStatus::Applied));
+        let expected_msi_applied = tweaks::is_all_msi_enabled().unwrap_or(false);
+        let expected_power_saving_applied =
+            matches!(tweaks::PcieUsbPowerSavingTweak.status(), Ok(tweaks::TweakStatus::Applied));
+        let expected_render_queue_applied = expected_render_queue_flag
+            && matches!(tweaks::RenderQueueTweak.status(), Ok(tweaks::TweakStatus::Applied));
+
+        assert_eq!(report.is_already_applied("cs2_priority"), expected_priority_applied);
+        assert_eq!(report.is_already_applied("disable_gpu_acceleration"), expected_gpu_accel_applied);
+        assert_eq!(report.is_already_applied("apply_dpi_optimization"), expected_dpi_applied);
+        assert_eq!(report.is_already_applied("disable_memory_compression"), expected_mem_comp_applied);
+        assert_eq!(report.is_already_applied("apply_timer_resolution"), expected_timer_applied);
+        assert_eq!(report.is_already_applied("apply_mmcss"), expected_mmcss_applied);
+        assert_eq!(report.is_already_applied("disable_hpet"), expected_hpet_applied);
+        assert_eq!(report.is_already_applied("disable_game_bar"), expected_game_bar_applied);
+        assert_eq!(report.is_already_applied("enable_msi"), expected_msi_applied);
+        assert_eq!(report.is_already_applied("disable_power_saving"), expected_power_saving_applied);
+        assert_eq!(report.is_already_applied("apply_render_queue"), expected_render_queue_applied);
 
         assert_eq!(report.evaluations.len(), 13);
+        for eval in &report.evaluations {
+            assert_eq!(
+                eval.needs_optimization,
+                eval.active && !eval.already_applied,
+                "Invariante needs_optimization falhou para '{}'",
+                eval.id
+            );
+        }
     }
 
     #[test]

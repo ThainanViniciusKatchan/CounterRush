@@ -52,7 +52,7 @@ impl RenderQueueStatus {
 pub fn apply_amd_flip_queue() -> Result<(), TweakError> {
     let script = r#"
 $ProgressPreference = 'SilentlyContinue'
-$gpuKeys = Get-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}\000*' -ErrorAction SilentlyContinue | Where-Object { $_.DriverDesc }
+$gpuKeys = Get-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}\000*' -ErrorAction SilentlyContinue | Where-Object { $_.DriverDesc -and ($_.DriverDesc -match '\b(AMD|Radeon)\b' -or $_.ProviderName -match '\b(AMD|Radeon)\b|Advanced Micro Devices') }
 if (-not $gpuKeys) {
     throw "Nenhum driver de adaptador de vídeo ativo foi encontrado na classe {4d36e968-e325-11ce-bfc1-08002be10318}."
 }
@@ -76,7 +76,7 @@ foreach ($gpu in $gpuKeys) {
 pub fn rollback_amd_flip_queue() -> Result<(), TweakError> {
     let script = r#"
 $ProgressPreference = 'SilentlyContinue'
-$gpuKeys = Get-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}\000*' -ErrorAction SilentlyContinue | Where-Object { $_.DriverDesc }
+$gpuKeys = Get-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}\000*' -ErrorAction SilentlyContinue | Where-Object { $_.DriverDesc -and ($_.DriverDesc -match '\b(AMD|Radeon)\b' -or $_.ProviderName -match '\b(AMD|Radeon)\b|Advanced Micro Devices') }
 foreach ($gpu in $gpuKeys) {
     Remove-ItemProperty -Path $gpu.PSPath -Name "FlipQueueSize" -ErrorAction SilentlyContinue
 }
@@ -97,7 +97,7 @@ foreach ($gpu in $gpuKeys) {
 pub fn get_amd_flip_queue_status() -> Result<Vec<AmdGpuFlipQueueStatus>, TweakError> {
     let script = r#"
 $ProgressPreference = 'SilentlyContinue'
-$gpuKeys = Get-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}\000*' -ErrorAction SilentlyContinue | Where-Object { $_.DriverDesc }
+$gpuKeys = Get-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}\000*' -ErrorAction SilentlyContinue | Where-Object { $_.DriverDesc -and ($_.DriverDesc -match '\b(AMD|Radeon)\b' -or $_.ProviderName -match '\b(AMD|Radeon)\b|Advanced Micro Devices') }
 foreach ($gpu in $gpuKeys) {
     $val = (Get-ItemProperty -Path $gpu.PSPath -Name "FlipQueueSize" -ErrorAction SilentlyContinue).FlipQueueSize
     $valStr = ""

@@ -32,14 +32,20 @@ pub struct MmcssStatus {
     pub tier_detected: MmcssHardwareTier,
 }
 
+pub fn classify_mmcss_hardware_tier(physical_cores: usize, ram_total_gb: f64) -> MmcssHardwareTier {
+    if physical_cores >= 6 && ram_total_gb >= 15.0 {
+        MmcssHardwareTier::HighEnd
+    } else {
+        MmcssHardwareTier::EntryLevel
+    }
+}
+
 pub fn detect_mmcss_hardware_tier() -> Result<MmcssHardwareTier, TweakError> {
     let info = windows_api::detect_hardware()?;
-    let is_high_end = info.cpu.physical_cores >= 6 && info.ram.total_gb >= 15.0;
-    if is_high_end {
-        Ok(MmcssHardwareTier::HighEnd)
-    } else {
-        Ok(MmcssHardwareTier::EntryLevel)
-    }
+    Ok(classify_mmcss_hardware_tier(
+        info.cpu.physical_cores,
+        info.ram.total_gb,
+    ))
 }
 
 fn set_reg_dword(key: &str, value_name: &str, value: u32) -> Result<(), TweakError> {
@@ -137,7 +143,12 @@ fn parse_dword_str(val: &str) -> Option<u32> {
 
 pub fn get_mmcss_status() -> Result<MmcssStatus, TweakError> {
     let tier_detected = detect_mmcss_hardware_tier()?;
+    get_mmcss_status_for_tier(tier_detected)
+}
 
+pub fn get_mmcss_status_for_tier(
+    tier_detected: MmcssHardwareTier,
+) -> Result<MmcssStatus, TweakError> {
     let net_throttling_raw = query_reg_value(REG_SYSTEM_PROFILE_KEY, "NetworkThrottlingIndex")?;
     let sys_resp_raw = query_reg_value(REG_SYSTEM_PROFILE_KEY, "SystemResponsiveness")?;
     let gpu_prio_raw = query_reg_value(REG_GAMES_PROFILE_KEY, "GPU Priority")?;
@@ -217,6 +228,15 @@ pub fn is_mmcss_applied_for_tier(status: &MmcssStatus, tier: MmcssHardwareTier) 
         .unwrap_or(false);
 
     resp_ok && net_ok && gpu_ok && prio_ok && sched_ok && sfio_ok
+}
+
+pub fn is_mmcss_applied_for_hardware_specs(
+    physical_cores: usize,
+    ram_total_gb: f64,
+) -> Result<bool, TweakError> {
+    let tier = classify_mmcss_hardware_tier(physical_cores, ram_total_gb);
+    let status = get_mmcss_status_for_tier(tier)?;
+    Ok(is_mmcss_applied_for_tier(&status, tier))
 }
 
 pub fn is_mmcss_applied_for_current_hardware() -> Result<bool, TweakError> {
