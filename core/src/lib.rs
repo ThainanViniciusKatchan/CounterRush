@@ -21,6 +21,15 @@ pub enum CoreError {
 
 pub mod classifier;
 pub use classifier::{classify_pc, PcCategory};
+pub mod binds;
+pub use binds::{
+    find_key_conflict_in_content, format_bind_commands, format_bind_line, manage_cs2_bind,
+    manage_cs2_bind_from_args, manage_cs2_bind_from_args_with_dirs, manage_cs2_bind_with_dirs,
+    parse_bind_line, prompt_user_bind_conflict, resolve_cfg_backup_dir, resolve_cs2_cfg_dir,
+    resolve_local_cfg_dir, restore_cs2_cfg_backup, restore_cs2_cfg_backup_in_dirs,
+    validate_bind_key, validate_cfg_file_name, BindConflict, BindDirectories, BindFlag,
+    BindOperationOutcome, DEFAULT_CS2_CFG_DIR,
+};
 pub mod startup;
 pub use startup::{
     disable_system_startup, enable_system_startup, is_system_startup_enabled,
@@ -1254,6 +1263,23 @@ impl OptimizerCore {
 
         Ok(results)
     }
+
+    pub fn manage_cs2_bind<S: AsRef<str>>(
+        &self,
+        nome_config: &str,
+        tecla: Option<&str>,
+        comandos: &[S],
+        flag: Option<BindFlag>,
+    ) -> Result<BindOperationOutcome, CoreError> {
+        binds::manage_cs2_bind(nome_config, tecla, comandos, flag)
+    }
+
+    pub fn restore_cs2_cfg_backup(
+        &self,
+        nome_config: &str,
+    ) -> Result<BindOperationOutcome, CoreError> {
+        binds::restore_cs2_cfg_backup(nome_config)
+    }
 }
 
 /// Reconcilia os flags de inicialização com o sistema e auto-otimização Steam.
@@ -1332,17 +1358,17 @@ pub fn get_default_launch_args_for_category(category: PcCategory) -> Vec<String>
     }
 }
 
-fn current_exe_dir() -> Option<PathBuf> {
+pub(crate) fn current_exe_dir() -> Option<PathBuf> {
     std::env::current_exe()
         .ok()
         .and_then(|exe_path| exe_path.parent().map(|dir| dir.to_path_buf()))
 }
 
-fn is_workspace_cwd(cwd: &Path) -> bool {
+pub(crate) fn is_workspace_cwd(cwd: &Path) -> bool {
     cwd.join("Cargo.toml").is_file()
 }
 
-fn join_dir(base: &Path, segments: &[&str]) -> PathBuf {
+pub(crate) fn join_dir(base: &Path, segments: &[&str]) -> PathBuf {
     let mut out = if base == Path::new(".") {
         PathBuf::new()
     } else {

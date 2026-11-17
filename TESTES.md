@@ -445,3 +445,27 @@ cargo run -p tweaks --example test_render_queue -- --rollback-nvidia
 # 17.7. Consultar status atual da fila de renderização em todas as placas
 cargo run -p tweaks --example test_render_queue -- --status
 ```
+
+---
+
+## 18. Gerenciador de Binds do Counter-Strike 2 (`.cfg`)
+
+Gerencia binds de Counter-Strike 2 na sintaxe plana padrão (`bind "<tecla>" "<comando>"`), aplicando alterações tanto na pasta local do software (`config\cfg`) quanto no diretório global do CS2 (`C:\Program Files (x86)\Steam\steamapps\common\Counter-Strike Global Offensive\game\csgo\cfg`), com detecção de conflito de teclas (solicitando confirmação do usuário) e backup automático da versão mais recente em `config\cfg\bkp`.
+
+> [!NOTE]
+> A gravação no diretório global do CS2 sob `C:\Program Files (x86)\...` pode exigir privilégios de Administrador conforme as permissões da pasta da Steam.
+
+```powershell
+# 18.1. Modo padrão (cria novo .cfg ou adiciona/atualiza a bind sem apagar o restante)
+cargo run -p core --example test_cfg_binds -- autoexec.cfg f3 "toggle cl_mute_enemy_team 0 1"
+
+# 18.2. Múltiplos comandos na mesma bind (unidos automaticamente com ';')
+cargo run -p core --example test_cfg_binds -- autoexec.cfg mouse4 "+jump" "-attack"
+
+# 18.3. Criar novo arquivo .cfg do zero (sobrescreve o anterior após salvar backup em config\cfg\bkp)
+cargo run -p core --example test_cfg_binds -- autoexec.cfg f4 "buy ak47" "buy vesthelm" --new_config
+
+# 18.4. Restaurar o último backup de config\cfg\bkp para config\cfg e diretório global do CS2
+cargo run -p core --example test_cfg_binds -- autoexec.cfg --restore
+```
+
