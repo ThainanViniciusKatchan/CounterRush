@@ -107,7 +107,10 @@ impl Tweak for Cs2DpiOptimizationTweak {
 
         if output.status.success() {
             let stdout = String::from_utf8_lossy(&output.stdout);
-            if stdout.contains("DISABLEDXMAXIMIZEDWINDOWEDMODE") {
+            if stdout.contains("DISABLEDXMAXIMIZEDWINDOWEDMODE")
+                && stdout.contains("PERPROCESSSYSTEMDPIFORCEOFF")
+                && stdout.contains("HIGHDPIAWARE")
+            {
                 return Ok(TweakStatus::Applied);
             }
         }

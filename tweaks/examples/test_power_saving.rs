@@ -63,6 +63,7 @@ fn print_status(status: &PowerSavingStatus) {
     } else {
         "ALGUMAS ECONOMIAS DE ENERGIA AINDA ESTÃO ATIVAS NO WINDOWS."
     });
+    println!("Status: {}", if status.is_all_optimized() { "Applied" } else { "Default" });
     println!("--------------------------------------------------------------------------------\n");
 }
 

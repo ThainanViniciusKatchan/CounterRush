@@ -63,12 +63,15 @@ fn main() {
                     match st {
                         HpetStatus::Disabled => {
                             println!("\n[OK] HPET desativado: Menor latência e sem sobrecarga do barramento da placa-mãe.");
+                            println!("Status: Applied");
                         }
                         HpetStatus::Enabled => {
                             println!("\n[AVISO] HPET está ativado forçadamente: Pode causar micro-stutters e maior input lag.");
+                            println!("Status: Default");
                         }
                         HpetStatus::Default => {
                             println!("\n[PADRÃO] useplatformclock não está presente no BCD. O Windows gerencia o relógio nativamente.");
+                            println!("Status: Default");
                         }
                     }
                 }

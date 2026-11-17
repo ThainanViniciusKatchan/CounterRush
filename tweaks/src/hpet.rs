@@ -32,6 +32,16 @@ pub fn get_hpet_status() -> Result<HpetStatus, TweakError> {
         return Err(TweakError::WindowsApi(windows_api::WindowsApiError::AccessDenied));
     }
 
+    if !output.status.success() {
+        if combined.contains("tipo de entrada") || combined.contains("entry type") {
+            return Err(TweakError::WindowsApi(windows_api::WindowsApiError::AccessDenied));
+        }
+        return Err(TweakError::ValidationFailed(format!(
+            "Falha ao executar 'bcdedit /enum {{current}}': {}",
+            combined.trim()
+        )));
+    }
+
     for line in stdout.lines() {
         let trimmed = line.trim();
         if trimmed.starts_with("useplatformclock") {

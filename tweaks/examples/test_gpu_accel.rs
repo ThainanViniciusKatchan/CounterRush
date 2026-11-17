@@ -96,6 +96,8 @@ fn main() {
             println!("2. {}: {:?}", steam.name(), steam.status().unwrap_or(tweaks::TweakStatus::Unknown));
             println!("3. {}: {:?}", chromium.name(), chromium.status().unwrap_or(tweaks::TweakStatus::Unknown));
             println!("4. {}: {:?}", firefox.name(), firefox.status().unwrap_or(tweaks::TweakStatus::Unknown));
+            let all_applied = tweaks::is_all_gpu_accel_disabled().unwrap_or(false);
+            println!("Status: {}", if all_applied { "Applied" } else { "Default" });
 
             println!("\nPara testar ações diretas com rollback opcional:");
             println!("  cargo run -p tweaks --example test_gpu_accel -- --disable-discord");

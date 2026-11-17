@@ -48,40 +48,37 @@ fn main() {
     }
     println!("  - Perfil Classificado: {}", report.category);
 
-    println!("\n[3] Avaliação de Hardware e Status Atual das Otimizações:");
+    println!("\n[3] Avaliação de Hardware e Status das Otimizações:");
+    let is_runtime_tweak = |id: &str| {
+        matches!(
+            id,
+            "empty_standby_list" | "cs2_affinity" | "cs2_priority" | "apply_timer_resolution"
+        )
+    };
+
     for eval in &report.evaluations {
-        if !eval.supported {
-            println!("  [BLOQUEADO POR HARDWARE] {}", eval.name);
-            println!("    ID no JSON:  {} (false)", eval.id);
-            println!("    Status SO:   Não aplicável");
-            println!("    Critério:    {}", eval.reason);
-        } else if eval.optional_default_off && !eval.active {
-            println!("  [OPCIONAL / PADRÃO OFF] {}", eval.name);
-            println!("    ID no JSON:  {} (false)", eval.id);
-            println!(
-                "    Status SO:   {}",
-                if eval.already_applied { "Já aplicado" } else { "Inativo" }
-            );
-            println!("    Critério:    {}", eval.reason);
-        } else if eval.already_applied {
-            println!("  [JÁ OTIMIZADO NO SO] {}", eval.name);
-            println!("    ID no JSON:  {} (true)", eval.id);
-            println!("    Status SO:   Já otimizado (preservado sem reaplicar)");
-            println!("    Critério:    {}", eval.reason);
+        let tipo = if is_runtime_tweak(&eval.id) {
+            "Inicialização (sem teste)"
         } else {
-            println!("  [PENDENTE PARA OTIMIZAR] {}", eval.name);
-            println!("    ID no JSON:  {} (true)", eval.id);
-            println!(
-                "    Status SO:   {}",
-                if eval.needs_optimization {
-                    "Pendente (será aplicado)"
-                } else {
-                    "Verificado"
-                }
-            );
-            println!("    Critério:    {}", eval.reason);
-        }
-        println!();
+            "Permanente"
+        };
+
+        let (tag, status_so) = if !eval.supported {
+            ("[BLOQUEADO POR HARDWARE]", "Não aplicável")
+        } else if eval.optional_default_off && !eval.active && !eval.already_applied {
+            ("[OPCIONAL / PADRÃO OFF]", "Inativo")
+        } else if eval.already_applied {
+            ("[JÁ OTIMIZADO NO SO]", "Applied")
+        } else if is_runtime_tweak(&eval.id) {
+            ("[EXECUÇÃO AO INICIAR]", "Sem teste de status")
+        } else {
+            ("[PENDENTE PARA OTIMIZAR]", "Default")
+        };
+
+        println!("  {} {} ({})", tag, eval.name, tipo);
+        println!("    ID no JSON:  {} = {}", eval.id, eval.active);
+        println!("    Status SO:   {}", status_so);
+        println!("    Critério:    {}\n", eval.reason);
     }
 
     println!("[4] Argumentos de Inicialização do CS2 (Launch Args):");
@@ -104,25 +101,39 @@ fn main() {
     }
 
     let count_active = report.evaluations.iter().filter(|e| e.active).count();
+    let count_runtime_active = report
+        .evaluations
+        .iter()
+        .filter(|e| e.active && is_runtime_tweak(&e.id))
+        .count();
+    let count_permanent_pending = report
+        .evaluations
+        .iter()
+        .filter(|e| e.active && !is_runtime_tweak(&e.id))
+        .count();
     let count_already = report.already_optimized_tweaks.len();
-    let count_pending = report.pending_tweaks.len();
-    let count_optional = report.evaluations.iter().filter(|e| e.optional_default_off && !e.active).count();
+    let count_optional = report
+        .evaluations
+        .iter()
+        .filter(|e| e.optional_default_off && !e.active && !e.already_applied)
+        .count();
     let count_blocked = report.blocked_tweaks.len();
 
     println!("\n================================================================================");
     println!("  Resumo da Autodetecção:");
-    println!("    - Otimizações recomendadas no AutoDetect.json:    {}", count_active);
-    println!("    - Já otimizadas atualmente no sistema:            {}", count_already);
-    println!("    - Pendentes (ainda precisam ser otimizadas):      {}", count_pending);
-    println!("    - Opcionais mantidas desativadas:                 {}", count_optional);
-    println!("    - Bloqueadas por limite de hardware:              {}", count_blocked);
+    println!("    - Marcadas como true no AutoDetect.json:          {}", count_active);
+    println!("      * Execução ao iniciar o jogo (sem teste):       {}", count_runtime_active);
+    println!("      * Permanentes pendentes (Status Default):       {}", count_permanent_pending);
+    println!("    - Permanentes já aplicadas (marcadas false):      {}", count_already);
+    println!("    - Opcionais mantidas desativadas (false):         {}", count_optional);
+    println!("    - Bloqueadas por limite de hardware (false):      {}", count_blocked);
     println!("================================================================================");
 
     if !report.already_optimized_tweaks.is_empty() {
-        println!("\nJá otimizadas no sistema: {}", report.already_optimized_tweaks.join(", "));
+        println!("\nJá aplicadas -> false: {}", report.already_optimized_tweaks.join(", "));
     }
     if !report.pending_tweaks.is_empty() {
-        println!("Pendentes para otimizar: {}", report.pending_tweaks.join(", "));
+        println!("Ativas no JSON -> true: {}", report.pending_tweaks.join(", "));
     }
 
     if count_blocked > 0 {

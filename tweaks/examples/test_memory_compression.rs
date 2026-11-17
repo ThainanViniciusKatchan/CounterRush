@@ -71,8 +71,14 @@ fn main() {
         Some("--status") | None => {
             println!("\nConsultando status atual com Get-MMAgent...");
             match get_memory_compression_status() {
-                Ok(true) => println!("Status atual: ATIVA (Padrão do Windows - MemoryCompression = True)"),
-                Ok(false) => println!("Status atual: DESATIVADA (Otimizado para >16GB - MemoryCompression = False)"),
+                Ok(true) => {
+                    println!("Status atual: ATIVA (Padrão do Windows - MemoryCompression = True)");
+                    println!("Status: Default");
+                }
+                Ok(false) => {
+                    println!("Status atual: DESATIVADA (Otimizado para >16GB - MemoryCompression = False)");
+                    println!("Status: Applied");
+                }
                 Err(err) => eprintln!("Erro ao consultar status: {err}"),
             }
             print_usage();

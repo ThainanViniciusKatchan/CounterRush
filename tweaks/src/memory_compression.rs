@@ -1,9 +1,56 @@
 use crate::{Tweak, TweakError, TweakStatus};
-use windows_api::run_powershell;
+use windows_api::{run_powershell, run_powershell_script, WindowsApiError};
 
 pub fn get_memory_compression_status() -> Result<bool, TweakError> {
-    let output = run_powershell("(Get-MMAgent).MemoryCompression")?;
-    Ok(output.trim().eq_ignore_ascii_case("True"))
+    let script = r#"
+try {
+    (Get-MMAgent -ErrorAction Stop).MemoryCompression
+} catch {
+    $msg = $_.Exception.Message
+    $fqid = $_.FullyQualifiedErrorId
+    if ($msg -match 'Acesso negado|Access is denied|PermissionDenied|System Error 5' -or $fqid -match 'PermissionDenied|Windows System Error 5') {
+        if ($null -ne (Get-Process -Name 'Memory Compression' -ErrorAction SilentlyContinue)) {
+            'True'
+        } else {
+            'False'
+        }
+    } else {
+        Write-Error $msg
+        exit 1
+    }
+}
+"#;
+    let output = match run_powershell_script(script) {
+        Ok(out) => out,
+        Err(WindowsApiError::ExecutionFailed(err)) => {
+            let lower = err.to_lowercase();
+            if lower.contains("acesso negado")
+                || lower.contains("access is denied")
+                || lower.contains("permissiondenied")
+                || lower.contains("system error 5")
+            {
+                return Err(TweakError::WindowsApi(WindowsApiError::AccessDenied));
+            }
+            return Err(TweakError::WindowsApi(WindowsApiError::ExecutionFailed(err)));
+        }
+        Err(other) => return Err(TweakError::WindowsApi(other)),
+    };
+    let last_line = output
+        .lines()
+        .map(str::trim)
+        .rfind(|line| !line.is_empty())
+        .unwrap_or("");
+
+    if last_line.eq_ignore_ascii_case("True") {
+        Ok(true)
+    } else if last_line.eq_ignore_ascii_case("False") {
+        Ok(false)
+    } else {
+        Err(TweakError::ValidationFailed(format!(
+            "Saída inesperada ao consultar Get-MMAgent: '{}'",
+            output.trim()
+        )))
+    }
 }
 
 pub fn disable_memory_compression() -> Result<(), TweakError> {

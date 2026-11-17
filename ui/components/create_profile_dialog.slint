@@ -83,18 +83,18 @@ export component CreateProfileDialog inherits Rectangle {
     property <string> profile-name: "";
     property <string> launch-args: "";
     property <bool> empty-standby-list: true;
-    property <bool> cs2-priority: true;
+    property <bool> cs2-priority: false;
     property <bool> cs2-affinity: true;
     property <bool> disable-gpu-acceleration: false;
-    property <bool> apply-dpi-optimization: true;
+    property <bool> apply-dpi-optimization: false;
     property <bool> disable-memory-compression: false;
     property <bool> apply-timer-resolution: true;
-    property <bool> apply-mmcss: true;
+    property <bool> apply-mmcss: false;
     property <bool> disable-hpet: false;
-    property <bool> disable-game-bar: true;
+    property <bool> disable-game-bar: false;
     property <bool> enable-msi: false;
-    property <bool> disable-power-saving: true;
-    property <bool> apply-render-queue: true;
+    property <bool> disable-power-saving: false;
+    property <bool> apply-render-queue: false;
 
     width: 980px;
     height: 620px;

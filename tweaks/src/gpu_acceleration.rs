@@ -25,12 +25,13 @@ impl Tweak for DiscordGpuAccelTweak {
             $config = "$env:APPDATA\discord\settings.json"
             if (Test-Path $config) {
                 $json = Get-Content $config -Raw | ConvertFrom-Json
-                if ($json.enableHardwareAcceleration -eq $false) { "Applied" } else { "Default" }
+                $prop = $json.PSObject.Properties['enableHardwareAcceleration']
+                if ($null -ne $prop -and $prop.Value -eq $false) { "Applied" } else { "Default" }
             } else { "Unknown" }
         "#;
         match run_powershell(script) {
-            Ok(output) if output.contains("Applied") => Ok(TweakStatus::Applied),
-            Ok(output) if output.contains("Default") => Ok(TweakStatus::Default),
+            Ok(output) if output.trim().eq_ignore_ascii_case("Applied") => Ok(TweakStatus::Applied),
+            Ok(output) if output.trim().eq_ignore_ascii_case("Default") => Ok(TweakStatus::Default),
             _ => Ok(TweakStatus::Unknown),
         }
     }
@@ -90,14 +91,22 @@ impl Tweak for SteamGpuAccelTweak {
 
     fn status(&self) -> Result<TweakStatus, TweakError> {
         let script = r#"
-            if (-not (Test-Path "HKCU:\Software\Valve\Steam")) { "Unknown" } else {
-                $val = (Get-ItemProperty -Path "HKCU:\Software\Valve\Steam" -Name "GPUAccelWebViewsV3" -ErrorAction SilentlyContinue).GPUAccelWebViewsV3
-                if ($val -eq 0) { "Applied" } else { "Default" }
+            $regPath = "HKCU:\Software\Valve\Steam"
+            if (-not (Test-Path $regPath)) { "Unknown" } else {
+                $props = Get-ItemProperty -Path $regPath -ErrorAction SilentlyContinue
+                $ok = $true
+                foreach ($name in @("GPUAccelWebViewsV3", "GPUAccelWebViews", "GPUAcceleratedWebViews", "SmoothScrollWebViews")) {
+                    $prop = $props.PSObject.Properties[$name]
+                    if ($null -eq $prop -or $prop.Value -ne 0) {
+                        $ok = $false
+                    }
+                }
+                if ($ok) { "Applied" } else { "Default" }
             }
         "#;
         match run_powershell(script) {
-            Ok(output) if output.contains("Applied") => Ok(TweakStatus::Applied),
-            Ok(output) if output.contains("Unknown") => Ok(TweakStatus::Unknown),
+            Ok(output) if output.trim().eq_ignore_ascii_case("Applied") => Ok(TweakStatus::Applied),
+            Ok(output) if output.trim().eq_ignore_ascii_case("Unknown") => Ok(TweakStatus::Unknown),
             _ => Ok(TweakStatus::Default),
         }
     }
@@ -201,7 +210,8 @@ impl Tweak for ChromiumGpuAccelTweak {
                 if (Test-Path $arquivo) {
                     $found = $true
                     $json = Get-Content $arquivo -Raw -Encoding UTF8 | ConvertFrom-Json
-                    if ($json.hardware_acceleration_mode.enabled -ne $false) {
+                    $hw = $json.PSObject.Properties['hardware_acceleration_mode']
+                    if ($null -eq $hw -or $null -eq $hw.Value -or $null -eq $hw.Value.PSObject.Properties['enabled'] -or $hw.Value.enabled -ne $false) {
                         $allDisabled = $false
                     }
                 }
@@ -211,8 +221,8 @@ impl Tweak for ChromiumGpuAccelTweak {
             else { "Default" }
         "#;
         match run_powershell(script) {
-            Ok(output) if output.contains("Applied") => Ok(TweakStatus::Applied),
-            Ok(output) if output.contains("Default") => Ok(TweakStatus::Default),
+            Ok(output) if output.trim().eq_ignore_ascii_case("Applied") => Ok(TweakStatus::Applied),
+            Ok(output) if output.trim().eq_ignore_ascii_case("Default") => Ok(TweakStatus::Default),
             _ => Ok(TweakStatus::Unknown),
         }
     }
@@ -296,8 +306,10 @@ impl Tweak for FirefoxGpuAccelTweak {
             else {
                 $applied = $true
                 foreach ($arquivo in $perfis) {
-                    $content = Get-Content $arquivo.FullName -Raw
-                    if ($content -notmatch 'user_pref\("layers\.acceleration\.disabled",\s*true\);') {
+                    $content = Get-Content $arquivo.FullName -Raw -Encoding UTF8
+                    $hasAccDisabled = $content -match 'user_pref\("layers\.acceleration\.disabled",\s*true\);'
+                    $hasPerfDisabled = $content -match 'user_pref\("browser\.preferences\.defaultPerformanceSettings\.enabled",\s*false\);'
+                    if (-not ($hasAccDisabled -and $hasPerfDisabled)) {
                         $applied = $false
                     }
                 }
@@ -305,8 +317,8 @@ impl Tweak for FirefoxGpuAccelTweak {
             }
         "#;
         match run_powershell(script) {
-            Ok(output) if output.contains("Applied") => Ok(TweakStatus::Applied),
-            Ok(output) if output.contains("Default") => Ok(TweakStatus::Default),
+            Ok(output) if output.trim().eq_ignore_ascii_case("Applied") => Ok(TweakStatus::Applied),
+            Ok(output) if output.trim().eq_ignore_ascii_case("Default") => Ok(TweakStatus::Default),
             _ => Ok(TweakStatus::Unknown),
         }
     }

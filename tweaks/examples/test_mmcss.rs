@@ -70,6 +70,8 @@ fn print_status_table(status: &MmcssStatus) {
     } else {
         println!("Conformidade: [PADRÃO DO WINDOWS OU PERSONALIZADO]");
     }
+    let is_applied = is_mmcss_applied_for_tier(status, status.tier_detected);
+    println!("Status: {}", if is_applied { "Applied" } else { "Default" });
 }
 
 fn main() {

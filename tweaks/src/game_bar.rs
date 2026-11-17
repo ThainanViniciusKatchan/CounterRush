@@ -34,8 +34,8 @@ impl GameBarStatus {
 
     pub fn is_xbox_mode_disabled(&self) -> bool {
         match &self.gaming_home_app {
-            Some(s) => s.is_empty() || s == "\"\"" || s == "\"\"",
-            None => true,
+            Some(s) => s.is_empty() || s == "\"\"",
+            None => false,
         }
     }
 

@@ -103,6 +103,126 @@ impl HardwareRestrictionsReport {
     }
 }
 
+fn detect_supported_gpu_vendor(hardware: &windows_api::HardwareInfo) -> (bool, bool) {
+    let gpu_lower = hardware.gpu.model.to_lowercase();
+    let is_nvidia = gpu_lower.contains("nvidia")
+        || gpu_lower.contains("geforce")
+        || gpu_lower.contains("rtx")
+        || gpu_lower.contains("gtx")
+        || (gpu_lower.is_empty() && tweaks::is_nvidia_smi_available());
+    let is_amd = gpu_lower.contains("amd") || gpu_lower.contains("radeon");
+    (is_nvidia, is_amd)
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PermanentTweakKind {
+    DisableGpuAcceleration,
+    ApplyDpiOptimization,
+    DisableMemoryCompression,
+    ApplyMmcss,
+    DisableHpet,
+    DisableGameBar,
+    EnableMsi,
+    DisablePowerSaving,
+    ApplyRenderQueue,
+}
+
+impl PermanentTweakKind {
+    pub const ALL: [Self; 9] = [
+        Self::DisableGpuAcceleration,
+        Self::ApplyDpiOptimization,
+        Self::DisableMemoryCompression,
+        Self::ApplyMmcss,
+        Self::DisableHpet,
+        Self::DisableGameBar,
+        Self::EnableMsi,
+        Self::DisablePowerSaving,
+        Self::ApplyRenderQueue,
+    ];
+
+    pub fn id(self) -> &'static str {
+        match self {
+            Self::DisableGpuAcceleration => "disable_gpu_acceleration",
+            Self::ApplyDpiOptimization => "apply_dpi_optimization",
+            Self::DisableMemoryCompression => "disable_memory_compression",
+            Self::ApplyMmcss => "apply_mmcss",
+            Self::DisableHpet => "disable_hpet",
+            Self::DisableGameBar => "disable_game_bar",
+            Self::EnableMsi => "enable_msi",
+            Self::DisablePowerSaving => "disable_power_saving",
+            Self::ApplyRenderQueue => "apply_render_queue",
+        }
+    }
+
+    pub fn display_name(self) -> &'static str {
+        match self {
+            Self::DisableGpuAcceleration => "Desativar Aceleração de GPU em Apps",
+            Self::ApplyDpiOptimization => "Otimização de DPI e Modo Janela",
+            Self::DisableMemoryCompression => "Desativação da Compactação de Memória",
+            Self::ApplyMmcss => "Otimização do Agendador Multimídia (MMCSS)",
+            Self::DisableHpet => "Desativação do HPET",
+            Self::DisableGameBar => "Desativação do Xbox Game Bar e GameDVR",
+            Self::EnableMsi => "Ativação do Modo MSI",
+            Self::DisablePowerSaving => "Desativação de Economia de Energia PCIe e USB",
+            Self::ApplyRenderQueue => "Fila de Quadros Renderizados (Render Queue)",
+        }
+    }
+
+    pub fn failure_label(self) -> &'static str {
+        match self {
+            Self::DisableGpuAcceleration => "Desativar Aceleração de GPU em Apps [não aplicado]",
+            Self::ApplyDpiOptimization => "Otimização de DPI e Modo Janela [não aplicado]",
+            Self::DisableMemoryCompression => {
+                "Desativação da Compactação de Memória [requer Administrador/RAM > 16GB]"
+            }
+            Self::ApplyMmcss => "Otimização do Agendador Multimídia (MMCSS) [requer Administrador]",
+            Self::DisableHpet => "Desativação do HPET [requer Administrador]",
+            Self::DisableGameBar => "Desativação do Xbox Game Bar e GameDVR [requer Administrador]",
+            Self::EnableMsi => "Ativação do Modo MSI [requer Administrador]",
+            Self::DisablePowerSaving => {
+                "Desativação de Economia de Energia PCIe e USB [requer Administrador]"
+            }
+            Self::ApplyRenderQueue => "Fila de Quadros Renderizados [requer Administrador]",
+        }
+    }
+
+    pub fn is_enabled_in(self, cfg: &config::CustomOptimizationConfig) -> bool {
+        match self {
+            Self::DisableGpuAcceleration => cfg.disable_gpu_acceleration,
+            Self::ApplyDpiOptimization => cfg.apply_dpi_optimization,
+            Self::DisableMemoryCompression => cfg.disable_memory_compression,
+            Self::ApplyMmcss => cfg.apply_mmcss,
+            Self::DisableHpet => cfg.disable_hpet,
+            Self::DisableGameBar => cfg.disable_game_bar,
+            Self::EnableMsi => cfg.enable_msi,
+            Self::DisablePowerSaving => cfg.disable_power_saving,
+            Self::ApplyRenderQueue => cfg.apply_render_queue,
+        }
+    }
+
+    pub fn set_enabled_in(self, cfg: &mut config::CustomOptimizationConfig, enabled: bool) {
+        match self {
+            Self::DisableGpuAcceleration => cfg.disable_gpu_acceleration = enabled,
+            Self::ApplyDpiOptimization => cfg.apply_dpi_optimization = enabled,
+            Self::DisableMemoryCompression => cfg.disable_memory_compression = enabled,
+            Self::ApplyMmcss => cfg.apply_mmcss = enabled,
+            Self::DisableHpet => cfg.disable_hpet = enabled,
+            Self::DisableGameBar => cfg.disable_game_bar = enabled,
+            Self::EnableMsi => cfg.enable_msi = enabled,
+            Self::DisablePowerSaving => cfg.disable_power_saving = enabled,
+            Self::ApplyRenderQueue => cfg.apply_render_queue = enabled,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PermanentTweakSyncOutcome {
+    SkippedDisabled,
+    AlreadyApplied,
+    AppliedNow,
+    Failed,
+}
+
 /// Snapshot do estado atual das otimizações no sistema operacional.
 #[derive(Debug, Clone, Default)]
 pub struct SystemTweakStatuses {
@@ -122,21 +242,25 @@ pub struct SystemTweakStatuses {
 }
 
 impl SystemTweakStatuses {
-    /// Consulta os verificadores reais do sistema reaproveitando o hardware já detectado.
+    /// Consulta os verificadores reais do sistema apenas para otimizações permanentes compatíveis.
+    /// Otimizações executadas a cada inicialização do jogo nunca executam teste de status.
     pub fn query_for_hardware(hardware: &windows_api::HardwareInfo) -> Self {
-        let cs2_running = windows_api::is_cs2_process_running_win32().unwrap_or(false);
         let is_applied = |res: Result<tweaks::TweakStatus, tweaks::TweakError>| {
             matches!(res, Ok(tweaks::TweakStatus::Applied))
         };
+        let (is_nvidia, is_amd) = detect_supported_gpu_vendor(hardware);
+        let render_queue_supported = is_nvidia || is_amd;
+        let mem_comp_supported = hardware.ram.total_gb > 16.0;
 
         Self {
             empty_standby_list: false,
-            cs2_priority: cs2_running && is_applied(tweaks::Cs2PriorityTweak.status()),
-            cs2_affinity: cs2_running && is_applied(tweaks::Cs2AffinityTweak.status()),
+            cs2_priority: false,
+            cs2_affinity: false,
+            apply_timer_resolution: false,
             disable_gpu_acceleration: tweaks::is_all_gpu_accel_disabled().unwrap_or(false),
             apply_dpi_optimization: is_applied(tweaks::Cs2DpiOptimizationTweak.status()),
-            disable_memory_compression: is_applied(tweaks::MemoryCompressionTweak.status()),
-            apply_timer_resolution: is_applied(tweaks::TimerResolutionTweak.status()),
+            disable_memory_compression: mem_comp_supported
+                && is_applied(tweaks::MemoryCompressionTweak.status()),
             apply_mmcss: tweaks::is_mmcss_applied_for_hardware_specs(
                 hardware.cpu.physical_cores,
                 hardware.ram.total_gb,
@@ -146,7 +270,8 @@ impl SystemTweakStatuses {
             disable_game_bar: is_applied(tweaks::GameBarTweak.status()),
             enable_msi: tweaks::is_all_msi_enabled().unwrap_or(false),
             disable_power_saving: is_applied(tweaks::PcieUsbPowerSavingTweak.status()),
-            apply_render_queue: is_applied(tweaks::RenderQueueTweak.status()),
+            apply_render_queue: render_queue_supported
+                && is_applied(tweaks::RenderQueueTweak.status()),
         }
     }
 }
@@ -211,16 +336,12 @@ fn format_status_suffix(
         return "Status SO: Não aplicável devido à restrição de hardware.";
     }
     if is_runtime {
-        return if already_applied {
-            "Status SO: Já aplicada no processo cs2.exe em execução."
-        } else {
-            "Status SO: Otimização de execução (aplicada ao iniciar o CS2)."
-        };
+        return "Status SO: Otimização de execução (sempre executada ao iniciar o CS2; sem teste de status).";
     }
     if already_applied {
-        "Status SO: Já otimizado no sistema (será preservado sem reaplicação)."
+        "Status SO: Já otimizado no sistema (marcado como false no AutoDetect.json)."
     } else if active {
-        "Status SO: Pendente (será aplicado na otimização automática)."
+        "Status SO: Pendente (marcado como true no AutoDetect.json para aplicar)."
     } else {
         "Status SO: Mantido desativado por padrão para este perfil."
     }
@@ -551,7 +672,7 @@ impl OptimizerCore {
         )
     }
 
-    /// Combina regras de hardware/categoria com o status atual das otimizações no sistema operacional.
+    /// Combina regras de hardware/categoria com o status atual das otimizações permanentes no sistema operacional.
     pub fn evaluate_autodetect_for_hardware_and_status(
         &self,
         hardware: windows_api::HardwareInfo,
@@ -561,21 +682,14 @@ impl OptimizerCore {
         let launch_args = get_default_launch_args_for_category(category);
         let mut collector = EvaluationCollector::new();
 
-        let priority_reason = format!(
-            "Desativada por padrão conforme diretriz do sistema. Mantida como otimização opcional para controle do usuário. | {}",
-            if statuses.cs2_priority {
-                "Status SO: Já aplicada no processo cs2.exe em execução."
-            } else {
-                "Status SO: Não aplicada."
-            }
-        );
+        let priority_reason = "Desativada por padrão conforme diretriz do sistema. Mantida como otimização opcional para controle do usuário. | Status SO: Otimização opcional de execução (sem teste de status).".to_string();
         collector.push(
             "cs2_priority",
             "Prioridade em Tempo Real do CS2",
             false,
             true,
             true,
-            statuses.cs2_priority,
+            false,
             priority_reason,
         );
 
@@ -593,12 +707,7 @@ impl OptimizerCore {
         };
         let affinity_reason = format!(
             "{affinity_base} | {}",
-            format_status_suffix(
-                affinity_supported,
-                affinity_supported,
-                statuses.cs2_affinity,
-                true
-            )
+            format_status_suffix(affinity_supported, affinity_supported, false, true)
         );
         collector.push(
             "cs2_affinity",
@@ -606,11 +715,13 @@ impl OptimizerCore {
             affinity_supported,
             affinity_supported,
             false,
-            statuses.cs2_affinity,
+            false,
             affinity_reason,
         );
 
         let mem_comp_supported = hardware.ram.total_gb > 16.0;
+        let mem_comp_already_applied = mem_comp_supported && statuses.disable_memory_compression;
+        let mem_comp_active = mem_comp_supported && !mem_comp_already_applied;
         let mem_comp_base = if mem_comp_supported {
             format!(
                 "Compatível: Sistema possui {:.2} GB de RAM (> 16 GB). Desativar compactação reduz latência de CPU sem risco de exaustão de memória.",
@@ -625,31 +736,26 @@ impl OptimizerCore {
         let mem_comp_reason = format!(
             "{mem_comp_base} | {}",
             format_status_suffix(
+                mem_comp_active,
                 mem_comp_supported,
-                mem_comp_supported,
-                statuses.disable_memory_compression,
+                mem_comp_already_applied,
                 false
             )
         );
         collector.push(
             "disable_memory_compression",
             "Desativação da Compactação de Memória",
-            mem_comp_supported,
+            mem_comp_active,
             mem_comp_supported,
             false,
-            statuses.disable_memory_compression,
+            mem_comp_already_applied,
             mem_comp_reason,
         );
 
-        let gpu_lower = hardware.gpu.model.to_lowercase();
-        let is_nvidia = gpu_lower.contains("nvidia")
-            || gpu_lower.contains("geforce")
-            || gpu_lower.contains("rtx")
-            || gpu_lower.contains("gtx")
-            || (gpu_lower.is_empty() && tweaks::is_nvidia_smi_available());
-        let is_amd = gpu_lower.contains("amd") || gpu_lower.contains("radeon");
+        let (is_nvidia, is_amd) = detect_supported_gpu_vendor(&hardware);
         let render_queue_supported = is_nvidia || is_amd;
         let render_queue_already_applied = render_queue_supported && statuses.apply_render_queue;
+        let render_queue_active = render_queue_supported && !render_queue_already_applied;
         let render_queue_base = if is_nvidia {
             "Compatível: GPU NVIDIA detectada. Modo de persistência do driver suportado para baixa latência.".to_string()
         } else if is_amd {
@@ -663,7 +769,7 @@ impl OptimizerCore {
         let render_queue_reason = format!(
             "{render_queue_base} | {}",
             format_status_suffix(
-                render_queue_supported,
+                render_queue_active,
                 render_queue_supported,
                 render_queue_already_applied,
                 false
@@ -672,15 +778,17 @@ impl OptimizerCore {
         collector.push(
             "apply_render_queue",
             "Fila de Quadros Renderizados (Render Queue)",
-            render_queue_supported,
+            render_queue_active,
             render_queue_supported,
             false,
             render_queue_already_applied,
             render_queue_reason,
         );
 
-        let gpu_accel_active = category != PcCategory::Potente;
-        let gpu_accel_base = if gpu_accel_active {
+        let gpu_accel_recommended = category != PcCategory::Potente;
+        let gpu_accel_already_applied = statuses.disable_gpu_acceleration;
+        let gpu_accel_active = gpu_accel_recommended && !gpu_accel_already_applied;
+        let gpu_accel_base = if gpu_accel_recommended {
             format!(
                 "Ativado: Recomendado para perfil {} para poupar VRAM dedicada e ciclos de decodificação.",
                 category
@@ -693,7 +801,7 @@ impl OptimizerCore {
             format_status_suffix(
                 gpu_accel_active,
                 true,
-                statuses.disable_gpu_acceleration,
+                gpu_accel_already_applied,
                 false
             )
         );
@@ -703,7 +811,7 @@ impl OptimizerCore {
             gpu_accel_active,
             true,
             category == PcCategory::Potente,
-            statuses.disable_gpu_acceleration,
+            gpu_accel_already_applied,
             gpu_accel_reason,
         );
 
@@ -713,7 +821,7 @@ impl OptimizerCore {
                 "Limpeza da Standby List (RAM)",
                 "Compatível: Universalmente suportado. Libera memória cache antes da inicialização.",
                 true,
-                statuses.empty_standby_list,
+                false,
             ),
             (
                 "apply_dpi_optimization",
@@ -726,8 +834,8 @@ impl OptimizerCore {
                 "apply_timer_resolution",
                 "Resolução do Temporizador do Sistema (0.5ms)",
                 "Compatível: Universalmente suportado. Crava o timer do kernel em 0.5ms para menor input lag.",
+                true,
                 false,
-                statuses.apply_timer_resolution,
             ),
             (
                 "apply_mmcss",
@@ -767,11 +875,12 @@ impl OptimizerCore {
         ];
 
         for (id, name, hardware_reason, is_runtime, already_applied) in universal_tweaks {
+            let active = if is_runtime { true } else { !already_applied };
             let reason = format!(
                 "{hardware_reason} | {}",
-                format_status_suffix(true, true, already_applied, is_runtime)
+                format_status_suffix(active, true, already_applied, is_runtime)
             );
-            collector.push(id, name, true, true, false, already_applied, reason);
+            collector.push(id, name, active, true, false, already_applied, reason);
         }
 
         let config = config::CustomOptimizationConfig {
@@ -780,15 +889,15 @@ impl OptimizerCore {
             cs2_priority: false,
             cs2_affinity: affinity_supported,
             disable_gpu_acceleration: gpu_accel_active,
-            apply_dpi_optimization: true,
-            disable_memory_compression: mem_comp_supported,
+            apply_dpi_optimization: !statuses.apply_dpi_optimization,
+            disable_memory_compression: mem_comp_active,
             apply_timer_resolution: true,
-            apply_mmcss: true,
-            disable_hpet: true,
-            disable_game_bar: true,
-            enable_msi: true,
-            disable_power_saving: true,
-            apply_render_queue: render_queue_supported,
+            apply_mmcss: !statuses.apply_mmcss,
+            disable_hpet: !statuses.disable_hpet,
+            disable_game_bar: !statuses.disable_game_bar,
+            enable_msi: !statuses.enable_msi,
+            disable_power_saving: !statuses.disable_power_saving,
+            apply_render_queue: render_queue_active,
         };
 
         let report = HardwareRestrictionsReport {
@@ -836,12 +945,79 @@ impl OptimizerCore {
 
     }
 
+    pub fn is_permanent_tweak_applied(&self, kind: PermanentTweakKind) -> Result<bool, CoreError> {
+        let is_applied = |res: Result<tweaks::TweakStatus, tweaks::TweakError>| -> Result<bool, CoreError> {
+            Ok(matches!(res?, tweaks::TweakStatus::Applied))
+        };
+        match kind {
+            PermanentTweakKind::DisableGpuAcceleration => Ok(tweaks::is_all_gpu_accel_disabled()?),
+            PermanentTweakKind::ApplyDpiOptimization => {
+                is_applied(tweaks::Cs2DpiOptimizationTweak.status())
+            }
+            PermanentTweakKind::DisableMemoryCompression => {
+                is_applied(tweaks::MemoryCompressionTweak.status())
+            }
+            PermanentTweakKind::ApplyMmcss => self.is_mmcss_applied_for_current_hardware(),
+            PermanentTweakKind::DisableHpet => is_applied(tweaks::HpetTweak.status()),
+            PermanentTweakKind::DisableGameBar => is_applied(tweaks::GameBarTweak.status()),
+            PermanentTweakKind::EnableMsi => Ok(tweaks::is_all_msi_enabled()?),
+            PermanentTweakKind::DisablePowerSaving => {
+                is_applied(tweaks::PcieUsbPowerSavingTweak.status())
+            }
+            PermanentTweakKind::ApplyRenderQueue => is_applied(tweaks::RenderQueueTweak.status()),
+        }
+    }
+
+    pub fn apply_permanent_tweak(&self, kind: PermanentTweakKind) -> Result<(), CoreError> {
+        match kind {
+            PermanentTweakKind::DisableGpuAcceleration => self.disable_all_gpu_acceleration(),
+            PermanentTweakKind::ApplyDpiOptimization => self.apply_dpi_optimization(),
+            PermanentTweakKind::DisableMemoryCompression => self.disable_memory_compression(),
+            PermanentTweakKind::ApplyMmcss => self.apply_all_mmcss().map(|_| ()),
+            PermanentTweakKind::DisableHpet => self.disable_hpet(),
+            PermanentTweakKind::DisableGameBar => self.disable_all_game_bar_features(),
+            PermanentTweakKind::EnableMsi => self.enable_all_msi(),
+            PermanentTweakKind::DisablePowerSaving => self.disable_all_power_saving(),
+            PermanentTweakKind::ApplyRenderQueue => self.apply_render_queue(),
+        }
+    }
+
+    /// Verifica uma otimização permanente respeitando a flag do JSON:
+    /// se `false`, pula o teste de status e a execução; se `true`, testa o status,
+    /// aplica apenas se pendente e atualiza a flag para `false` quando já estiver aplicada.
+    pub fn check_and_apply_permanent_tweak(
+        &self,
+        cfg: &mut config::CustomOptimizationConfig,
+        kind: PermanentTweakKind,
+    ) -> PermanentTweakSyncOutcome {
+        if !kind.is_enabled_in(cfg) {
+            return PermanentTweakSyncOutcome::SkippedDisabled;
+        }
+
+        match self.is_permanent_tweak_applied(kind) {
+            Ok(true) => {
+                kind.set_enabled_in(cfg, false);
+                PermanentTweakSyncOutcome::AlreadyApplied
+            }
+            Ok(false) => {
+                if self.apply_permanent_tweak(kind).is_ok() {
+                    kind.set_enabled_in(cfg, false);
+                    PermanentTweakSyncOutcome::AppliedNow
+                } else {
+                    PermanentTweakSyncOutcome::Failed
+                }
+            }
+            Err(_) => PermanentTweakSyncOutcome::Failed,
+        }
+    }
+
     pub fn launch_custom(
         &self,
         config_path: Option<&Path>,
         timeout: std::time::Duration,
     ) -> Result<CustomLaunchReport, CoreError> {
         let (_resolved_path, mut cfg) = self.load_or_create_custom_config(config_path)?;
+        let mut config_dirty = false;
 
         let mut report = CustomLaunchReport {
             config: cfg.clone(),
@@ -850,11 +1026,14 @@ impl OptimizerCore {
         };
 
         if let Ok((hw_info, _)) = self.get_hardware_profile() {
+            let before = cfg.clone();
             let blocked = enforce_hardware_restrictions_for_info(&mut cfg, &hw_info);
+            if cfg != before {
+                config_dirty = true;
+            }
             for b in blocked {
                 report.skipped_tweaks.push(Box::leak(b.into_boxed_str()));
             }
-            report.config = cfg.clone();
         };
 
         if cfg.empty_standby_list {
@@ -864,44 +1043,24 @@ impl OptimizerCore {
             }
         }
 
-        if cfg.disable_gpu_acceleration {
-            match tweaks::is_all_gpu_accel_disabled() {
-                Ok(true) => report.skipped_tweaks.push("Desativar Aceleração de GPU em Apps"),
-                Ok(false) => {
-                    if self.disable_all_gpu_acceleration().is_ok() {
-                        report.applied_tweaks.push("Desativar Aceleração de GPU em Apps");
-                    } else {
-                        report.skipped_tweaks.push("Desativar Aceleração de GPU em Apps [não aplicado]");
-                    }
+        let pre_timer_permanents = [
+            PermanentTweakKind::DisableGpuAcceleration,
+            PermanentTweakKind::ApplyDpiOptimization,
+            PermanentTweakKind::DisableMemoryCompression,
+        ];
+        for kind in pre_timer_permanents {
+            match self.check_and_apply_permanent_tweak(&mut cfg, kind) {
+                PermanentTweakSyncOutcome::SkippedDisabled => {}
+                PermanentTweakSyncOutcome::AlreadyApplied => {
+                    config_dirty = true;
+                    report.skipped_tweaks.push(kind.display_name());
                 }
-                Err(_) => report.skipped_tweaks.push("Desativar Aceleração de GPU em Apps [ignorado]"),
-            }
-        }
-
-        if cfg.apply_dpi_optimization {
-            match tweaks::Cs2DpiOptimizationTweak.status() {
-                Ok(tweaks::TweakStatus::Applied) => {
-                    report.skipped_tweaks.push("Otimização de DPI e Modo Janela");
+                PermanentTweakSyncOutcome::AppliedNow => {
+                    config_dirty = true;
+                    report.applied_tweaks.push(kind.display_name());
                 }
-                _ => {
-                    if self.apply_dpi_optimization().is_ok() {
-                        report.applied_tweaks.push("Otimização de DPI e Modo Janela");
-                    } else {
-                        report.skipped_tweaks.push("Otimização de DPI e Modo Janela [não aplicado]");
-                    }
-                }
-            }
-        }
-
-        if cfg.disable_memory_compression {
-            match self.get_memory_compression_status() {
-                Ok(false) => report.skipped_tweaks.push("Desativação da Compactação de Memória"),
-                _ => {
-                    if self.disable_memory_compression().is_ok() {
-                        report.applied_tweaks.push("Desativação da Compactação de Memória");
-                    } else {
-                        report.skipped_tweaks.push("Desativação da Compactação de Memória [requer Administrador/RAM > 16GB]");
-                    }
+                PermanentTweakSyncOutcome::Failed => {
+                    report.skipped_tweaks.push(kind.failure_label());
                 }
             }
         }
@@ -914,121 +1073,53 @@ impl OptimizerCore {
             }
         }
 
-        if cfg.apply_mmcss {
-            match self.is_mmcss_applied_for_current_hardware() {
-                Ok(true) => report.skipped_tweaks.push("Otimização do Agendador Multimídia (MMCSS)"),
-                _ => {
-                    if self.apply_all_mmcss().is_ok() {
-                        report.applied_tweaks.push("Otimização do Agendador Multimídia (MMCSS)");
-                    } else {
-                        report.skipped_tweaks.push("Otimização do Agendador Multimídia (MMCSS) [requer Administrador]");
-                    }
+        let post_timer_permanents = [
+            PermanentTweakKind::ApplyMmcss,
+            PermanentTweakKind::DisableHpet,
+            PermanentTweakKind::DisableGameBar,
+            PermanentTweakKind::EnableMsi,
+            PermanentTweakKind::DisablePowerSaving,
+            PermanentTweakKind::ApplyRenderQueue,
+        ];
+        for kind in post_timer_permanents {
+            match self.check_and_apply_permanent_tweak(&mut cfg, kind) {
+                PermanentTweakSyncOutcome::SkippedDisabled => {}
+                PermanentTweakSyncOutcome::AlreadyApplied => {
+                    config_dirty = true;
+                    report.skipped_tweaks.push(kind.display_name());
+                }
+                PermanentTweakSyncOutcome::AppliedNow => {
+                    config_dirty = true;
+                    report.applied_tweaks.push(kind.display_name());
+                }
+                PermanentTweakSyncOutcome::Failed => {
+                    report.skipped_tweaks.push(kind.failure_label());
                 }
             }
         }
 
-        if cfg.disable_hpet {
-            match self.get_hpet_status() {
-                Ok(tweaks::HpetStatus::Disabled) => report.skipped_tweaks.push("Desativação do HPET"),
-                _ => {
-                    if self.disable_hpet().is_ok() {
-                        report.applied_tweaks.push("Desativação do HPET");
-                    } else {
-                        report.skipped_tweaks.push("Desativação do HPET [requer Administrador]");
-                    }
-                }
-            }
+        if config_dirty {
+            let _ = cfg.save_to_file(&_resolved_path);
         }
-
-        if cfg.disable_game_bar {
-            match self.get_game_bar_status() {
-                Ok(status) if status.is_all_disabled() => {
-                    report.skipped_tweaks.push("Desativação do Xbox Game Bar e GameDVR");
-                }
-                _ => {
-                    if self.disable_all_game_bar_features().is_ok() {
-                        report.applied_tweaks.push("Desativação do Xbox Game Bar e GameDVR");
-                    } else {
-                        report.skipped_tweaks.push("Desativação do Xbox Game Bar e GameDVR [requer Administrador]");
-                    }
-                }
-            }
-        }
-
-        if cfg.enable_msi {
-            match tweaks::is_all_msi_enabled() {
-                Ok(true) => report.skipped_tweaks.push("Ativação do Modo MSI"),
-                _ => {
-                    if self.enable_all_msi().is_ok() {
-                        report.applied_tweaks.push("Ativação do Modo MSI");
-                    } else {
-                        report.skipped_tweaks.push("Ativação do Modo MSI [requer Administrador]");
-                    }
-                }
-            }
-        }
-
-        if cfg.disable_power_saving {
-            match self.get_power_saving_status() {
-                Ok(status) if status.is_all_optimized() => {
-                    report.skipped_tweaks.push("Desativação de Economia de Energia PCIe e USB");
-                }
-                _ => {
-                    if self.disable_all_power_saving().is_ok() {
-                        report.applied_tweaks.push("Desativação de Economia de Energia PCIe e USB");
-                    } else {
-                        report.skipped_tweaks.push("Desativação de Economia de Energia PCIe e USB [requer Administrador]");
-                    }
-                }
-            }
-        }
-
-        if cfg.apply_render_queue {
-            match self.get_render_queue_status() {
-                Ok(status) if status.is_all_optimized() => {
-                    report.skipped_tweaks.push("Fila de Quadros Renderizados (Render Queue)");
-                }
-                _ => {
-                    if self.apply_render_queue().is_ok() {
-                        report.applied_tweaks.push("Fila de Quadros Renderizados (Render Queue)");
-                    } else {
-                        report.skipped_tweaks.push("Fila de Quadros Renderizados [requer Administrador]");
-                    }
-                }
-            }
-        }
+        report.config = cfg.clone();
 
         windows_api::launch_cs2_with_args_slice(&cfg.launch_args)?;
         let process_found = windows_api::wait_for_process("cs2", timeout).is_ok();
 
         if process_found {
             if cfg.cs2_priority {
-                match tweaks::Cs2PriorityTweak.status() {
-                    Ok(tweaks::TweakStatus::Applied) => {
-                        report.skipped_tweaks.push("Prioridade em Tempo Real do CS2");
-                    }
-                    _ => {
-                        if tweaks::Cs2PriorityTweak.apply().is_ok() {
-                            report.applied_tweaks.push("Prioridade em Tempo Real do CS2");
-                        } else {
-                            report.skipped_tweaks.push("Prioridade em Tempo Real do CS2 [requer Administrador]");
-                        }
-                    }
+                if tweaks::Cs2PriorityTweak.apply().is_ok() {
+                    report.applied_tweaks.push("Prioridade em Tempo Real do CS2");
+                } else {
+                    report.skipped_tweaks.push("Prioridade em Tempo Real do CS2 [requer Administrador]");
                 }
             }
 
             if cfg.cs2_affinity {
-                match tweaks::Cs2AffinityTweak.status() {
-                    Ok(tweaks::TweakStatus::Applied) => {
-                        report.skipped_tweaks.push("Afinidade de Processador do CS2 (sem Core 0)");
-                    }
-                    _ => {
-                        if tweaks::Cs2AffinityTweak.apply().is_ok() {
-                            report.applied_tweaks.push("Afinidade de Processador do CS2 (sem Core 0)");
-                        } else {
-                            report.skipped_tweaks.push("Afinidade de Processador do CS2 [não aplicado]");
-                        }
-                    }
+                if tweaks::Cs2AffinityTweak.apply().is_ok() {
+                    report.applied_tweaks.push("Afinidade de Processador do CS2 (sem Core 0)");
+                } else {
+                    report.skipped_tweaks.push("Afinidade de Processador do CS2 [não aplicado]");
                 }
             }
         } else {
@@ -1044,10 +1135,15 @@ impl OptimizerCore {
         config_path: Option<&Path>,
     ) -> Result<Vec<TweakExecutionResult>, CoreError> {
         let (_resolved_path, mut cfg) = self.load_or_create_custom_config(config_path)?;
+        let mut config_dirty = false;
         let mut results = Vec::new();
 
         if let Ok((hw_info, _)) = self.get_hardware_profile() {
+            let before = cfg.clone();
             let blocked = enforce_hardware_restrictions_for_info(&mut cfg, &hw_info);
+            if cfg != before {
+                config_dirty = true;
+            }
             for b in blocked {
                 results.push(TweakExecutionResult {
                     id: "hardware_restriction".to_string(),
@@ -1075,56 +1171,41 @@ impl OptimizerCore {
             }
         }
 
-        if cfg.disable_gpu_acceleration {
-            match tweaks::is_all_gpu_accel_disabled() {
-                Ok(true) => results.push(TweakExecutionResult {
-                    id: "gpu_accel".into(),
-                    name: "Desativar Aceleração de GPU em Apps".into(),
-                    success: true,
-                    message: "Já desativada em navegadores e apps de suporte.".into(),
-                }),
-                _ => {
-                    let res = self.disable_all_gpu_acceleration();
+        let pre_timer_permanents = [
+            PermanentTweakKind::DisableGpuAcceleration,
+            PermanentTweakKind::ApplyDpiOptimization,
+            PermanentTweakKind::DisableMemoryCompression,
+        ];
+        for kind in pre_timer_permanents {
+            match self.check_and_apply_permanent_tweak(&mut cfg, kind) {
+                PermanentTweakSyncOutcome::SkippedDisabled => {}
+                PermanentTweakSyncOutcome::AlreadyApplied => {
+                    config_dirty = true;
                     results.push(TweakExecutionResult {
-                        id: "gpu_accel".into(),
-                        name: "Desativar Aceleração de GPU em Apps".into(),
-                        success: res.is_ok(),
-                        message: if res.is_ok() {
-                            "Aceleração de GPU desativada em apps secundários.".into()
-                        } else {
-                            "Não foi possível desativar aceleração de GPU em todos os apps.".into()
-                        },
+                        id: kind.id().into(),
+                        name: kind.display_name().into(),
+                        success: true,
+                        message: "Já otimizado no sistema (preservado sem reaplicar).".into(),
+                    });
+                }
+                PermanentTweakSyncOutcome::AppliedNow => {
+                    config_dirty = true;
+                    results.push(TweakExecutionResult {
+                        id: kind.id().into(),
+                        name: kind.display_name().into(),
+                        success: true,
+                        message: "Otimização aplicada com sucesso.".into(),
+                    });
+                }
+                PermanentTweakSyncOutcome::Failed => {
+                    results.push(TweakExecutionResult {
+                        id: kind.id().into(),
+                        name: kind.display_name().into(),
+                        success: false,
+                        message: kind.failure_label().into(),
                     });
                 }
             }
-        }
-
-        if cfg.apply_dpi_optimization {
-            let res = self.apply_dpi_optimization();
-            results.push(TweakExecutionResult {
-                id: "dpi_optimization".into(),
-                name: "Otimização de DPI e Modo Janela".into(),
-                success: res.is_ok(),
-                message: if res.is_ok() {
-                    "Otimizações de tela cheia e DPI aplicadas.".into()
-                } else {
-                    "Falha ao aplicar otimização de DPI.".into()
-                },
-            });
-        }
-
-        if cfg.disable_memory_compression {
-            let res = self.disable_memory_compression();
-            results.push(TweakExecutionResult {
-                id: "memory_compression".into(),
-                name: "Desativação da Compactação de Memória".into(),
-                success: res.is_ok(),
-                message: if res.is_ok() {
-                    "Compactação de memória desativada.".into()
-                } else {
-                    "Falha ou permissão insuficiente para compactação de memória.".into()
-                },
-            });
         }
 
         if cfg.apply_timer_resolution {
@@ -1141,88 +1222,48 @@ impl OptimizerCore {
             });
         }
 
-        if cfg.apply_mmcss {
-            let res = self.apply_all_mmcss();
-            results.push(TweakExecutionResult {
-                id: "mmcss".into(),
-                name: "Otimização do Agendador Multimídia (MMCSS)".into(),
-                success: res.is_ok(),
-                message: if res.is_ok() {
-                    "Prioridade MMCSS configurada para jogos.".into()
-                } else {
-                    "Falha ao ajustar MMCSS.".into()
-                },
-            });
+        let post_timer_permanents = [
+            PermanentTweakKind::ApplyMmcss,
+            PermanentTweakKind::DisableHpet,
+            PermanentTweakKind::DisableGameBar,
+            PermanentTweakKind::EnableMsi,
+            PermanentTweakKind::DisablePowerSaving,
+            PermanentTweakKind::ApplyRenderQueue,
+        ];
+        for kind in post_timer_permanents {
+            match self.check_and_apply_permanent_tweak(&mut cfg, kind) {
+                PermanentTweakSyncOutcome::SkippedDisabled => {}
+                PermanentTweakSyncOutcome::AlreadyApplied => {
+                    config_dirty = true;
+                    results.push(TweakExecutionResult {
+                        id: kind.id().into(),
+                        name: kind.display_name().into(),
+                        success: true,
+                        message: "Já otimizado no sistema (preservado sem reaplicar).".into(),
+                    });
+                }
+                PermanentTweakSyncOutcome::AppliedNow => {
+                    config_dirty = true;
+                    results.push(TweakExecutionResult {
+                        id: kind.id().into(),
+                        name: kind.display_name().into(),
+                        success: true,
+                        message: "Otimização aplicada com sucesso.".into(),
+                    });
+                }
+                PermanentTweakSyncOutcome::Failed => {
+                    results.push(TweakExecutionResult {
+                        id: kind.id().into(),
+                        name: kind.display_name().into(),
+                        success: false,
+                        message: kind.failure_label().into(),
+                    });
+                }
+            }
         }
 
-        if cfg.disable_hpet {
-            let res = self.disable_hpet();
-            results.push(TweakExecutionResult {
-                id: "hpet".into(),
-                name: "Desativação do HPET".into(),
-                success: res.is_ok(),
-                message: if res.is_ok() {
-                    "HPET desativado com sucesso.".into()
-                } else {
-                    "Falha ao desativar HPET.".into()
-                },
-            });
-        }
-
-        if cfg.disable_game_bar {
-            let res = self.disable_all_game_bar_features();
-            results.push(TweakExecutionResult {
-                id: "game_bar".into(),
-                name: "Desativação do Xbox Game Bar e GameDVR".into(),
-                success: res.is_ok(),
-                message: if res.is_ok() {
-                    "Xbox Game Bar e GameDVR desativados.".into()
-                } else {
-                    "Falha ao desativar Xbox Game Bar.".into()
-                },
-            });
-        }
-
-        if cfg.enable_msi {
-            let res = self.enable_all_msi();
-            results.push(TweakExecutionResult {
-                id: "msi".into(),
-                name: "Ativação do Modo MSI".into(),
-                success: res.is_ok(),
-                message: if res.is_ok() {
-                    "Modo MSI ativado para dispositivos compatíveis.".into()
-                } else {
-                    "Falha ao configurar Modo MSI.".into()
-                },
-            });
-        }
-
-        if cfg.disable_power_saving {
-            let res = self.disable_all_power_saving();
-            results.push(TweakExecutionResult {
-                id: "power_saving".into(),
-                name: "Desativação de Economia de Energia PCIe e USB".into(),
-                success: res.is_ok(),
-                message: if res.is_ok() {
-                    "Economia de energia PCIe e USB desativada.".into()
-                } else {
-                    "Falha ao desativar economia de energia.".into()
-                },
-            });
-        }
-
-        if cfg.apply_render_queue {
-            let res = self.apply_render_queue();
-            results.push(TweakExecutionResult {
-                id: "render_queue".into(),
-                name: "Fila de Quadros Renderizados (Render Queue)".into(),
-                success: res.is_ok(),
-                message: if res.is_ok() {
-                    "Fila de quadros otimizada para baixa latência.".into()
-                } else {
-                    "Falha ao configurar fila de renderização.".into()
-                },
-            });
+        if config_dirty {
+            let _ = cfg.save_to_file(&_resolved_path);
         }
 
         let is_running = if let Some(p) = pid {
@@ -1767,13 +1808,7 @@ pub fn enforce_hardware_restrictions_for_info(
     }
 
     if config.apply_render_queue {
-        let gpu_lower = hardware.gpu.model.to_lowercase();
-        let is_nvidia = gpu_lower.contains("nvidia")
-            || gpu_lower.contains("geforce")
-            || gpu_lower.contains("rtx")
-            || gpu_lower.contains("gtx")
-            || tweaks::is_nvidia_smi_available();
-        let is_amd = gpu_lower.contains("amd") || gpu_lower.contains("radeon");
+        let (is_nvidia, is_amd) = detect_supported_gpu_vendor(hardware);
         if !is_nvidia && !is_amd {
             config.apply_render_queue = false;
             blocked.push(format!(
@@ -1997,17 +2032,27 @@ mod tests {
             .evaluate_autodetect_for_hardware_and_status(hw, PcCategory::Intermediario, &statuses)
             .expect("Falha ao avaliar hardware + status");
 
-        // AutoDetect.json deve permanecer ativo para tudo que é recomendado para o hardware
-        assert!(cfg.apply_dpi_optimization);
-        assert!(cfg.apply_mmcss);
+        // Otimizações de inicialização ficam true (exceto cs2_priority opcional);
+        // permanentes já aplicadas ficam false e pendentes ficam true.
+        assert!(cfg.empty_standby_list);
+        assert!(cfg.apply_timer_resolution);
+        assert!(cfg.cs2_affinity);
+        assert!(!cfg.cs2_priority);
+        assert!(!cfg.apply_dpi_optimization);
+        assert!(!cfg.apply_mmcss);
+        assert!(!cfg.disable_game_bar);
+        assert!(!cfg.enable_msi);
         assert!(cfg.disable_hpet);
         assert!(cfg.disable_gpu_acceleration);
         assert!(cfg.apply_render_queue);
-        assert!(!cfg.cs2_priority);
+        assert!(cfg.disable_memory_compression);
+        assert!(cfg.disable_power_saving);
 
         // Relatório distingue o que já estava otimizado do que ainda precisa ser aplicado
         assert!(report.is_already_applied("apply_dpi_optimization"));
         assert!(!report.needs_optimization("apply_dpi_optimization"));
+        assert!(!report.is_already_applied("apply_timer_resolution"));
+        assert!(report.needs_optimization("apply_timer_resolution"));
         assert!(!report.is_already_applied("disable_hpet"));
         assert!(report.needs_optimization("disable_hpet"));
         assert!(report.already_optimized_tweaks.contains(&"apply_dpi_optimization".to_string()));
@@ -2047,6 +2092,7 @@ mod tests {
             )
             .expect("Falha ao avaliar hardware com GPU integrada");
         assert!(!cfg_igpu.apply_render_queue);
+        assert!(!cfg_igpu.disable_game_bar);
         assert!(!report_igpu.is_already_applied("apply_render_queue"));
         assert!(!report_igpu.needs_optimization("apply_render_queue"));
         assert!(!report_igpu.blocked_tweaks.is_empty());
@@ -2084,50 +2130,19 @@ mod tests {
         let raw_json = std::fs::read_to_string(&autodetect_path).expect("Falha ao ler AutoDetect.json gerado");
         let parsed: serde_json::Value = serde_json::from_str(&raw_json).expect("Falha ao parsear AutoDetect.json");
 
-        // Regras de hardware definem o AutoDetect.json
+        // Regras de hardware + status definem o AutoDetect.json
         let expected_affinity = report.hardware.cpu.physical_cores > 4;
         let expected_mem_comp = report.hardware.ram.total_gb > 16.0;
         let expected_gpu_accel_flag = report.category != PcCategory::Potente;
-        let gpu_lower = report.hardware.gpu.model.to_lowercase();
-        let expected_render_queue_flag = gpu_lower.contains("nvidia")
-            || gpu_lower.contains("geforce")
-            || gpu_lower.contains("rtx")
-            || gpu_lower.contains("gtx")
-            || gpu_lower.contains("amd")
-            || gpu_lower.contains("radeon")
-            || (gpu_lower.is_empty() && tweaks::is_nvidia_smi_available());
+        let (is_nvidia, is_amd) = detect_supported_gpu_vendor(&report.hardware);
+        let expected_render_queue_flag = is_nvidia || is_amd;
 
-        assert_eq!(config.empty_standby_list, true);
-        assert_eq!(parsed["empty_standby_list"], true);
-        assert_eq!(config.cs2_priority, false);
-        assert_eq!(parsed["cs2_priority"], false);
-        assert_eq!(config.cs2_affinity, expected_affinity);
-        assert_eq!(parsed["cs2_affinity"], expected_affinity);
-        assert_eq!(config.disable_memory_compression, expected_mem_comp);
-        assert_eq!(parsed["disable_memory_compression"], expected_mem_comp);
-        assert_eq!(config.disable_gpu_acceleration, expected_gpu_accel_flag);
-        assert_eq!(parsed["disable_gpu_acceleration"], expected_gpu_accel_flag);
-        assert_eq!(config.apply_render_queue, expected_render_queue_flag);
-        assert_eq!(parsed["apply_render_queue"], expected_render_queue_flag);
-        assert_eq!(config.apply_timer_resolution, true);
-        assert_eq!(config.apply_dpi_optimization, true);
-        assert_eq!(config.apply_mmcss, true);
-        assert_eq!(config.disable_hpet, true);
-        assert_eq!(config.disable_game_bar, true);
-        assert_eq!(config.enable_msi, true);
-        assert_eq!(config.disable_power_saving, true);
-
-        // Relatório também reflete exatamente os verificadores atuais do SO
-        let cs2_running = windows_api::is_cs2_process_running_win32().unwrap_or(false);
-        let expected_priority_applied = cs2_running
-            && matches!(tweaks::Cs2PriorityTweak.status(), Ok(tweaks::TweakStatus::Applied));
+        // Permanentes passam por verificação de status
         let expected_gpu_accel_applied = tweaks::is_all_gpu_accel_disabled().unwrap_or(false);
         let expected_dpi_applied =
             matches!(tweaks::Cs2DpiOptimizationTweak.status(), Ok(tweaks::TweakStatus::Applied));
-        let expected_mem_comp_applied =
-            matches!(tweaks::MemoryCompressionTweak.status(), Ok(tweaks::TweakStatus::Applied));
-        let expected_timer_applied =
-            matches!(tweaks::TimerResolutionTweak.status(), Ok(tweaks::TweakStatus::Applied));
+        let expected_mem_comp_applied = expected_mem_comp
+            && matches!(tweaks::MemoryCompressionTweak.status(), Ok(tweaks::TweakStatus::Applied));
         let expected_mmcss_applied = tweaks::is_mmcss_applied_for_hardware_specs(
             report.hardware.cpu.physical_cores,
             report.hardware.ram.total_gb,
@@ -2143,11 +2158,61 @@ mod tests {
         let expected_render_queue_applied = expected_render_queue_flag
             && matches!(tweaks::RenderQueueTweak.status(), Ok(tweaks::TweakStatus::Applied));
 
-        assert_eq!(report.is_already_applied("cs2_priority"), expected_priority_applied);
+        // Otimizações executadas na inicialização nunca rodam testes de status e seguem regras fixas
+        assert_eq!(config.empty_standby_list, true);
+        assert_eq!(parsed["empty_standby_list"], true);
+        assert_eq!(config.apply_timer_resolution, true);
+        assert_eq!(parsed["apply_timer_resolution"], true);
+        assert_eq!(config.cs2_priority, false);
+        assert_eq!(parsed["cs2_priority"], false);
+        assert_eq!(config.cs2_affinity, expected_affinity);
+        assert_eq!(parsed["cs2_affinity"], expected_affinity);
+
+        // Permanentes ficam false quando já aplicadas, true apenas quando compatíveis e pendentes
+        assert_eq!(
+            config.disable_memory_compression,
+            expected_mem_comp && !expected_mem_comp_applied
+        );
+        assert_eq!(
+            parsed["disable_memory_compression"],
+            expected_mem_comp && !expected_mem_comp_applied
+        );
+        assert_eq!(
+            config.disable_gpu_acceleration,
+            expected_gpu_accel_flag && !expected_gpu_accel_applied
+        );
+        assert_eq!(
+            parsed["disable_gpu_acceleration"],
+            expected_gpu_accel_flag && !expected_gpu_accel_applied
+        );
+        assert_eq!(
+            config.apply_render_queue,
+            expected_render_queue_flag && !expected_render_queue_applied
+        );
+        assert_eq!(
+            parsed["apply_render_queue"],
+            expected_render_queue_flag && !expected_render_queue_applied
+        );
+        assert_eq!(config.apply_dpi_optimization, !expected_dpi_applied);
+        assert_eq!(parsed["apply_dpi_optimization"], !expected_dpi_applied);
+        assert_eq!(config.apply_mmcss, !expected_mmcss_applied);
+        assert_eq!(parsed["apply_mmcss"], !expected_mmcss_applied);
+        assert_eq!(config.disable_hpet, !expected_hpet_applied);
+        assert_eq!(parsed["disable_hpet"], !expected_hpet_applied);
+        assert_eq!(config.disable_game_bar, !expected_game_bar_applied);
+        assert_eq!(parsed["disable_game_bar"], !expected_game_bar_applied);
+        assert_eq!(config.enable_msi, !expected_msi_applied);
+        assert_eq!(parsed["enable_msi"], !expected_msi_applied);
+        assert_eq!(config.disable_power_saving, !expected_power_saving_applied);
+        assert_eq!(parsed["disable_power_saving"], !expected_power_saving_applied);
+
+        assert!(!report.is_already_applied("empty_standby_list"));
+        assert!(!report.is_already_applied("cs2_priority"));
+        assert!(!report.is_already_applied("cs2_affinity"));
+        assert!(!report.is_already_applied("apply_timer_resolution"));
         assert_eq!(report.is_already_applied("disable_gpu_acceleration"), expected_gpu_accel_applied);
         assert_eq!(report.is_already_applied("apply_dpi_optimization"), expected_dpi_applied);
         assert_eq!(report.is_already_applied("disable_memory_compression"), expected_mem_comp_applied);
-        assert_eq!(report.is_already_applied("apply_timer_resolution"), expected_timer_applied);
         assert_eq!(report.is_already_applied("apply_mmcss"), expected_mmcss_applied);
         assert_eq!(report.is_already_applied("disable_hpet"), expected_hpet_applied);
         assert_eq!(report.is_already_applied("disable_game_bar"), expected_game_bar_applied);
@@ -2162,6 +2227,66 @@ mod tests {
                 eval.active && !eval.already_applied,
                 "Invariante needs_optimization falhou para '{}'",
                 eval.id
+            );
+        }
+    }
+
+    #[test]
+    fn test_permanent_tweaks_skip_when_false_and_update_when_applied() {
+        let core = OptimizerCore::new();
+        let mut cfg = config::CustomOptimizationConfig::all_disabled();
+
+        // Quando todas as permanentes estão false, nenhum teste de status é executado
+        for kind in PermanentTweakKind::ALL {
+            assert_eq!(
+                core.check_and_apply_permanent_tweak(&mut cfg, kind),
+                PermanentTweakSyncOutcome::SkippedDisabled,
+                "Otimização '{:?}' marcada como false deveria pular teste de status",
+                kind
+            );
+        }
+
+        // Otimizações marcadas como false em AutoDetect.json são puladas na inicialização
+        let temp_dir = tempfile::tempdir().expect("Falha ao criar diretório temporário");
+        let autodetect_path = temp_dir.path().join("AutoDetect.json");
+        let mut initial_cfg = config::CustomOptimizationConfig::default();
+
+        // Verifica que default() tem true apenas nas otimizações de inicialização (sem cs2_priority)
+        assert!(initial_cfg.empty_standby_list);
+        assert!(initial_cfg.cs2_affinity);
+        assert!(initial_cfg.apply_timer_resolution);
+        assert!(!initial_cfg.cs2_priority);
+        for kind in PermanentTweakKind::ALL {
+            assert!(
+                !kind.is_enabled_in(&initial_cfg),
+                "Otimização permanente '{:?}' deve ser false por padrão",
+                kind
+            );
+        }
+
+        // Simula DPI já otimizada no SO, porém marcada como true no arquivo JSON
+        let dpi_applied =
+            matches!(tweaks::Cs2DpiOptimizationTweak.status(), Ok(tweaks::TweakStatus::Applied));
+        initial_cfg.empty_standby_list = false;
+        initial_cfg.apply_timer_resolution = false;
+        initial_cfg.cs2_affinity = false;
+        initial_cfg.cs2_priority = false;
+        if dpi_applied {
+            initial_cfg.apply_dpi_optimization = true;
+            initial_cfg.save_to_file(&autodetect_path).expect("Falha ao salvar JSON");
+
+            let results = core
+                .optimize_running_cs2(None, Some(&autodetect_path))
+                .expect("Falha ao executar optimize_running_cs2");
+            assert_eq!(results.len(), 1);
+            assert_eq!(results[0].id, "apply_dpi_optimization");
+            assert!(results[0].success);
+
+            let updated = config::CustomOptimizationConfig::load_from_file(&autodetect_path)
+                .expect("Falha ao recarregar JSON");
+            assert!(
+                !updated.apply_dpi_optimization,
+                "Otimização permanente já aplicada deve ser marcada como false no arquivo"
             );
         }
     }

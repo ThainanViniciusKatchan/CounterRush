@@ -374,10 +374,21 @@ fn update_auto_optimize_ui(
 struct AutoTweakStep {
     progress: f32,
     tweak_id: &'static str,
+    permanent_kind: Option<counterrush_core::PermanentTweakKind>,
     enabled_in_config: bool,
     applying_label: &'static str,
     already_label: &'static str,
     skipped_label: &'static str,
+    session_tweak: Option<AppliedSessionTweak>,
+    apply_fn: fn(&counterrush_core::OptimizerCore) -> bool,
+}
+
+struct ConfiguredTweakStep {
+    enabled_in_config: bool,
+    progress: f32,
+    applying_label: &'static str,
+    already_label: &'static str,
+    permanent_kind: Option<counterrush_core::PermanentTweakKind>,
     session_tweak: Option<AppliedSessionTweak>,
     apply_fn: fn(&counterrush_core::OptimizerCore) -> bool,
 }
@@ -437,7 +448,7 @@ fn run_auto_optimize_flow(
 
     // Etapa 1: Avaliação Combinada (Hardware + Status atual do SO)
     update_auto_optimize_ui(ui, 0.16, "Analisando hardware e otimizações existentes...");
-    let (config, report) = match core.generate_autodetect_config() {
+    let (mut config, report) = match core.generate_autodetect_config() {
         Ok(res) => res,
         Err(e) => {
             post_ui(ui, move |ui| {
@@ -462,6 +473,7 @@ fn run_auto_optimize_flow(
         AutoTweakStep {
             progress: 0.23,
             tweak_id: "apply_timer_resolution",
+            permanent_kind: None,
             enabled_in_config: config.apply_timer_resolution,
             applying_label: "Otimizando resolução do temporizador (0.5ms)...",
             already_label: "Resolução do temporizador (0.5ms) já configurada — preservada.",
@@ -472,6 +484,7 @@ fn run_auto_optimize_flow(
         AutoTweakStep {
             progress: 0.31,
             tweak_id: "apply_mmcss",
+            permanent_kind: Some(counterrush_core::PermanentTweakKind::ApplyMmcss),
             enabled_in_config: config.apply_mmcss,
             applying_label: "Configurando agendador multimídia e rede (MMCSS)...",
             already_label: "Agendador multimídia (MMCSS) já otimizado — preservado.",
@@ -482,6 +495,7 @@ fn run_auto_optimize_flow(
         AutoTweakStep {
             progress: 0.39,
             tweak_id: "apply_dpi_optimization",
+            permanent_kind: Some(counterrush_core::PermanentTweakKind::ApplyDpiOptimization),
             enabled_in_config: config.apply_dpi_optimization,
             applying_label: "Ajustando DPI e compatibilidade de tela inteira CS2...",
             already_label: "Otimização de DPI já configurada — preservada.",
@@ -492,6 +506,7 @@ fn run_auto_optimize_flow(
         AutoTweakStep {
             progress: 0.47,
             tweak_id: "disable_gpu_acceleration",
+            permanent_kind: Some(counterrush_core::PermanentTweakKind::DisableGpuAcceleration),
             enabled_in_config: config.disable_gpu_acceleration,
             applying_label: "Desativando aceleração de GPU em aplicativos secundários...",
             already_label: "Aceleração de GPU em apps já desativada — preservada.",
@@ -502,6 +517,7 @@ fn run_auto_optimize_flow(
         AutoTweakStep {
             progress: 0.55,
             tweak_id: "disable_memory_compression",
+            permanent_kind: Some(counterrush_core::PermanentTweakKind::DisableMemoryCompression),
             enabled_in_config: config.disable_memory_compression,
             applying_label: "Desativando compactação de memória do Windows...",
             already_label: "Compactação de memória já desativada — preservada.",
@@ -512,6 +528,7 @@ fn run_auto_optimize_flow(
         AutoTweakStep {
             progress: 0.62,
             tweak_id: "empty_standby_list",
+            permanent_kind: None,
             enabled_in_config: config.empty_standby_list,
             applying_label: "Liberando cache de memória RAM em Standby...",
             already_label: "Standby List já verificada.",
@@ -522,6 +539,7 @@ fn run_auto_optimize_flow(
         AutoTweakStep {
             progress: 0.69,
             tweak_id: "disable_hpet",
+            permanent_kind: Some(counterrush_core::PermanentTweakKind::DisableHpet),
             enabled_in_config: config.disable_hpet,
             applying_label: "Desativando HPET no BCD do Windows...",
             already_label: "HPET já desativado no sistema — preservado.",
@@ -532,6 +550,7 @@ fn run_auto_optimize_flow(
         AutoTweakStep {
             progress: 0.76,
             tweak_id: "disable_game_bar",
+            permanent_kind: Some(counterrush_core::PermanentTweakKind::DisableGameBar),
             enabled_in_config: config.disable_game_bar,
             applying_label: "Desativando Xbox Game Bar e capturas GameDVR...",
             already_label: "Xbox Game Bar / GameDVR já desativados — preservados.",
@@ -542,6 +561,7 @@ fn run_auto_optimize_flow(
         AutoTweakStep {
             progress: 0.83,
             tweak_id: "enable_msi",
+            permanent_kind: Some(counterrush_core::PermanentTweakKind::EnableMsi),
             enabled_in_config: config.enable_msi,
             applying_label: "Ativando Modo MSI para GPU e periféricos...",
             already_label: "Modo MSI já habilitado nos dispositivos — preservado.",
@@ -552,6 +572,7 @@ fn run_auto_optimize_flow(
         AutoTweakStep {
             progress: 0.90,
             tweak_id: "disable_power_saving",
+            permanent_kind: Some(counterrush_core::PermanentTweakKind::DisablePowerSaving),
             enabled_in_config: config.disable_power_saving,
             applying_label: "Desativando suspensão de energia PCIe e USB...",
             already_label: "Economia de energia PCIe/USB já desativada — preservada.",
@@ -562,6 +583,7 @@ fn run_auto_optimize_flow(
         AutoTweakStep {
             progress: 0.97,
             tweak_id: "apply_render_queue",
+            permanent_kind: Some(counterrush_core::PermanentTweakKind::ApplyRenderQueue),
             enabled_in_config: config.apply_render_queue,
             applying_label: "Configurando fila de renderização (Render Queue)...",
             already_label: "Fila de renderização já configurada — preservada.",
@@ -584,17 +606,20 @@ fn run_auto_optimize_flow(
             return;
         }
 
-        if !step.enabled_in_config {
-            update_auto_optimize_ui(ui, step.progress, step.skipped_label);
-        } else if report.is_already_applied(step.tweak_id) {
+        if report.is_already_applied(step.tweak_id) {
             update_auto_optimize_ui(ui, step.progress, step.already_label);
             already_count += 1;
+        } else if !step.enabled_in_config {
+            update_auto_optimize_ui(ui, step.progress, step.skipped_label);
         } else {
             update_auto_optimize_ui(ui, step.progress, step.applying_label);
             if (step.apply_fn)(&core) {
                 applied_count += 1;
                 if let Some(session_tweak) = step.session_tweak {
                     applied_tweaks.push(session_tweak);
+                }
+                if let Some(kind) = step.permanent_kind {
+                    kind.set_enabled_in(&mut config, false);
                 }
             }
         }
@@ -684,22 +709,24 @@ fn save_active_preset_setting(preset_name: Option<String>) {
 fn execute_configured_tweaks_with_modal(
     ui: &slint::Weak<MainWindow>,
     core: &counterrush_core::OptimizerCore,
-    config: &counterrush_core::config::CustomOptimizationConfig,
+    config: &mut counterrush_core::config::CustomOptimizationConfig,
     token: &std::sync::atomic::AtomicBool,
     step_duration: std::time::Duration,
     cancel_msg: &str,
-) -> Option<Vec<AppliedSessionTweak>> {
+) -> Option<(Vec<AppliedSessionTweak>, bool)> {
     let mut applied_tweaks = Vec::new();
-    let cancel_and_rollback = |applied: Vec<AppliedSessionTweak>| -> Option<Vec<AppliedSessionTweak>> {
-        rollback_applied_tweaks(core, applied);
-        let msg = cancel_msg.to_string();
-        post_ui(ui, move |ui| {
-            ui.set_show_auto_optimize_modal(false);
-            ui.set_is_launching(false);
-            ui.set_status_message(msg.into());
-        });
-        None
-    };
+    let mut config_dirty = false;
+    let cancel_and_rollback =
+        |applied: Vec<AppliedSessionTweak>| -> Option<(Vec<AppliedSessionTweak>, bool)> {
+            rollback_applied_tweaks(core, applied);
+            let msg = cancel_msg.to_string();
+            post_ui(ui, move |ui| {
+                ui.set_show_auto_optimize_modal(false);
+                ui.set_is_launching(false);
+                ui.set_status_message(msg.into());
+            });
+            None
+        };
 
     if token.load(std::sync::atomic::Ordering::SeqCst) {
         return cancel_and_rollback(applied_tweaks);
@@ -709,110 +736,152 @@ fn execute_configured_tweaks_with_modal(
         return cancel_and_rollback(applied_tweaks);
     }
 
-    let steps: [(
-        bool,
-        f32,
-        &str,
-        Option<AppliedSessionTweak>,
-        fn(&counterrush_core::OptimizerCore) -> bool,
-    ); 11] = [
-        (
-            config.empty_standby_list,
-            0.16,
-            "Liberando cache de memória RAM em Standby...",
-            None,
-            |c| c.empty_standby_list().is_ok(),
-        ),
-        (
-            config.apply_timer_resolution,
-            0.24,
-            "Otimizando resolução do temporizador (0.5ms)...",
-            Some(AppliedSessionTweak::Timer),
-            |c| c.apply_timer_resolution().is_ok(),
-        ),
-        (
-            config.apply_mmcss,
-            0.32,
-            "Configurando agendador multimídia e rede (MMCSS)...",
-            Some(AppliedSessionTweak::Mmcss),
-            |c| c.apply_all_mmcss().is_ok(),
-        ),
-        (
-            config.apply_dpi_optimization,
-            0.40,
-            "Ajustando DPI e compatibilidade de tela inteira CS2...",
-            Some(AppliedSessionTweak::Dpi),
-            |c| c.apply_dpi_optimization().is_ok(),
-        ),
-        (
-            config.disable_gpu_acceleration,
-            0.48,
-            "Desativando aceleração de GPU em aplicativos secundários...",
-            Some(AppliedSessionTweak::GpuAccel),
-            |c| c.disable_all_gpu_acceleration().is_ok(),
-        ),
-        (
-            config.disable_memory_compression,
-            0.56,
-            "Calibrando compactação de memória do Windows...",
-            Some(AppliedSessionTweak::MemCompression),
-            |c| c.disable_memory_compression().is_ok(),
-        ),
-        (
-            config.disable_hpet,
-            0.64,
-            "Desativando HPET (temporizador de alta precisão)...",
-            Some(AppliedSessionTweak::Hpet),
-            |c| c.disable_hpet().is_ok(),
-        ),
-        (
-            config.disable_game_bar,
-            0.72,
-            "Desativando Xbox Game Bar e capturas GameDVR...",
-            Some(AppliedSessionTweak::GameBar),
-            |c| c.disable_all_game_bar_features().is_ok(),
-        ),
-        (
-            config.enable_msi,
-            0.80,
-            "Ativando Modo MSI para GPU e periféricos...",
-            Some(AppliedSessionTweak::Msi),
-            |c| c.enable_all_msi().is_ok(),
-        ),
-        (
-            config.disable_power_saving,
-            0.86,
-            "Desativando suspensão de energia PCIe e USB...",
-            Some(AppliedSessionTweak::PowerSaving),
-            |c| c.disable_all_power_saving().is_ok(),
-        ),
-        (
-            config.apply_render_queue,
-            0.92,
-            "Configurando fila de renderização (Render Queue)...",
-            Some(AppliedSessionTweak::RenderQueue),
-            |c| c.apply_render_queue().is_ok(),
-        ),
+    let steps = [
+        ConfiguredTweakStep {
+            enabled_in_config: config.empty_standby_list,
+            progress: 0.16,
+            applying_label: "Liberando cache de memória RAM em Standby...",
+            already_label: "",
+            permanent_kind: None,
+            session_tweak: None,
+            apply_fn: |c| c.empty_standby_list().is_ok(),
+        },
+        ConfiguredTweakStep {
+            enabled_in_config: config.apply_timer_resolution,
+            progress: 0.24,
+            applying_label: "Otimizando resolução do temporizador (0.5ms)...",
+            already_label: "",
+            permanent_kind: None,
+            session_tweak: Some(AppliedSessionTweak::Timer),
+            apply_fn: |c| c.apply_timer_resolution().is_ok(),
+        },
+        ConfiguredTweakStep {
+            enabled_in_config: config.apply_mmcss,
+            progress: 0.32,
+            applying_label: "Configurando agendador multimídia e rede (MMCSS)...",
+            already_label: "Agendador multimídia (MMCSS) já otimizado — preservado.",
+            permanent_kind: Some(counterrush_core::PermanentTweakKind::ApplyMmcss),
+            session_tweak: Some(AppliedSessionTweak::Mmcss),
+            apply_fn: |c| c.apply_all_mmcss().is_ok(),
+        },
+        ConfiguredTweakStep {
+            enabled_in_config: config.apply_dpi_optimization,
+            progress: 0.40,
+            applying_label: "Ajustando DPI e compatibilidade de tela inteira CS2...",
+            already_label: "Otimização de DPI já configurada — preservada.",
+            permanent_kind: Some(counterrush_core::PermanentTweakKind::ApplyDpiOptimization),
+            session_tweak: Some(AppliedSessionTweak::Dpi),
+            apply_fn: |c| c.apply_dpi_optimization().is_ok(),
+        },
+        ConfiguredTweakStep {
+            enabled_in_config: config.disable_gpu_acceleration,
+            progress: 0.48,
+            applying_label: "Desativando aceleração de GPU em aplicativos secundários...",
+            already_label: "Aceleração de GPU em apps já desativada — preservada.",
+            permanent_kind: Some(counterrush_core::PermanentTweakKind::DisableGpuAcceleration),
+            session_tweak: Some(AppliedSessionTweak::GpuAccel),
+            apply_fn: |c| c.disable_all_gpu_acceleration().is_ok(),
+        },
+        ConfiguredTweakStep {
+            enabled_in_config: config.disable_memory_compression,
+            progress: 0.56,
+            applying_label: "Calibrando compactação de memória do Windows...",
+            already_label: "Compactação de memória já desativada — preservada.",
+            permanent_kind: Some(counterrush_core::PermanentTweakKind::DisableMemoryCompression),
+            session_tweak: Some(AppliedSessionTweak::MemCompression),
+            apply_fn: |c| c.disable_memory_compression().is_ok(),
+        },
+        ConfiguredTweakStep {
+            enabled_in_config: config.disable_hpet,
+            progress: 0.64,
+            applying_label: "Desativando HPET (temporizador de alta precisão)...",
+            already_label: "HPET já desativado no sistema — preservado.",
+            permanent_kind: Some(counterrush_core::PermanentTweakKind::DisableHpet),
+            session_tweak: Some(AppliedSessionTweak::Hpet),
+            apply_fn: |c| c.disable_hpet().is_ok(),
+        },
+        ConfiguredTweakStep {
+            enabled_in_config: config.disable_game_bar,
+            progress: 0.72,
+            applying_label: "Desativando Xbox Game Bar e capturas GameDVR...",
+            already_label: "Xbox Game Bar / GameDVR já desativados — preservados.",
+            permanent_kind: Some(counterrush_core::PermanentTweakKind::DisableGameBar),
+            session_tweak: Some(AppliedSessionTweak::GameBar),
+            apply_fn: |c| c.disable_all_game_bar_features().is_ok(),
+        },
+        ConfiguredTweakStep {
+            enabled_in_config: config.enable_msi,
+            progress: 0.80,
+            applying_label: "Ativando Modo MSI para GPU e periféricos...",
+            already_label: "Modo MSI já habilitado nos dispositivos — preservado.",
+            permanent_kind: Some(counterrush_core::PermanentTweakKind::EnableMsi),
+            session_tweak: Some(AppliedSessionTweak::Msi),
+            apply_fn: |c| c.enable_all_msi().is_ok(),
+        },
+        ConfiguredTweakStep {
+            enabled_in_config: config.disable_power_saving,
+            progress: 0.86,
+            applying_label: "Desativando suspensão de energia PCIe e USB...",
+            already_label: "Economia de energia PCIe/USB já desativada — preservada.",
+            permanent_kind: Some(counterrush_core::PermanentTweakKind::DisablePowerSaving),
+            session_tweak: Some(AppliedSessionTweak::PowerSaving),
+            apply_fn: |c| c.disable_all_power_saving().is_ok(),
+        },
+        ConfiguredTweakStep {
+            enabled_in_config: config.apply_render_queue,
+            progress: 0.92,
+            applying_label: "Configurando fila de renderização (Render Queue)...",
+            already_label: "Fila de renderização já configurada — preservada.",
+            permanent_kind: Some(counterrush_core::PermanentTweakKind::ApplyRenderQueue),
+            session_tweak: Some(AppliedSessionTweak::RenderQueue),
+            apply_fn: |c| c.apply_render_queue().is_ok(),
+        },
     ];
 
-    for (enabled, progress, label, session_tweak, apply_fn) in steps {
+    for step in steps {
         if token.load(std::sync::atomic::Ordering::SeqCst) {
             return cancel_and_rollback(applied_tweaks);
         }
-        if enabled {
-            update_auto_optimize_ui(ui, progress, label);
-            if apply_fn(core) {
-                if let Some(t) = session_tweak {
+        if !step.enabled_in_config {
+            continue;
+        }
+
+        if let Some(kind) = step.permanent_kind {
+            match core.is_permanent_tweak_applied(kind) {
+                Ok(true) => {
+                    update_auto_optimize_ui(ui, step.progress, step.already_label);
+                    kind.set_enabled_in(config, false);
+                    config_dirty = true;
+                }
+                Ok(false) => {
+                    update_auto_optimize_ui(ui, step.progress, step.applying_label);
+                    if (step.apply_fn)(core) {
+                        if let Some(t) = step.session_tweak {
+                            applied_tweaks.push(t);
+                        }
+                        kind.set_enabled_in(config, false);
+                        config_dirty = true;
+                    }
+                }
+                Err(_) => {
+                    update_auto_optimize_ui(ui, step.progress, step.applying_label);
+                }
+            }
+        } else {
+            update_auto_optimize_ui(ui, step.progress, step.applying_label);
+            if (step.apply_fn)(core) {
+                if let Some(t) = step.session_tweak {
                     applied_tweaks.push(t);
                 }
             }
-            if !sleep_with_cancellation(step_duration, token) {
-                return cancel_and_rollback(applied_tweaks);
-            }
+        }
+
+        if !sleep_with_cancellation(step_duration, token) {
+            return cancel_and_rollback(applied_tweaks);
         }
     }
 
-    Some(applied_tweaks)
+    Some((applied_tweaks, config_dirty))
 }
 
 fn run_steam_auto_optimize_flow(
@@ -886,21 +955,29 @@ fn run_steam_auto_optimize_flow(
             }
         };
 
+    let mut hw_dirty = false;
     if let Ok((hw_info, _)) = core.get_hardware_profile() {
+        let before = config.clone();
         let _ = counterrush_core::enforce_hardware_restrictions_for_info(&mut config, &hw_info);
+        hw_dirty = config != before;
     }
 
-    if execute_configured_tweaks_with_modal(
+    let steps_dirty = match execute_configured_tweaks_with_modal(
         ui,
         &core,
-        &config,
+        &mut config,
         token,
         std::time::Duration::from_millis(120),
         "Auto-otimização Steam cancelada pelo usuário. Alterações revertidas.",
-    )
-    .is_none()
-    {
-        return;
+    ) {
+        Some((_, dirty)) => dirty,
+        None => return,
+    };
+
+    if hw_dirty || steps_dirty {
+        let _ = config.save_to_file(&resolved_cfg_path);
+        let updated_tweaks = Tweaks::from_config(&config);
+        post_ui(ui, move |ui| updated_tweaks.apply_to_ui(ui));
     }
 
     if config.cs2_priority || config.cs2_affinity {
@@ -987,7 +1064,7 @@ fn run_launch_flow(
 
     let target_cfg_path = config_path.read().map(|p| p.clone()).unwrap_or(fallback_path);
     let core = counterrush_core::OptimizerCore::default();
-    let (_resolved, mut config) = match core.load_or_create_custom_config(Some(&target_cfg_path)) {
+    let (resolved_cfg_path, mut config) = match core.load_or_create_custom_config(Some(&target_cfg_path)) {
         Ok(res) => res,
         Err(err) => {
             let err_msg = format!("Erro na configuração: {err}");
@@ -1011,19 +1088,22 @@ fn run_launch_flow(
         ui.set_is_launching(true);
     });
 
+    let mut hw_dirty = false;
     if let Ok((hw_info, _)) = core.get_hardware_profile() {
+        let before = config.clone();
         let _ = counterrush_core::enforce_hardware_restrictions_for_info(&mut config, &hw_info);
+        hw_dirty = config != before;
     }
 
-    let applied_tweaks = match execute_configured_tweaks_with_modal(
+    let (applied_tweaks, steps_dirty) = match execute_configured_tweaks_with_modal(
         ui,
         &core,
-        &config,
+        &mut config,
         &token,
         std::time::Duration::from_millis(180),
         "Inicialização cancelada pelo usuário. Alterações revertidas.",
     ) {
-        Some(tweaks) => tweaks,
+        Some(res) => res,
         None => return,
     };
 
@@ -1095,6 +1175,12 @@ fn run_launch_flow(
             ui.set_auto_optimize_stage_title("".into());
             ui.set_auto_optimize_stage_subtitle("".into());
         });
+    }
+
+    if hw_dirty || steps_dirty {
+        let _ = config.save_to_file(&resolved_cfg_path);
+        let updated_tweaks = Tweaks::from_config(&config);
+        post_ui(ui, move |ui| updated_tweaks.apply_to_ui(ui));
     }
 
     update_auto_optimize_ui(ui, 0.96, "Inicializando Counter-Strike 2 pela Steam...");

@@ -49,7 +49,10 @@ fn main() {
         }
         Some("--status") | None => {
             match tweak.status() {
-                Ok(status) => println!("\nStatus atual no Registro: {:?}", status),
+                Ok(status) => {
+                    println!("\nStatus atual no Registro: {:?}", status);
+                    println!("Status: {:?}", status);
+                }
                 Err(err) => eprintln!("\nErro ao consultar status no Registro: {err}"),
             }
             print_usage();

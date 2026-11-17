@@ -65,8 +65,10 @@ fn print_status_table(devices: &[MsiDeviceStatus]) {
     let all_enabled = is_all_msi_enabled().unwrap_or(false);
     if all_enabled && !devices.is_empty() {
         println!("Conformidade Geral: [TODOS OS DISPOSITIVOS ESTÃO COM MODO MSI ATIVO E OTIMIZADO]");
+        println!("Status: Applied");
     } else {
         println!("Conformidade Geral: [PARCIALMENTE ATIVADO OU PADRÃO DO WINDOWS]");
+        println!("Status: Default");
     }
 }
 

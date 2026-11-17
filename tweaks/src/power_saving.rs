@@ -25,11 +25,11 @@ pub struct PowerSavingStatus {
 
 impl PowerSavingStatus {
     pub fn is_pcie_optimized(&self) -> bool {
-        self.pcie_ac_setting == Some(0) && (self.pcie_dc_setting == Some(0) || self.pcie_dc_setting.is_none())
+        self.pcie_ac_setting == Some(0) && self.pcie_dc_setting == Some(0)
     }
 
     pub fn is_usb_suspend_optimized(&self) -> bool {
-        self.usb_suspend_ac_setting == Some(0) && (self.usb_suspend_dc_setting == Some(0) || self.usb_suspend_dc_setting.is_none())
+        self.usb_suspend_ac_setting == Some(0) && self.usb_suspend_dc_setting == Some(0)
     }
 
     pub fn is_usb_hubs_optimized(&self) -> bool {
@@ -108,28 +108,40 @@ fn apply_powercfg_active_scheme() -> Result<(), TweakError> {
     Ok(())
 }
 
+fn extract_hex_after_prefix(lower: &str) -> Option<u32> {
+    let pos = lower.rfind("0x")?;
+    let hex_part = &lower[pos + 2..];
+    let hex_digits: String = hex_part.chars().take_while(|c| c.is_ascii_hexdigit()).collect();
+    if hex_digits.is_empty() {
+        return None;
+    }
+    u32::from_str_radix(&hex_digits, 16).ok()
+}
+
 fn parse_powercfg_ac_dc(stdout: &str) -> (Option<u32>, Option<u32>) {
     let mut ac = None;
     let mut dc = None;
+    let mut hex_values = Vec::new();
 
     for line in stdout.lines() {
         let lower = line.to_lowercase();
-        if (lower.contains("alternadas") || lower.contains("ac power setting")) && lower.contains("0x") {
-            if let Some(pos) = lower.find("0x") {
-                let hex_part = &lower[pos + 2..];
-                let hex_digits: String = hex_part.chars().take_while(|c| c.is_ascii_hexdigit()).collect();
-                if let Ok(val) = u32::from_str_radix(&hex_digits, 16) {
-                    ac = Some(val);
-                }
+        if let Some(val) = extract_hex_after_prefix(&lower) {
+            hex_values.push(val);
+            if lower.contains("alternadas") || lower.contains("ac power setting") {
+                ac = Some(val);
+            } else if lower.contains("cont") || lower.contains("dc power setting") {
+                dc = Some(val);
             }
-        } else if (lower.contains("cont") || lower.contains("dc power setting")) && lower.contains("0x") {
-            if let Some(pos) = lower.find("0x") {
-                let hex_part = &lower[pos + 2..];
-                let hex_digits: String = hex_part.chars().take_while(|c| c.is_ascii_hexdigit()).collect();
-                if let Ok(val) = u32::from_str_radix(&hex_digits, 16) {
-                    dc = Some(val);
-                }
-            }
+        }
+    }
+
+    if (ac.is_none() || dc.is_none()) && hex_values.len() >= 2 {
+        let len = hex_values.len();
+        if ac.is_none() {
+            ac = Some(hex_values[len - 2]);
+        }
+        if dc.is_none() {
+            dc = Some(hex_values[len - 1]);
         }
     }
 

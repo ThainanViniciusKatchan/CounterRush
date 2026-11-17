@@ -78,8 +78,10 @@ fn print_status_table(status: &GameBarStatus) {
 
     if status.is_all_disabled() {
         println!("Conformidade Geral: [TODOS OS RECURSOS XBOX/GAMEDVR ESTÃO DESATIVADOS (100% OTIMIZADO)]");
+        println!("Status: Applied");
     } else {
         println!("Conformidade Geral: [PARCIALMENTE ATIVADO OU PADRÃO DO WINDOWS]");
+        println!("Status: Default");
     }
 }
 

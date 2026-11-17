@@ -65,6 +65,7 @@ fn print_status(status: &RenderQueueStatus) {
     } else {
         "OTIMIZAÇÕES DE FILA DE QUADROS AINDA NÃO FORAM APLICADAS EM TODAS AS GPUS."
     });
+    println!("Status: {}", if status.is_all_optimized() { "Applied" } else { "Default" });
     println!("--------------------------------------------------------------------------------\n");
 }
 

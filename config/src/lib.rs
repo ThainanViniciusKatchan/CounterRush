@@ -132,18 +132,18 @@ impl Default for CustomOptimizationConfig {
         Self {
             launch_args: Vec::new(),
             empty_standby_list: true,
-            cs2_priority: true,
+            cs2_priority: false,
             cs2_affinity: true,
             disable_gpu_acceleration: false,
-            apply_dpi_optimization: true,
+            apply_dpi_optimization: false,
             disable_memory_compression: false,
             apply_timer_resolution: true,
-            apply_mmcss: true,
+            apply_mmcss: false,
             disable_hpet: false,
-            disable_game_bar: true,
+            disable_game_bar: false,
             enable_msi: false,
-            disable_power_saving: true,
-            apply_render_queue: true,
+            disable_power_saving: false,
+            apply_render_queue: false,
         }
     }
 }
