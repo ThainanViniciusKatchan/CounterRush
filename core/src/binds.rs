@@ -458,7 +458,9 @@ where
 
 fn write_cfg_to_targets(local_path: &Path, cs2_path: &Path, data: &[u8]) -> Result<(), CoreError> {
     write_bytes_atomically(local_path, data)?;
-    write_bytes_atomically(cs2_path, data)?;
+    if cs2_path != local_path {
+        write_bytes_atomically(cs2_path, data)?;
+    }
     Ok(())
 }
 
@@ -693,4 +695,411 @@ pub fn manage_cs2_bind_from_args<S: AsRef<str>>(
         args,
         prompt_user_bind_conflict,
     )
+}
+
+/// Lista todos os arquivos `.cfg` presentes no diretório informado, ordenados por nome.
+pub fn list_cfg_files_in_dir<P: AsRef<Path>>(dir: P) -> Vec<PathBuf> {
+    let mut files = Vec::new();
+    if let Ok(entries) = std::fs::read_dir(dir.as_ref()) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_file()
+                && path
+                    .extension()
+                    .and_then(|s| s.to_str())
+                    .map(|ext| ext.eq_ignore_ascii_case("cfg"))
+                    == Some(true)
+            {
+                files.push(path);
+            }
+        }
+    }
+    files.sort_by_key(|p| {
+        p.file_name()
+            .map(|n| n.to_string_lossy().to_ascii_lowercase())
+    });
+    files
+}
+
+/// Lista todos os arquivos `.cfg` existentes no diretório local `config\cfg`.
+pub fn list_cfg_files() -> Vec<PathBuf> {
+    list_cfg_files_in_dir(resolve_local_cfg_dir())
+}
+
+/// Lê um arquivo `.cfg` e extrai todas as linhas de bind ativas no formato `(tecla, comando)`.
+pub fn read_binds_from_cfg_file(path: &Path) -> Result<Vec<(String, String)>, CoreError> {
+    let content = std::fs::read_to_string(path)?;
+    let mut binds = Vec::new();
+    for line in content.lines() {
+        if let Some(pair) = parse_bind_line(line) {
+            binds.push(pair);
+        }
+    }
+    Ok(binds)
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GuiBindSaveReport {
+    pub outcome: BindOperationOutcome,
+    pub synced_to_cs2_global: bool,
+    pub cs2_sync_warning: Option<String>,
+}
+
+/// Determina se o salvamento na interface deve atualizar o arquivo existente selecionado (`BindFlag::Default`)
+/// ou criar um novo arquivo preservando o original (`BindFlag::NewConfig`).
+pub fn determine_bind_save_mode(
+    selected_existing_file: &str,
+    file_name_input: &str,
+) -> Result<(String, BindFlag), CoreError> {
+    let target_file = validate_cfg_file_name(file_name_input)?;
+    let selected_trimmed = selected_existing_file.trim();
+
+    if selected_trimmed.is_empty() {
+        return Ok((target_file, BindFlag::NewConfig));
+    }
+
+    match validate_cfg_file_name(selected_trimmed) {
+        Ok(selected_normalized) if selected_normalized.eq_ignore_ascii_case(&target_file) => {
+            Ok((target_file, BindFlag::Default))
+        }
+        _ => Ok((target_file, BindFlag::NewConfig)),
+    }
+}
+
+fn restore_snapshot(path: &Path, prev_bytes: Option<Vec<u8>>) {
+    match prev_bytes {
+        Some(bytes) => {
+            let _ = write_bytes_atomically(path, &bytes);
+        }
+        None => {
+            if path.is_file() {
+                let _ = std::fs::remove_file(path);
+            }
+        }
+    }
+}
+
+/// Grava a bind nos diretórios informados com fallback automático para gravação local
+/// quando o diretório global do CS2 estiver inacessível ou exigir elevação.
+pub fn save_cs2_bind_with_local_fallback<S, F>(
+    dirs: &BindDirectories,
+    nome_config: &str,
+    tecla: &str,
+    comandos: &[S],
+    flag: BindFlag,
+    mut confirm_conflict: F,
+) -> Result<GuiBindSaveReport, CoreError>
+where
+    S: AsRef<str>,
+    F: FnMut(&BindConflict) -> Result<bool, CoreError>,
+{
+    let file_name = validate_cfg_file_name(nome_config)?;
+    let local_path = dirs.local_cfg_dir.join(&file_name);
+    let backup_path = dirs.backup_dir.join(&file_name);
+
+    let prev_local_bytes = std::fs::read(&local_path).ok();
+    let prev_backup_bytes = std::fs::read(&backup_path).ok();
+    let mut cached_confirmation: Option<bool> = None;
+
+    let first_attempt = manage_cs2_bind_with_dirs(
+        dirs,
+        nome_config,
+        Some(tecla),
+        comandos,
+        Some(flag),
+        |conflict| {
+            let accepted = confirm_conflict(conflict)?;
+            cached_confirmation = Some(accepted);
+            Ok(accepted)
+        },
+    );
+
+    match first_attempt {
+        Ok(outcome) => Ok(GuiBindSaveReport {
+            outcome,
+            synced_to_cs2_global: true,
+            cs2_sync_warning: None,
+        }),
+        Err(CoreError::Io(ref io_err))
+            if matches!(
+                io_err.kind(),
+                io::ErrorKind::PermissionDenied | io::ErrorKind::NotFound
+            ) && dirs.local_cfg_dir != dirs.cs2_cfg_dir =>
+        {
+            restore_snapshot(&local_path, prev_local_bytes);
+            restore_snapshot(&backup_path, prev_backup_bytes);
+
+            let warning = format!(
+                "Salvo em config\\cfg (sem acesso ao diretório global do CS2: {io_err})"
+            );
+            let local_only_dirs = BindDirectories::with_paths(
+                &dirs.local_cfg_dir,
+                &dirs.backup_dir,
+                &dirs.local_cfg_dir,
+            );
+            let outcome = manage_cs2_bind_with_dirs(
+                &local_only_dirs,
+                nome_config,
+                Some(tecla),
+                comandos,
+                Some(flag),
+                |conflict| match cached_confirmation {
+                    Some(accepted) => Ok(accepted),
+                    None => confirm_conflict(conflict),
+                },
+            )?;
+            Ok(GuiBindSaveReport {
+                outcome,
+                synced_to_cs2_global: false,
+                cs2_sync_warning: Some(warning),
+            })
+        }
+        Err(err) => Err(err),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_list_cfg_files_in_dir_filters_and_sorts() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let root = temp.path();
+
+        std::fs::create_dir_all(root.join("bkp")).unwrap();
+        std::fs::write(root.join("bkp").join("autoexec.cfg"), "bind \"k\" \"kill\"\n").unwrap();
+        std::fs::write(root.join("zeta.cfg"), "bind \"z\" \"slot9\"\n").unwrap();
+        std::fs::write(root.join("Alpha.CFG"), "bind \"a\" \"+left\"\n").unwrap();
+        std::fs::write(root.join("notes.txt"), "ignorar\n").unwrap();
+
+        let listed = list_cfg_files_in_dir(root);
+        let names: Vec<String> = listed
+            .iter()
+            .filter_map(|p| p.file_name().and_then(|n| n.to_str()).map(str::to_string))
+            .collect();
+
+        assert_eq!(names, vec!["Alpha.CFG".to_string(), "zeta.cfg".to_string()]);
+    }
+
+    #[test]
+    fn test_read_binds_from_cfg_file_parses_active_lines() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let cfg = temp.path().join("autoexec.cfg");
+        std::fs::write(
+            &cfg,
+            "// comentario\nbind \"f4\" \"buy ak47;buy vesthelm\"\nbind \"v\" \"noclip\"\n",
+        )
+        .unwrap();
+
+        let binds = read_binds_from_cfg_file(&cfg).expect("deve ler binds");
+        assert_eq!(
+            binds,
+            vec![
+                ("f4".to_string(), "buy ak47;buy vesthelm".to_string()),
+                ("v".to_string(), "noclip".to_string()),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_save_cs2_bind_with_local_fallback_works_isolated() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let local_dir = temp.path().join("local_cfg");
+        let bkp_dir = local_dir.join("bkp");
+        let cs2_dir = temp.path().join("cs2_cfg");
+
+        let dirs = BindDirectories::with_paths(&local_dir, &bkp_dir, &cs2_dir);
+        let report = save_cs2_bind_with_local_fallback(
+            &dirs,
+            "teste",
+            "mwheeldown",
+            &["+jump"],
+            BindFlag::NewConfig,
+            |_| Ok(true),
+        )
+        .expect("gravacao deve ter sucesso");
+
+        assert!(report.synced_to_cs2_global);
+        assert!(report.cs2_sync_warning.is_none());
+        assert_eq!(
+            std::fs::read_to_string(local_dir.join("teste.cfg")).unwrap(),
+            "bind \"mwheeldown\" \"+jump\"\n"
+        );
+        assert_eq!(
+            std::fs::read_to_string(cs2_dir.join("teste.cfg")).unwrap(),
+            "bind \"mwheeldown\" \"+jump\"\n"
+        );
+    }
+
+    #[test]
+    fn test_determine_bind_save_mode_and_new_file_without_selection() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let local_dir = temp.path().join("local_cfg");
+        let bkp_dir = local_dir.join("bkp");
+        let cs2_dir = temp.path().join("cs2_cfg");
+        let dirs = BindDirectories::with_paths(&local_dir, &bkp_dir, &cs2_dir);
+
+        let (file_name, flag) =
+            determine_bind_save_mode("", "novo_treino").expect("nome válido sem seleção");
+        assert_eq!(file_name, "novo_treino.cfg");
+        assert_eq!(flag, BindFlag::NewConfig);
+
+        let report = save_cs2_bind_with_local_fallback(
+            &dirs,
+            &file_name,
+            "v",
+            &["noclip", "sv_rethrow_last_grenade"],
+            flag,
+            |_| Ok(true),
+        )
+        .expect("gravação de novo arquivo deve funcionar");
+
+        assert!(matches!(report.outcome, BindOperationOutcome::Created { .. }));
+        assert_eq!(
+            std::fs::read_to_string(local_dir.join("novo_treino.cfg")).unwrap(),
+            "bind \"v\" \"noclip;sv_rethrow_last_grenade\"\n"
+        );
+    }
+
+    #[test]
+    fn test_determine_bind_save_mode_updates_selected_file_preserving_existing_binds() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let local_dir = temp.path().join("local_cfg");
+        let bkp_dir = local_dir.join("bkp");
+        let cs2_dir = temp.path().join("cs2_cfg");
+        std::fs::create_dir_all(&local_dir).unwrap();
+        std::fs::create_dir_all(&cs2_dir).unwrap();
+        let initial_content = "bind \"f4\" \"buy ak47;buy vesthelm\"\n";
+        std::fs::write(local_dir.join("autoexec.cfg"), initial_content).unwrap();
+
+        let (file_same, flag_same) =
+            determine_bind_save_mode("autoexec.cfg", "autoexec.cfg").unwrap();
+        assert_eq!(file_same, "autoexec.cfg");
+        assert_eq!(flag_same, BindFlag::Default);
+
+        let (file_no_ext, flag_no_ext) =
+            determine_bind_save_mode("autoexec.cfg", "autoexec").unwrap();
+        assert_eq!(file_no_ext, "autoexec.cfg");
+        assert_eq!(flag_no_ext, BindFlag::Default);
+
+        let dirs = BindDirectories::with_paths(&local_dir, &bkp_dir, &cs2_dir);
+        let report = save_cs2_bind_with_local_fallback(
+            &dirs,
+            &file_no_ext,
+            "mwheeldown",
+            &["+jump"],
+            flag_no_ext,
+            |_| Ok(false),
+        )
+        .expect("atualização sem conflito deve funcionar");
+
+        assert!(matches!(
+            report.outcome,
+            BindOperationOutcome::Updated {
+                replaced_existing_key: false,
+                ..
+            }
+        ));
+        let updated = std::fs::read_to_string(local_dir.join("autoexec.cfg")).unwrap();
+        assert!(updated.contains("bind \"f4\" \"buy ak47;buy vesthelm\""));
+        assert!(updated.contains("bind \"mwheeldown\" \"+jump\""));
+    }
+
+    #[test]
+    fn test_renaming_selected_file_creates_new_and_preserves_original_byte_for_byte() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let local_dir = temp.path().join("local_cfg");
+        let bkp_dir = local_dir.join("bkp");
+        let cs2_dir = temp.path().join("cs2_cfg");
+        std::fs::create_dir_all(&local_dir).unwrap();
+        std::fs::create_dir_all(&cs2_dir).unwrap();
+        let original_bytes = b"// comentario preservado\r\nbind \"f4\" \"buy ak47;buy vesthelm\"\r\n";
+        std::fs::write(local_dir.join("autoexec.cfg"), original_bytes).unwrap();
+
+        let (target_file, flag) =
+            determine_bind_save_mode("autoexec.cfg", "autoexec_custom.cfg").unwrap();
+        assert_eq!(target_file, "autoexec_custom.cfg");
+        assert_eq!(flag, BindFlag::NewConfig);
+
+        let dirs = BindDirectories::with_paths(&local_dir, &bkp_dir, &cs2_dir);
+        let report = save_cs2_bind_with_local_fallback(
+            &dirs,
+            &target_file,
+            "c",
+            &["slot8"],
+            flag,
+            |_| Ok(true),
+        )
+        .expect("criação do novo arquivo deve funcionar");
+
+        assert!(matches!(report.outcome, BindOperationOutcome::Created { .. }));
+        assert_eq!(
+            std::fs::read(local_dir.join("autoexec.cfg")).unwrap(),
+            original_bytes,
+            "O arquivo original deve permanecer 100% intacto byte a byte"
+        );
+        assert_eq!(
+            std::fs::read_to_string(local_dir.join("autoexec_custom.cfg")).unwrap(),
+            "bind \"c\" \"slot8\"\n"
+        );
+    }
+
+    #[test]
+    fn test_conflict_detection_cancels_or_overwrites_with_backup() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let local_dir = temp.path().join("local_cfg");
+        let bkp_dir = local_dir.join("bkp");
+        let cs2_dir = temp.path().join("cs2_cfg");
+        std::fs::create_dir_all(&local_dir).unwrap();
+        std::fs::create_dir_all(&cs2_dir).unwrap();
+        let original = "bind \"f4\" \"buy ak47;buy vesthelm\"\nbind \"v\" \"noclip\"\n";
+        std::fs::write(local_dir.join("autoexec.cfg"), original).unwrap();
+
+        let dirs = BindDirectories::with_paths(&local_dir, &bkp_dir, &cs2_dir);
+        let (_, flag) = determine_bind_save_mode("autoexec.cfg", "autoexec.cfg").unwrap();
+
+        let cancelled = save_cs2_bind_with_local_fallback(
+            &dirs,
+            "autoexec.cfg",
+            "f4",
+            &["slot8"],
+            flag,
+            |_| Ok(false),
+        )
+        .expect("recusa deve retornar CancelledByUser");
+        assert!(matches!(
+            cancelled.outcome,
+            BindOperationOutcome::CancelledByUser(_)
+        ));
+        assert_eq!(
+            std::fs::read_to_string(local_dir.join("autoexec.cfg")).unwrap(),
+            original
+        );
+
+        let overwritten = save_cs2_bind_with_local_fallback(
+            &dirs,
+            "autoexec.cfg",
+            "f4",
+            &["slot8"],
+            flag,
+            |_| Ok(true),
+        )
+        .expect("confirmação deve substituir com backup");
+        assert!(matches!(
+            overwritten.outcome,
+            BindOperationOutcome::Updated {
+                replaced_existing_key: true,
+                ..
+            }
+        ));
+        assert_eq!(
+            std::fs::read_to_string(bkp_dir.join("autoexec.cfg")).unwrap(),
+            original
+        );
+        assert_eq!(
+            std::fs::read_to_string(local_dir.join("autoexec.cfg")).unwrap(),
+            "bind \"f4\" \"slot8\"\nbind \"v\" \"noclip\"\n"
+        );
+    }
 }

@@ -21,14 +21,18 @@ pub enum CoreError {
 
 pub mod classifier;
 pub use classifier::{classify_pc, PcCategory};
+pub mod bind_catalog;
+pub use bind_catalog::{cs2_bind_catalog, normalize_captured_key_to_cs2, BindCommandEntry};
 pub mod binds;
 pub use binds::{
-    find_key_conflict_in_content, format_bind_commands, format_bind_line, manage_cs2_bind,
+    determine_bind_save_mode, find_key_conflict_in_content, format_bind_commands,
+    format_bind_line, list_cfg_files, list_cfg_files_in_dir, manage_cs2_bind,
     manage_cs2_bind_from_args, manage_cs2_bind_from_args_with_dirs, manage_cs2_bind_with_dirs,
-    parse_bind_line, prompt_user_bind_conflict, resolve_cfg_backup_dir, resolve_cs2_cfg_dir,
-    resolve_local_cfg_dir, restore_cs2_cfg_backup, restore_cs2_cfg_backup_in_dirs,
-    validate_bind_key, validate_cfg_file_name, BindConflict, BindDirectories, BindFlag,
-    BindOperationOutcome, DEFAULT_CS2_CFG_DIR,
+    parse_bind_line, prompt_user_bind_conflict, read_binds_from_cfg_file, resolve_cfg_backup_dir,
+    resolve_cs2_cfg_dir, resolve_local_cfg_dir, restore_cs2_cfg_backup,
+    restore_cs2_cfg_backup_in_dirs, save_cs2_bind_with_local_fallback, validate_bind_key,
+    validate_cfg_file_name, BindConflict, BindDirectories, BindFlag, BindOperationOutcome,
+    GuiBindSaveReport, DEFAULT_CS2_CFG_DIR,
 };
 pub mod startup;
 pub use startup::{

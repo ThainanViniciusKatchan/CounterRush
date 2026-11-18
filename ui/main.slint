@@ -10,6 +10,7 @@ import { NoProfileDialog } from "components/no_profile_dialog.slint";
 import { InDevelopmentDialog } from "components/in_development_dialog.slint";
 import { AutoOptimizeDialog } from "components/auto_optimize_dialog.slint";
 import { AppTray } from "components/tray.slint";
+import { BindsTestWindow, BindCatalogRow } from "binds_window.slint";
 
 export struct PresetModel {
     name: string,
@@ -21,7 +22,7 @@ export struct LanguageItem {
     display_name: string,
 }
 
-export { NewProfileData, AppTray }
+export { NewProfileData, AppTray, BindsTestWindow, BindCatalogRow }
 
 export component MainWindow inherits Window {
     title: @tr("CounterRush - CS2 Performance");

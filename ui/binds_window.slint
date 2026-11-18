@@ -1,0 +1,1274 @@
+import { ScrollView } from "std-widgets.slint";
+import { CS2Theme } from "theme.slint";
+
+export struct BindCatalogRow {
+    // 0 = Categoria, 1 = Subcategoria, 2 = Comando com checkbox
+    row-kind: int,
+    command-index: int,
+    title: string,
+    subtitle: string,
+    command-value: string,
+    checked: bool,
+}
+
+component VectorCheckmark inherits Rectangle {
+    in property <bool> checked: false;
+
+    width: 16px;
+    height: 16px;
+    border-radius: 3px;
+    border-width: 1px;
+    border-color: root.checked ? CS2Theme.accent-ct-blue : CS2Theme.border-hover;
+    background: root.checked ? CS2Theme.accent-ct-blue : CS2Theme.bg-main;
+    animate background { duration: 100ms; }
+    animate border-color { duration: 100ms; }
+
+    if root.checked : Path {
+        width: 10px;
+        height: 8px;
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        viewbox-width: 12;
+        viewbox-height: 10;
+        stroke: #ffffff;
+        stroke-width: 2.2px;
+        commands: "M 1.5 5.2 L 4.6 8.3 L 10.5 1.8";
+    }
+}
+
+export component BindsTestWindow inherits Window {
+    title: "CounterRush — Configuração de Binds CS2 (Janela Isolada de Testes)";
+    icon: @image-url("assets/icons/cfg.svg");
+    min-width: 960px;
+    preferred-width: 1120px;
+    min-height: 620px;
+    preferred-height: 740px;
+    background: CS2Theme.bg-main;
+
+    // Estado da barra superior fixa
+    in-out property <string> file-name-input: "";
+    in-out property <string> selected-existing-file: "";
+    in-out property <[string]> existing-cfg-files: ["autoexec.cfg", "meuexec.cfg"];
+    in-out property <bool> selector-dropdown-open: false;
+    in-out property <string> bound-key: "";
+    in-out property <bool> is-listening-key: false;
+    in-out property <string> save-mode-badge: "NOVO ARQUIVO";
+    in-out property <bool> is-creating-new-file: true;
+
+    // Estado da listagem, prévia e feedback
+    in-out property <int> selected-commands-count: 0;
+    in-out property <string> bind-preview-line: "";
+    in-out property <string> status-message: "Selecione ou digite um arquivo .cfg, capture uma tecla e marque os comandos desejados.";
+    in-out property <string> status-kind: "info";
+    in-out property <bool> show-conflict-prompt: false;
+    in-out property <string> conflict-message: "";
+
+    in-out property <[BindCatalogRow]> catalog-rows: [
+        { row-kind: 0, command-index: -1, title: "1. Movimentação", subtitle: "Deslocamento, saltos, postura e controle de câmera (Source 2)", command-value: "", checked: false },
+        { row-kind: 1, command-index: -1, title: "Comandos Principais", subtitle: "", command-value: "", checked: false },
+        { row-kind: 2, command-index: 0, title: "+forward", subtitle: "Move para frente (W).", command-value: "+forward", checked: false },
+        { row-kind: 2, command-index: 1, title: "+back", subtitle: "Move para trás (S).", command-value: "+back", checked: false },
+        { row-kind: 2, command-index: 2, title: "+left", subtitle: "Move lateralmente / strafe para a esquerda (A).", command-value: "+left", checked: false },
+        { row-kind: 2, command-index: 3, title: "+right", subtitle: "Move lateralmente / strafe para a direita (D).", command-value: "+right", checked: false },
+        { row-kind: 2, command-index: 4, title: "+jump", subtitle: "Executa o pulo (muito utilizado no scroll do mouse para facilitar o Bunnyhop).", command-value: "+jump", checked: false },
+        { row-kind: 2, command-index: 5, title: "+duck", subtitle: "Agacha o personagem (CTRL).", command-value: "+duck", checked: false },
+        { row-kind: 2, command-index: 6, title: "+sprint", subtitle: "Caminha devagar e sem emitir som de passos (SHIFT).", command-value: "+sprint", checked: false },
+        { row-kind: 2, command-index: 7, title: "toggle option_duck_method 0 1", subtitle: "Alterna o modo de agachar entre segurar a tecla (0) e manter agachado (1).", command-value: "toggle option_duck_method 0 1", checked: false },
+        { row-kind: 2, command-index: 8, title: "toggle option_speed_method 0 1", subtitle: "Alterna o caminhar silencioso entre segurar (0) e alternar com um toque (1).", command-value: "toggle option_speed_method 0 1", checked: false },
+        { row-kind: 2, command-index: 9, title: "+turnleft", subtitle: "Gira a câmera horizontalmente para a esquerda (Surf, KZ e Bhop).", command-value: "+turnleft", checked: false },
+        { row-kind: 2, command-index: 10, title: "+turnright", subtitle: "Gira a câmera horizontalmente para a direita (Surf, KZ e Bhop).", command-value: "+turnright", checked: false },
+        { row-kind: 2, command-index: 11, title: "+lookup", subtitle: "Move o ângulo de visão verticalmente para cima via teclado.", command-value: "+lookup", checked: false },
+        { row-kind: 2, command-index: 12, title: "+lookdown", subtitle: "Move o ângulo de visão verticalmente para baixo via teclado.", command-value: "+lookdown", checked: false },
+        { row-kind: 0, command-index: -1, title: "2. Treinamento", subtitle: "Exigem sv_cheats 1", command-value: "", checked: false },
+        { row-kind: 1, command-index: -1, title: "Movimentação Livre e Teleporte de Precisão", subtitle: "", command-value: "", checked: false },
+        { row-kind: 2, command-index: 13, title: "noclip", subtitle: "Liga/desliga o voo livre atravessando paredes e objetos.", command-value: "noclip", checked: false },
+        { row-kind: 2, command-index: 14, title: "getpos", subtitle: "Imprime no console as coordenadas exatas (setpos e setang) da posição e mira atuais.", command-value: "getpos", checked: false },
+        { row-kind: 2, command-index: 15, title: "toggle host_timescale 1 0.5 2", subtitle: "Alterna a velocidade do servidor entre normal (1), câmera lenta (0.5) e acelerada (2).", command-value: "toggle host_timescale 1 0.5 2", checked: false },
+        { row-kind: 1, command-index: -1, title: "Treino Avançado de Granadas", subtitle: "", command-value: "", checked: false },
+        { row-kind: 2, command-index: 16, title: "sv_rethrow_last_grenade", subtitle: "Arremessa novamente a última granada jogada no servidor.", command-value: "sv_rethrow_last_grenade", checked: false },
+        { row-kind: 2, command-index: 17, title: "toggle sv_grenade_trajectory_prac_pipreview 0 1", subtitle: "Abre ou fecha a janelinha Picture-in-Picture mostrando onde sua granada vai cair.", command-value: "toggle sv_grenade_trajectory_prac_pipreview 0 1", checked: false },
+        { row-kind: 2, command-index: 18, title: "cl_sim_grenade_trajectory", subtitle: "Congela a linha de trajetória atual da granada na sua mão por alguns segundos.", command-value: "cl_sim_grenade_trajectory", checked: false },
+        { row-kind: 2, command-index: 19, title: "ent_fire smokegrenade_projectile kill; ent_fire molotov_projectile kill; ent_fire inferno kill; ent_fire flashbang_projectile kill; ent_fire hegrenade_projectile kill; ent_fire decoy_projectile kill; stopsound", subtitle: "Apaga instantaneamente todas as smokes, Molotovs, granadas no ar e corta efeitos sonoros ativos.", command-value: "ent_fire smokegrenade_projectile kill; ent_fire molotov_projectile kill; ent_fire inferno kill; ent_fire flashbang_projectile kill; ent_fire hegrenade_projectile kill; ent_fire decoy_projectile kill; stopsound", checked: false },
+        { row-kind: 1, command-index: -1, title: "Controle de Bots", subtitle: "", command-value: "", checked: false },
+        { row-kind: 2, command-index: 20, title: "bot_place", subtitle: "Posiciona um bot imediatamente no local onde sua mira aponta.", command-value: "bot_place", checked: false },
+        { row-kind: 2, command-index: 21, title: "bot_add_ct", subtitle: "Adiciona um bot ao lado Contraterrorista (CT).", command-value: "bot_add_ct", checked: false },
+        { row-kind: 2, command-index: 22, title: "bot_add_t", subtitle: "Adiciona um bot ao lado Terrorista (TR).", command-value: "bot_add_t", checked: false },
+        { row-kind: 2, command-index: 23, title: "bot_kick", subtitle: "Remove todos os bots da partida.", command-value: "bot_kick", checked: false },
+        { row-kind: 2, command-index: 24, title: "toggle bot_crouch 0 1", subtitle: "Faz todos os bots ficarem agachados ou em pé.", command-value: "toggle bot_crouch 0 1", checked: false },
+        { row-kind: 2, command-index: 25, title: "toggle bot_stop 0 1", subtitle: "Congela ou libera a movimentação dos bots.", command-value: "toggle bot_stop 0 1", checked: false },
+        { row-kind: 2, command-index: 26, title: "toggle bot_mimic 0 1", subtitle: "Faz os bots copiarem todos os seus movimentos e disparos em tempo real.", command-value: "toggle bot_mimic 0 1", checked: false },
+        { row-kind: 2, command-index: 27, title: "toggle bot_dont_shoot 0 1", subtitle: "Impede ou permite que os bots atirem.", command-value: "toggle bot_dont_shoot 0 1", checked: false },
+        { row-kind: 1, command-index: -1, title: "Combate, Hitboxes e Partida", subtitle: "", command-value: "", checked: false },
+        { row-kind: 2, command-index: 28, title: "toggle sv_showimpacts 0 1 2", subtitle: "Mostra quadrados coloridos de impacto dos tiros (1 = cliente + servidor, 2 = apenas cliente).", command-value: "toggle sv_showimpacts 0 1 2", checked: false },
+        { row-kind: 2, command-index: 29, title: "toggle sv_infinite_ammo 0 1 2", subtitle: "Alterna munição e granadas infinitas (1 = sem recarregar, 2 = reserva infinita).", command-value: "toggle sv_infinite_ammo 0 1 2", checked: false },
+        { row-kind: 2, command-index: 30, title: "god", subtitle: "Ativa invencibilidade total.", command-value: "god", checked: false },
+        { row-kind: 2, command-index: 31, title: "buddha", subtitle: "Permite sofrer dano até ficar com 1 de HP sem nunca morrer.", command-value: "buddha", checked: false },
+        { row-kind: 2, command-index: 32, title: "cl_ent_hitbox", subtitle: "Exibe as hitboxes do modelo para o qual você está apontando.", command-value: "cl_ent_hitbox", checked: false },
+        { row-kind: 2, command-index: 33, title: "toggle r_drawothermodels 1 2", subtitle: "Alterna renderização de personagens entre normal (1) e modo wireframe através das paredes (2).", command-value: "toggle r_drawothermodels 1 2", checked: false },
+        { row-kind: 2, command-index: 34, title: "impulse 101", subtitle: "Concede dinheiro máximo instantaneamente.", command-value: "impulse 101", checked: false },
+        { row-kind: 2, command-index: 35, title: "mp_restartgame 1", subtitle: "Reinicia o mapa/partida em 1 segundo.", command-value: "mp_restartgame 1", checked: false },
+        { row-kind: 0, command-index: -1, title: "3. Jogabilidade", subtitle: "Permitidos em partidas competitivas", command-value: "", checked: false },
+        { row-kind: 1, command-index: -1, title: "Interação, Visão e Bomba (C4)", subtitle: "", command-value: "", checked: false },
+        { row-kind: 2, command-index: 36, title: "+attack", subtitle: "Disparo primário (MOUSE1).", command-value: "+attack", checked: false },
+        { row-kind: 2, command-index: 37, title: "+attack2", subtitle: "Ação secundária como zoom, silenciador ou arremesso curto (MOUSE2).", command-value: "+attack2", checked: false },
+        { row-kind: 2, command-index: 38, title: "+reload", subtitle: "Recarregar a arma (R).", command-value: "+reload", checked: false },
+        { row-kind: 2, command-index: 39, title: "+use", subtitle: "Interagir, abrir portas, pegar armas no chão e desarmar a C4 (E).", command-value: "+use", checked: false },
+        { row-kind: 2, command-index: 40, title: "switchhands", subtitle: "Alterna instantaneamente a arma entre a mão direita e a esquerda.", command-value: "switchhands", checked: false },
+        { row-kind: 2, command-index: 41, title: "+lookatweapon", subtitle: "Inspeciona a arma/faca equipada (F).", command-value: "+lookatweapon", checked: false },
+        { row-kind: 2, command-index: 42, title: "+spray_menu", subtitle: "Abre o menu para aplicar grafite nas superfícies (T).", command-value: "+spray_menu", checked: false },
+        { row-kind: 2, command-index: 43, title: "slot5; drop", subtitle: "Equipa e larga a C4 rapidamente.", command-value: "slot5; drop", checked: false },
+        { row-kind: 1, command-index: -1, title: "Radar Inteligente", subtitle: "", command-value: "", checked: false },
+        { row-kind: 2, command-index: 44, title: "incrementvar cl_radar_scale 0.25 1.0 0.15", subtitle: "Aumenta o zoom do minimapa em etapas e volta ao mínimo ao atingir o limite.", command-value: "incrementvar cl_radar_scale 0.25 1.0 0.15", checked: false },
+        { row-kind: 2, command-index: 45, title: "toggle cl_radar_scale 0.35 0.75", subtitle: "Alterna entre visão panorâmica do mapa (0.35) e aproximada no bombsite (0.75).", command-value: "toggle cl_radar_scale 0.35 0.75", checked: false },
+        { row-kind: 2, command-index: 46, title: "toggle cl_radar_always_centered 0 1", subtitle: "Alterna entre manter o personagem sempre no centro do radar ou usar todo o espaço.", command-value: "toggle cl_radar_always_centered 0 1", checked: false },
+        { row-kind: 2, command-index: 47, title: "toggle cl_radar_rotate 0 1", subtitle: "Alterna entre radar giratório e radar fixo.", command-value: "toggle cl_radar_rotate 0 1", checked: false },
+        { row-kind: 1, command-index: -1, title: "Mira Dinâmica e Alinhamento (Crosshair)", subtitle: "", command-value: "", checked: false },
+        { row-kind: 2, command-index: 48, title: "toggle cl_crosshair_recoil 0 1", subtitle: "Ativa ou desativa a mira que segue o padrão de recuo (Follow Recoil).", command-value: "toggle cl_crosshair_recoil 0 1", checked: false },
+        { row-kind: 2, command-index: 49, title: "toggle cl_crosshairsize 2 1000", subtitle: "Estende as linhas da mira até as bordas do monitor (1000) para alinhar smokes e volta a 2.", command-value: "toggle cl_crosshairsize 2 1000", checked: false },
+        { row-kind: 2, command-index: 50, title: "toggle cl_crosshaircolor 1 2 4 5", subtitle: "Troca a cor da mira na hora (Verde, Amarelo, Ciano, Personalizada).", command-value: "toggle cl_crosshaircolor 1 2 4 5", checked: false },
+        { row-kind: 2, command-index: 51, title: "toggle cl_crosshairdot 0 1", subtitle: "Liga ou desliga o ponto central da mira.", command-value: "toggle cl_crosshairdot 0 1", checked: false },
+        { row-kind: 2, command-index: 52, title: "toggle crosshair 0 1", subtitle: "Oculta ou exibe completamente a mira.", command-value: "toggle crosshair 0 1", checked: false },
+        { row-kind: 2, command-index: 53, title: "toggle cl_grenadecrosshair_keepusercrosshair 0 1", subtitle: "Define se sua mira padrão permanece visível quando a retícula de granada entra na tela.", command-value: "toggle cl_grenadecrosshair_keepusercrosshair 0 1", checked: false },
+        { row-kind: 0, command-index: -1, title: "4. Comunicação", subtitle: "Voz, clutch binds, pings 3D, rodas e rádio", command-value: "", checked: false },
+        { row-kind: 1, command-index: -1, title: "Microfone e \"Clutch Binds\" (Voz)", subtitle: "", command-value: "", checked: false },
+        { row-kind: 2, command-index: 54, title: "+voicerecord", subtitle: "Aciona o microfone (Push-to-Talk).", command-value: "+voicerecord", checked: false },
+        { row-kind: 2, command-index: 55, title: "voice_modenable_toggle", subtitle: "Muta ou desmuta completamente a comunicação de voz da equipe com um clique.", command-value: "voice_modenable_toggle", checked: false },
+        { row-kind: 2, command-index: 56, title: "toggle snd_voipvolume 0.08 1.0", subtitle: "Reduz o volume das vozes do time para 8% (0.08) em clutch e retorna a 100% (1.0).", command-value: "toggle snd_voipvolume 0.08 1.0", checked: false },
+        { row-kind: 2, command-index: 57, title: "voice_toggle_open_mic", subtitle: "Alterna entre microfone aberto e Push-to-Talk.", command-value: "voice_toggle_open_mic", checked: false },
+        { row-kind: 1, command-index: -1, title: "Pings e Rodas de Chat (Chat Wheels)", subtitle: "", command-value: "", checked: false },
+        { row-kind: 2, command-index: 58, title: "player_ping", subtitle: "Cria um marcador visual 3D (ping) exatamente onde sua mira aponta.", command-value: "player_ping", checked: false },
+        { row-kind: 2, command-index: 59, title: "+radialradio", subtitle: "Mantém aberta a Roda de Comunicação 1.", command-value: "+radialradio", checked: false },
+        { row-kind: 2, command-index: 60, title: "+radialradio2", subtitle: "Mantém aberta a Roda de Comunicação 2.", command-value: "+radialradio2", checked: false },
+        { row-kind: 2, command-index: 61, title: "+radialradio3", subtitle: "Mantém aberta a Roda de Comunicação 3.", command-value: "+radialradio3", checked: false },
+        { row-kind: 1, command-index: -1, title: "Menus de Rádio e Falas Diretas de Personagem", subtitle: "", command-value: "", checked: false },
+        { row-kind: 2, command-index: 62, title: "radio", subtitle: "Abre o menu clássico principal de comandos de rádio na tela.", command-value: "radio", checked: false },
+        { row-kind: 2, command-index: 63, title: "radio1", subtitle: "Abre o menu clássico de comandos de rádio 1.", command-value: "radio1", checked: false },
+        { row-kind: 2, command-index: 64, title: "radio2", subtitle: "Abre o menu clássico de comandos de rádio 2.", command-value: "radio2", checked: false },
+        { row-kind: 2, command-index: 65, title: "radio3", subtitle: "Abre o menu clássico de comandos de rádio 3.", command-value: "radio3", checked: false },
+        { row-kind: 2, command-index: 66, title: "coverme", subtitle: "Fala direta tática: \"Me dê cobertura!\".", command-value: "coverme", checked: false },
+        { row-kind: 2, command-index: 67, title: "takepoint", subtitle: "Fala direta tática: \"Vá na frente\".", command-value: "takepoint", checked: false },
+        { row-kind: 2, command-index: 68, title: "holdpos", subtitle: "Fala direta tática: \"Mantenha a posição\".", command-value: "holdpos", checked: false },
+        { row-kind: 2, command-index: 69, title: "followme", subtitle: "Fala direta tática: \"Siga-me\".", command-value: "followme", checked: false },
+        { row-kind: 2, command-index: 70, title: "regroup", subtitle: "Fala direta tática: \"Reagrupar\".", command-value: "regroup", checked: false },
+        { row-kind: 2, command-index: 71, title: "fallback", subtitle: "Fala direta tática: \"Recuar!\".", command-value: "fallback", checked: false },
+        { row-kind: 2, command-index: 72, title: "sticktog", subtitle: "Fala direta tática: \"Fiquem juntos\".", command-value: "sticktog", checked: false },
+        { row-kind: 2, command-index: 73, title: "go", subtitle: "Fala direta tática: \"Vai, vai, vai!\".", command-value: "go", checked: false },
+        { row-kind: 2, command-index: 74, title: "enemyspot", subtitle: "Fala direta de informação: \"Inimigo avistado\".", command-value: "enemyspot", checked: false },
+        { row-kind: 2, command-index: 75, title: "needbackup", subtitle: "Fala direta de informação: \"Preciso de reforço\".", command-value: "needbackup", checked: false },
+        { row-kind: 2, command-index: 76, title: "sectorclear", subtitle: "Fala direta de informação: \"Setor limpo\".", command-value: "sectorclear", checked: false },
+        { row-kind: 2, command-index: 77, title: "inposition", subtitle: "Fala direta de informação: \"Em posição\".", command-value: "inposition", checked: false },
+        { row-kind: 2, command-index: 78, title: "enemydown", subtitle: "Fala direta de informação: \"Inimigo abatido\".", command-value: "enemydown", checked: false },
+        { row-kind: 2, command-index: 79, title: "getout", subtitle: "Fala direta de informação: \"Saiam daí, vai explodir!\".", command-value: "getout", checked: false },
+        { row-kind: 2, command-index: 80, title: "thanks", subtitle: "Fala direta social: \"Obrigado\".", command-value: "thanks", checked: false },
+        { row-kind: 2, command-index: 81, title: "compliment", subtitle: "Fala direta social: \"Boa!\".", command-value: "compliment", checked: false },
+        { row-kind: 2, command-index: 82, title: "cheer", subtitle: "Fala direta social: Comemorar.", command-value: "cheer", checked: false },
+        { row-kind: 1, command-index: -1, title: "Chat de Texto", subtitle: "", command-value: "", checked: false },
+        { row-kind: 2, command-index: 83, title: "messagemode", subtitle: "Abre a caixa de digitação para Todos (Y padrão).", command-value: "messagemode", checked: false },
+        { row-kind: 2, command-index: 84, title: "messagemode2", subtitle: "Abre a caixa de digitação apenas para a Equipe (U padrão).", command-value: "messagemode2", checked: false },
+        { row-kind: 2, command-index: 85, title: "say \"texto\"", subtitle: "Envia instantaneamente uma frase no chat geral (gravado sem aspas internas).", command-value: "say GGWP!", checked: false },
+        { row-kind: 2, command-index: 86, title: "say_team \"texto\"", subtitle: "Envia instantaneamente uma frase apenas para o seu time (gravado sem aspas internas).", command-value: "say_team Preciso de drop, por favor!", checked: false },
+        { row-kind: 0, command-index: -1, title: "5. Armas e Granadas", subtitle: "Seleção via slots e compras rápidas Source 2", command-value: "", checked: false },
+        { row-kind: 1, command-index: -1, title: "Slots de Armas e Equipamentos", subtitle: "", command-value: "", checked: false },
+        { row-kind: 2, command-index: 87, title: "slot1", subtitle: "Arma primária (Rifles, SMGs, Escopetas, Metralhadoras).", command-value: "slot1", checked: false },
+        { row-kind: 2, command-index: 88, title: "slot2", subtitle: "Arma secundária (Pistolas).", command-value: "slot2", checked: false },
+        { row-kind: 2, command-index: 89, title: "slot3", subtitle: "Faca (ou Zeus x27, se já estiver com a faca na mão).", command-value: "slot3", checked: false },
+        { row-kind: 2, command-index: 90, title: "slot4", subtitle: "Percorre sequencialmente todas as granadas no inventário.", command-value: "slot4", checked: false },
+        { row-kind: 2, command-index: 91, title: "slot5", subtitle: "Equipa diretamente o explosivo C4.", command-value: "slot5", checked: false },
+        { row-kind: 2, command-index: 92, title: "slot11", subtitle: "Equipa diretamente a Zeus x27 sem precisar apertar a faca duas vezes.", command-value: "slot11", checked: false },
+        { row-kind: 2, command-index: 93, title: "slot12", subtitle: "Equipa o Healthshot (seringa médica em modos Mata-Mata / Treino).", command-value: "slot12", checked: false },
+        { row-kind: 2, command-index: 94, title: "lastinv", subtitle: "Alterna para o último item equipado (Q padrão).", command-value: "lastinv", checked: false },
+        { row-kind: 2, command-index: 95, title: "invnext", subtitle: "Seleciona a próxima arma do inventário.", command-value: "invnext", checked: false },
+        { row-kind: 2, command-index: 96, title: "invprev", subtitle: "Seleciona a arma anterior do inventário.", command-value: "invprev", checked: false },
+        { row-kind: 2, command-index: 97, title: "drop", subtitle: "Joga no chão a arma ou utilitário atual (G padrão).", command-value: "drop", checked: false },
+        { row-kind: 1, command-index: -1, title: "Seleção Direta de Granadas (Altamente Recomendado)", subtitle: "", command-value: "", checked: false },
+        { row-kind: 2, command-index: 98, title: "slot6", subtitle: "Granada HE (Explosiva).", command-value: "slot6", checked: false },
+        { row-kind: 2, command-index: 99, title: "slot7", subtitle: "Flashbang (Luz).", command-value: "slot7", checked: false },
+        { row-kind: 2, command-index: 100, title: "slot8", subtitle: "Smoke (Fumaça).", command-value: "slot8", checked: false },
+        { row-kind: 2, command-index: 101, title: "slot9", subtitle: "Decoy (Distração).", command-value: "slot9", checked: false },
+        { row-kind: 2, command-index: 102, title: "slot10", subtitle: "Molotov / Granada Incendiária.", command-value: "slot10", checked: false },
+        { row-kind: 1, command-index: -1, title: "Comandos de Compra Rápida (buy e Reembolso)", subtitle: "", command-value: "", checked: false },
+        { row-kind: 2, command-index: 103, title: "autobuy", subtitle: "Compra automática (F3 padrão).", command-value: "autobuy", checked: false },
+        { row-kind: 2, command-index: 104, title: "rebuy", subtitle: "Recompra do round anterior (F4 padrão).", command-value: "rebuy", checked: false },
+        { row-kind: 2, command-index: 105, title: "sellbackall", subtitle: "Reembolsa instantaneamente todas as compras feitas no freezetime atual.", command-value: "sellbackall", checked: false },
+        { row-kind: 2, command-index: 106, title: "buy vest", subtitle: "Compra Colete.", command-value: "buy vest", checked: false },
+        { row-kind: 2, command-index: 107, title: "buy vesthelm", subtitle: "Compra Colete + Capacete.", command-value: "buy vesthelm", checked: false },
+        { row-kind: 2, command-index: 108, title: "buy defuser", subtitle: "Compra Kit Defuse (CT).", command-value: "buy defuser", checked: false },
+        { row-kind: 2, command-index: 109, title: "buy taser", subtitle: "Compra Zeus x27.", command-value: "buy taser", checked: false },
+        { row-kind: 2, command-index: 110, title: "buy smokegrenade", subtitle: "Compra Smoke.", command-value: "buy smokegrenade", checked: false },
+        { row-kind: 2, command-index: 111, title: "buy flashbang", subtitle: "Compra Flashbang.", command-value: "buy flashbang", checked: false },
+        { row-kind: 2, command-index: 112, title: "buy hegrenade", subtitle: "Compra Granada HE.", command-value: "buy hegrenade", checked: false },
+        { row-kind: 2, command-index: 113, title: "buy molotov; buy incgrenade", subtitle: "Compra Molotov (TR) ou Granada Incendiária (CT).", command-value: "buy molotov; buy incgrenade", checked: false },
+        { row-kind: 2, command-index: 114, title: "buy decoy", subtitle: "Compra Decoy.", command-value: "buy decoy", checked: false },
+        { row-kind: 2, command-index: 115, title: "buy glock; buy hkp2000; buy usp_silencer", subtitle: "Compra pistola inicial (Glock / P2000 / USP-S).", command-value: "buy glock; buy hkp2000; buy usp_silencer", checked: false },
+        { row-kind: 2, command-index: 116, title: "buy p250", subtitle: "Compra P250.", command-value: "buy p250", checked: false },
+        { row-kind: 2, command-index: 117, title: "buy tec9; buy fiveseven; buy cz75a", subtitle: "Compra Tec-9 / Five-SeveN / CZ75-Auto.", command-value: "buy tec9; buy fiveseven; buy cz75a", checked: false },
+        { row-kind: 2, command-index: 118, title: "buy deagle; buy revolver", subtitle: "Compra Desert Eagle / R8 Revolver.", command-value: "buy deagle; buy revolver", checked: false },
+        { row-kind: 2, command-index: 119, title: "buy elite", subtitle: "Compra Dual Berettas.", command-value: "buy elite", checked: false },
+        { row-kind: 2, command-index: 120, title: "buy galilar; buy famas", subtitle: "Compra Galil AR (TR) ou FAMAS (CT).", command-value: "buy galilar; buy famas", checked: false },
+        { row-kind: 2, command-index: 121, title: "buy ak47; buy m4a1; buy m4a1_silencer", subtitle: "Compra AK-47 (TR), M4A4 (m4a1) ou M4A1-S (m4a1_silencer).", command-value: "buy ak47; buy m4a1; buy m4a1_silencer", checked: false },
+        { row-kind: 2, command-index: 122, title: "buy ssg08", subtitle: "Compra SSG 08 (Scout).", command-value: "buy ssg08", checked: false },
+        { row-kind: 2, command-index: 123, title: "buy sg556; buy aug", subtitle: "Compra SG 553 (TR) ou AUG (CT).", command-value: "buy sg556; buy aug", checked: false },
+        { row-kind: 2, command-index: 124, title: "buy awp", subtitle: "Compra AWP.", command-value: "buy awp", checked: false },
+        { row-kind: 2, command-index: 125, title: "buy g3sg1; buy scar20", subtitle: "Compra G3SG1 (TR) ou SCAR-20 (CT).", command-value: "buy g3sg1; buy scar20", checked: false },
+        { row-kind: 2, command-index: 126, title: "buy mac10; buy mp9", subtitle: "Compra MAC-10 (TR) ou MP9 (CT).", command-value: "buy mac10; buy mp9", checked: false },
+        { row-kind: 2, command-index: 127, title: "buy mp7; buy mp5sd", subtitle: "Compra MP7 / MP5-SD.", command-value: "buy mp7; buy mp5sd", checked: false },
+        { row-kind: 2, command-index: 128, title: "buy ump45", subtitle: "Compra UMP-45.", command-value: "buy ump45", checked: false },
+        { row-kind: 2, command-index: 129, title: "buy p90", subtitle: "Compra P90.", command-value: "buy p90", checked: false },
+        { row-kind: 2, command-index: 130, title: "buy bizon", subtitle: "Compra PP-Bizon.", command-value: "buy bizon", checked: false },
+        { row-kind: 2, command-index: 131, title: "buy nova", subtitle: "Compra Nova.", command-value: "buy nova", checked: false },
+        { row-kind: 2, command-index: 132, title: "buy xm1014", subtitle: "Compra XM1014.", command-value: "buy xm1014", checked: false },
+        { row-kind: 2, command-index: 133, title: "buy mag7; buy sawedoff", subtitle: "Compra MAG-7 (CT) ou Sawed-Off (TR).", command-value: "buy mag7; buy sawedoff", checked: false },
+        { row-kind: 2, command-index: 134, title: "buy m249", subtitle: "Compra M249.", command-value: "buy m249", checked: false },
+        { row-kind: 2, command-index: 135, title: "buy negev", subtitle: "Compra Negev.", command-value: "buy negev", checked: false },
+        { row-kind: 2, command-index: 136, title: "buy secondary0", subtitle: "Compra pistola do espaço 0 do Loadout CS2.", command-value: "buy secondary0", checked: false },
+        { row-kind: 2, command-index: 137, title: "buy secondary1", subtitle: "Compra pistola do espaço 1 do Loadout CS2.", command-value: "buy secondary1", checked: false },
+        { row-kind: 2, command-index: 138, title: "buy secondary2", subtitle: "Compra pistola do espaço 2 do Loadout CS2.", command-value: "buy secondary2", checked: false },
+        { row-kind: 2, command-index: 139, title: "buy secondary3", subtitle: "Compra pistola do espaço 3 do Loadout CS2.", command-value: "buy secondary3", checked: false },
+        { row-kind: 2, command-index: 140, title: "buy secondary4", subtitle: "Compra pistola do espaço 4 do Loadout CS2.", command-value: "buy secondary4", checked: false },
+        { row-kind: 2, command-index: 141, title: "buy midtier0", subtitle: "Compra arma intermediária (Mid-Tier) do espaço 0 do Loadout CS2.", command-value: "buy midtier0", checked: false },
+        { row-kind: 2, command-index: 142, title: "buy midtier1", subtitle: "Compra arma intermediária (Mid-Tier) do espaço 1 do Loadout CS2.", command-value: "buy midtier1", checked: false },
+        { row-kind: 2, command-index: 143, title: "buy midtier2", subtitle: "Compra arma intermediária (Mid-Tier) do espaço 2 do Loadout CS2.", command-value: "buy midtier2", checked: false },
+        { row-kind: 2, command-index: 144, title: "buy midtier3", subtitle: "Compra arma intermediária (Mid-Tier) do espaço 3 do Loadout CS2.", command-value: "buy midtier3", checked: false },
+        { row-kind: 2, command-index: 145, title: "buy midtier4", subtitle: "Compra arma intermediária (Mid-Tier) do espaço 4 do Loadout CS2.", command-value: "buy midtier4", checked: false },
+        { row-kind: 2, command-index: 146, title: "buy rifle0", subtitle: "Compra rifle do espaço 0 do Loadout CS2.", command-value: "buy rifle0", checked: false },
+        { row-kind: 2, command-index: 147, title: "buy rifle1", subtitle: "Compra rifle do espaço 1 do Loadout CS2.", command-value: "buy rifle1", checked: false },
+        { row-kind: 2, command-index: 148, title: "buy rifle2", subtitle: "Compra rifle do espaço 2 do Loadout CS2.", command-value: "buy rifle2", checked: false },
+        { row-kind: 2, command-index: 149, title: "buy rifle3", subtitle: "Compra rifle do espaço 3 do Loadout CS2.", command-value: "buy rifle3", checked: false },
+        { row-kind: 2, command-index: 150, title: "buy rifle4", subtitle: "Compra rifle do espaço 4 do Loadout CS2.", command-value: "buy rifle4", checked: false },
+        { row-kind: 0, command-index: -1, title: "6. Monitoramento (FPS, Telemetria e Rede)", subtitle: "Telemetria nativa do HUD CS2 e diagnósticos", command-value: "", checked: false },
+        { row-kind: 1, command-index: -1, title: "Telemetria Nativa do CS2 (0 = Nunca, 1 = Problema, 2 = Sempre)", subtitle: "", command-value: "", checked: false },
+        { row-kind: 2, command-index: 151, title: "toggle cl_hud_telemetry_frametime_show 0 1 2", subtitle: "Exibe o contador de FPS e o tempo de quadro (Frametime em ms) no canto superior direito.", command-value: "toggle cl_hud_telemetry_frametime_show 0 1 2", checked: false },
+        { row-kind: 2, command-index: 152, title: "toggle cl_hud_telemetry_ping_show 0 1 2", subtitle: "Exibe o seu Ping (ms) em tempo real.", command-value: "toggle cl_hud_telemetry_ping_show 0 1 2", checked: false },
+        { row-kind: 2, command-index: 153, title: "toggle cl_hud_telemetry_net_misdelivery_show 0 1 2", subtitle: "Exibe alertas e porcentagem de perda ou atraso de pacotes (packet loss / jitter).", command-value: "toggle cl_hud_telemetry_net_misdelivery_show 0 1 2", checked: false },
+        { row-kind: 2, command-index: 154, title: "toggle cl_hud_telemetry_serverrecvmargin_graph_show 0 1 2", subtitle: "Mostra um micrográfico em tempo real da estabilidade de envio ao servidor.", command-value: "toggle cl_hud_telemetry_serverrecvmargin_graph_show 0 1 2", checked: false },
+        { row-kind: 1, command-index: -1, title: "Diagnósticos Clássicos e Placar", subtitle: "", command-value: "", checked: false },
+        { row-kind: 2, command-index: 155, title: "toggle cq_netgraph 0 1", subtitle: "Liga/desliga a barra gráfica de Command Queue (sub-tick) no canto superior direito.", command-value: "toggle cq_netgraph 0 1", checked: false },
+        { row-kind: 2, command-index: 156, title: "toggle cl_showfps 0 1 2 3 4", subtitle: "Contador direto de FPS da engine (1 = simples, 2 a 4 = latência detalhada).", command-value: "toggle cl_showfps 0 1 2 3 4", checked: false },
+        { row-kind: 2, command-index: 157, title: "toggle cl_showpos 0 1", subtitle: "Mostra coordenadas (pos), ângulo (ang) e velocidade horizontal (vel).", command-value: "toggle cl_showpos 0 1", checked: false },
+        { row-kind: 2, command-index: 158, title: "+showscores", subtitle: "Abre a tabela de pontuação / Placar (TAB).", command-value: "+showscores", checked: false },
+        { row-kind: 2, command-index: 159, title: "status", subtitle: "Imprime no console dados do servidor atual, mapa, ping e jogadores conectados.", command-value: "status", checked: false },
+        { row-kind: 2, command-index: 160, title: "sys_info", subtitle: "Gera no console um relatório completo de hardware, drivers e configurações ativas.", command-value: "sys_info", checked: false },
+        { row-kind: 0, command-index: -1, title: "7. Outros (Áudio, Demos/Replays, HUD e Sistema)", subtitle: "Som, análise de demos GOTV, HUD e manutenção", command-value: "", checked: false },
+        { row-kind: 1, command-index: -1, title: "Controle de Volume e Áudio", subtitle: "", command-value: "", checked: false },
+        { row-kind: 2, command-index: 161, title: "incrementvar volume 0 1 0.05", subtitle: "Aumenta o volume geral do jogo em passos de 5%.", command-value: "incrementvar volume 0 1 0.05", checked: false },
+        { row-kind: 2, command-index: 162, title: "incrementvar volume 0 1 -0.05", subtitle: "Diminui o volume geral do jogo em passos de 5%.", command-value: "incrementvar volume 0 1 -0.05", checked: false },
+        { row-kind: 2, command-index: 163, title: "toggle volume 0.08 0.55", subtitle: "Alterna entre Modo Aquecimento/DM (0.08) e Modo Competitivo (0.55).", command-value: "toggle volume 0.08 0.55", checked: false },
+        { row-kind: 2, command-index: 164, title: "toggle snd_mute_losefocus 0 1", subtitle: "Define se o áudio fica mudo ou continua tocando quando você dá Alt+Tab.", command-value: "toggle snd_mute_losefocus 0 1", checked: false },
+        { row-kind: 1, command-index: -1, title: "Replays e Análise de Demos (GOTV / Suas Partidas)", subtitle: "", command-value: "", checked: false },
+        { row-kind: 2, command-index: 165, title: "demoui", subtitle: "Abre ou fecha a barra de controle de reprodução de Demo (Shift+F2).", command-value: "demoui", checked: false },
+        { row-kind: 2, command-index: 166, title: "demo_togglepause", subtitle: "Pausa ou retoma a reprodução da Demo instantaneamente.", command-value: "demo_togglepause", checked: false },
+        { row-kind: 2, command-index: 167, title: "toggle demo_timescale 0.25 0.5 1 2 4 8", subtitle: "Alterna a velocidade do replay entre 0.25x e 8x.", command-value: "toggle demo_timescale 0.25 0.5 1 2 4 8", checked: false },
+        { row-kind: 2, command-index: 168, title: "demo_goto -960 1 0", subtitle: "Volta aproximadamente 15 segundos na linha do tempo da Demo.", command-value: "demo_goto -960 1 0", checked: false },
+        { row-kind: 2, command-index: 169, title: "demo_goto 960 1 0", subtitle: "Avança aproximadamente 15 segundos na linha do tempo da Demo.", command-value: "demo_goto 960 1 0", checked: false },
+        { row-kind: 2, command-index: 170, title: "toggle spec_show_xray 0 1", subtitle: "Liga ou desliga o Raio-X (X-Ray) durante análise do replay ou modo espectador.", command-value: "toggle spec_show_xray 0 1", checked: false },
+        { row-kind: 1, command-index: -1, title: "Personalização de HUD e Capturas", subtitle: "", command-value: "", checked: false },
+        { row-kind: 2, command-index: 171, title: "incrementvar cl_hud_color 0 11 1", subtitle: "Troca ciclicamente a cor de toda a interface (HUD) entre as 12 cores disponíveis.", command-value: "incrementvar cl_hud_color 0 11 1", checked: false },
+        { row-kind: 2, command-index: 172, title: "toggle cl_draw_only_deathnotices 0 1", subtitle: "Esconde HUD e radar deixando apenas a mira e o registro de abates (killfeed).", command-value: "toggle cl_draw_only_deathnotices 0 1", checked: false },
+        { row-kind: 2, command-index: 173, title: "toggle cl_drawhud 0 1", subtitle: "Oculta absolutamente toda a interface da tela (exige sv_cheats 1).", command-value: "toggle cl_drawhud 0 1", checked: false },
+        { row-kind: 2, command-index: 174, title: "screenshot", subtitle: "Captura uma foto imediata da tela.", command-value: "screenshot", checked: false },
+        { row-kind: 2, command-index: 175, title: "jpeg", subtitle: "Captura uma foto imediata da tela em formato JPEG.", command-value: "jpeg", checked: false },
+        { row-kind: 1, command-index: -1, title: "Console, Sistema e Gerenciamento de Binds", subtitle: "", command-value: "", checked: false },
+        { row-kind: 2, command-index: 176, title: "toggleconsole", subtitle: "Abre ou fecha o Console de Desenvolvedor (' ou ~).", command-value: "toggleconsole", checked: false },
+        { row-kind: 2, command-index: 177, title: "exec autoexec", subtitle: "Carrega imediatamente todas as configurações salvas no arquivo autoexec.cfg.", command-value: "exec autoexec", checked: false },
+        { row-kind: 2, command-index: 178, title: "callvote", subtitle: "Abre o menu de votações (pedir pausa, expulsar jogador, render-se).", command-value: "callvote", checked: false },
+        { row-kind: 2, command-index: 179, title: "disconnect", subtitle: "Desconecta imediatamente do servidor/partida atual e volta ao menu inicial.", command-value: "disconnect", checked: false },
+        { row-kind: 2, command-index: 180, title: "quit", subtitle: "Fecha o Counter-Strike 2 instantaneamente para a Área de Trabalho.", command-value: "quit", checked: false },
+        { row-kind: 2, command-index: 181, title: "key_listboundkeys", subtitle: "Lista no console todas as teclas que possuem binds ativas no momento.", command-value: "key_listboundkeys", checked: false },
+        { row-kind: 2, command-index: 182, title: "key_findbinding \"comando\"", subtitle: "Pesquisa qual tecla está associada a um comando específico (gravado sem aspas internas).", command-value: "key_findbinding +voicerecord", checked: false },
+        { row-kind: 2, command-index: 183, title: "find \"palavra\"", subtitle: "Busca qualquer comando ou variável existente no CS2 com o termo pesquisado (gravado sem aspas internas).", command-value: "find radar", checked: false },
+        { row-kind: 2, command-index: 184, title: "unbind \"TECLA\"", subtitle: "Remove o comando atribuído a uma tecla específica (gravado sem aspas internas).", command-value: "unbind v", checked: false },
+        { row-kind: 2, command-index: 185, title: "binddefaults", subtitle: "Restaura todas as teclas para a configuração original de fábrica da Valve.", command-value: "binddefaults", checked: false },
+    ];
+
+    // Callbacks para integração com o backend Rust
+    pure callback resolve-cs2-key(string) -> string;
+    callback existing-file-selected(string);
+    callback file-name-edited(string);
+    callback key-captured(string);
+    callback command-toggled(int, bool);
+    callback clear-selected-commands();
+    callback save-bind-clicked();
+    callback confirm-conflict-overwrite();
+    callback cancel-conflict-overwrite();
+
+    // Função dedicada de ativação da escuta da próxima tecla
+    public function activate-key-listener() {
+        root.selector-dropdown-open = false;
+        root.show-conflict-prompt = false;
+        root.is-listening-key = true;
+        key-listener-scope.focus();
+    }
+
+    pure function fallback-resolve-key(text: string) -> string {
+        if text == Key.Space || text == " " {
+            return "space";
+        }
+        if text == Key.Return {
+            return "enter";
+        }
+        if text == Key.Escape {
+            return "escape";
+        }
+        if text == Key.Tab {
+            return "tab";
+        }
+        if text == Key.Backspace {
+            return "backspace";
+        }
+        if text == Key.Delete {
+            return "del";
+        }
+        if text == Key.Insert {
+            return "ins";
+        }
+        if text == Key.Home {
+            return "home";
+        }
+        if text == Key.End {
+            return "end";
+        }
+        if text == Key.PageUp {
+            return "pgup";
+        }
+        if text == Key.PageDown {
+            return "pgdn";
+        }
+        if text == Key.UpArrow {
+            return "uparrow";
+        }
+        if text == Key.DownArrow {
+            return "downarrow";
+        }
+        if text == Key.LeftArrow {
+            return "leftarrow";
+        }
+        if text == Key.RightArrow {
+            return "rightarrow";
+        }
+        if text == Key.Shift {
+            return "shift";
+        }
+        if text == Key.ShiftR {
+            return "rshift";
+        }
+        if text == Key.Control {
+            return "ctrl";
+        }
+        if text == Key.ControlR {
+            return "rctrl";
+        }
+        if text == Key.Alt {
+            return "alt";
+        }
+        if text == Key.AltGr {
+            return "ralt";
+        }
+        if text == Key.CapsLock {
+            return "capslock";
+        }
+        if text == Key.F1 { return "f1"; }
+        if text == Key.F2 { return "f2"; }
+        if text == Key.F3 { return "f3"; }
+        if text == Key.F4 { return "f4"; }
+        if text == Key.F5 { return "f5"; }
+        if text == Key.F6 { return "f6"; }
+        if text == Key.F7 { return "f7"; }
+        if text == Key.F8 { return "f8"; }
+        if text == Key.F9 { return "f9"; }
+        if text == Key.F10 { return "f10"; }
+        if text == Key.F11 { return "f11"; }
+        if text == Key.F12 { return "f12"; }
+        if text == ";" {
+            return "semicolon";
+        }
+        if text == "" || text == "\"" {
+            return "";
+        }
+        return text;
+    }
+
+    function apply-captured-key(key-name: string) {
+        root.bound-key = key-name;
+        root.is-listening-key = false;
+        root.key-captured(root.bound-key);
+    }
+
+    function sync-local-save-mode() {
+        if root.selected-existing-file == "" {
+            root.is-creating-new-file = true;
+            root.save-mode-badge = "NOVO ARQUIVO";
+        } else if root.file-name-input == "" {
+            root.is-creating-new-file = true;
+            root.save-mode-badge = "DIGITE O NOME";
+        } else if root.file-name-input == root.selected-existing-file {
+            root.is-creating-new-file = false;
+            root.save-mode-badge = "ATUALIZAR ATUAL";
+        } else {
+            root.is-creating-new-file = true;
+            root.save-mode-badge = "CRIAR NOVO";
+        }
+    }
+
+    // Função dedicada que escuta e associa automaticamente a próxima tecla pressionada
+    function capture-next-key(event: KeyEvent) -> EventResult {
+        if !root.is-listening-key {
+            return reject;
+        }
+
+        let mapped-from-backend = root.resolve-cs2-key(event.text);
+        let mapped-key = mapped-from-backend != "" ? mapped-from-backend : root.fallback-resolve-key(event.text);
+        if mapped-key == "" {
+            return accept;
+        }
+
+        root.apply-captured-key(mapped-key);
+        return accept;
+    }
+
+    VerticalLayout {
+        // =====================================================================
+        // 1. BARRA SUPERIOR FIXA (HEADER)
+        // =====================================================================
+        Rectangle {
+            background: CS2Theme.bg-surface;
+
+            VerticalLayout {
+                padding-left: 20px;
+                padding-right: 20px;
+                padding-top: 14px;
+                padding-bottom: 12px;
+                spacing: 10px;
+
+                // Linha superior: título enxuto + badge de ambiente isolado
+                HorizontalLayout {
+                    alignment: space-between;
+
+                    HorizontalLayout {
+                        spacing: 10px;
+
+                        Image {
+                            source: @image-url("assets/icons/cfg.svg");
+                            width: 18px;
+                            height: 18px;
+                            colorize: CS2Theme.accent-ct-cyan;
+                            y: (parent.height - self.height) / 2;
+                        }
+
+                        Text {
+                            text: "GERADOR DE BINDS CS2";
+                            font-size: 14px;
+                            font-weight: 900;
+                            letter-spacing: 0.7px;
+                            color: CS2Theme.text-primary;
+                            vertical-alignment: center;
+                        }
+                    }
+
+                    Rectangle {
+                        height: 22px;
+                        border-radius: CS2Theme.radius-xs;
+                        background: CS2Theme.accent-ct-soft;
+                        border-width: 1px;
+                        border-color: CS2Theme.border-accent-cyan;
+
+                        HorizontalLayout {
+                            padding-left: 8px;
+                            padding-right: 8px;
+                            Text {
+                                text: "JANELA ISOLADA DE TESTES";
+                                font-size: 9px;
+                                font-weight: 800;
+                                letter-spacing: 0.6px;
+                                color: CS2Theme.text-cyan;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+                }
+
+                // Controles do Header lado a lado
+                HorizontalLayout {
+                    spacing: 10px;
+
+                    // 1.1 Input Fixo para Nome do Arquivo (.cfg)
+                    VerticalLayout {
+                        spacing: 4px;
+                        horizontal-stretch: 2;
+                        min-width: 220px;
+
+                        HorizontalLayout {
+                            alignment: space-between;
+
+                            Text {
+                                text: "ARQUIVO (.CFG)";
+                                font-size: 10px;
+                                font-weight: 800;
+                                letter-spacing: 0.5px;
+                                color: CS2Theme.text-muted;
+                            }
+
+                            Rectangle {
+                                height: 15px;
+                                border-radius: CS2Theme.radius-xs;
+                                background: root.is-creating-new-file ? CS2Theme.accent-t-soft : CS2Theme.accent-ct-soft;
+
+                                HorizontalLayout {
+                                    padding-left: 6px;
+                                    padding-right: 6px;
+                                    Text {
+                                        text: root.save-mode-badge;
+                                        font-size: 8px;
+                                        font-weight: 900;
+                                        letter-spacing: 0.5px;
+                                        color: root.is-creating-new-file ? CS2Theme.text-gold : CS2Theme.text-cyan;
+                                        vertical-alignment: center;
+                                    }
+                                }
+                            }
+                        }
+
+                        Rectangle {
+                            height: 36px;
+                            background: CS2Theme.bg-main;
+                            border-radius: CS2Theme.radius-sm;
+                            border-width: file-name-field.has-focus ? 2px : 1px;
+                            border-color: file-name-field.has-focus ? CS2Theme.accent-ct-cyan : CS2Theme.border;
+                            animate border-color { duration: 100ms; }
+
+                            HorizontalLayout {
+                                padding-left: 10px;
+                                padding-right: 10px;
+
+                                file-name-field := TextInput {
+                                    text <=> root.file-name-input;
+                                    color: CS2Theme.text-primary;
+                                    font-size: 12px;
+                                    font-weight: 700;
+                                    vertical-alignment: center;
+                                    edited => {
+                                        root.show-conflict-prompt = false;
+                                        root.sync-local-save-mode();
+                                        root.file-name-edited(self.text);
+                                    }
+                                }
+                            }
+
+                            if root.file-name-input == "" : Text {
+                                x: 10px;
+                                y: (parent.height - self.height) / 2;
+                                text: "Digite um nome (ex: minhas_binds.cfg)";
+                                color: CS2Theme.text-muted;
+                                font-size: 11px;
+                                opacity: 0.75;
+                            }
+                        }
+                    }
+
+                    // 1.2 Seletor de Arquivo Existente (lado a lado com o Input)
+                    VerticalLayout {
+                        spacing: 4px;
+                        width: 215px;
+
+                        Text {
+                            text: "CARREGAR EXISTENTE";
+                            font-size: 10px;
+                            font-weight: 800;
+                            letter-spacing: 0.5px;
+                            color: CS2Theme.text-muted;
+                        }
+
+                        selector-anchor := Rectangle {
+                            height: 36px;
+                            background: selector-touch.has-hover || root.selector-dropdown-open ? CS2Theme.bg-card-hover : CS2Theme.bg-main;
+                            border-radius: CS2Theme.radius-sm;
+                            border-width: root.selector-dropdown-open ? 2px : 1px;
+                            border-color: root.selector-dropdown-open ? CS2Theme.accent-ct-cyan : (selector-touch.has-hover ? CS2Theme.border-hover : CS2Theme.border);
+                            animate background { duration: 100ms; }
+                            animate border-color { duration: 100ms; }
+
+                            HorizontalLayout {
+                                padding-left: 10px;
+                                padding-right: 10px;
+                                spacing: 8px;
+                                alignment: space-between;
+
+                                Text {
+                                    text: root.selected-existing-file != "" ? root.selected-existing-file : "Selecionar .cfg...";
+                                    font-size: 12px;
+                                    font-weight: root.selected-existing-file != "" ? 700 : 500;
+                                    color: root.selected-existing-file != "" ? CS2Theme.text-primary : CS2Theme.text-muted;
+                                    vertical-alignment: center;
+                                    overflow: elide;
+                                    horizontal-stretch: 1;
+                                }
+
+                                VerticalLayout {
+                                    alignment: center;
+                                    Path {
+                                        width: 10px;
+                                        height: 6px;
+                                        viewbox-width: 10;
+                                        viewbox-height: 6;
+                                        stroke: root.selector-dropdown-open ? CS2Theme.accent-ct-cyan : CS2Theme.text-muted;
+                                        stroke-width: 1.8px;
+                                        commands: root.selector-dropdown-open ? "M 1 5 L 5 1 L 9 5" : "M 1 1 L 5 5 L 9 1";
+                                    }
+                                }
+                            }
+
+                            selector-touch := TouchArea {
+                                mouse-cursor: pointer;
+                                clicked => {
+                                    root.is-listening-key = false;
+                                    root.selector-dropdown-open = !root.selector-dropdown-open;
+                                }
+                            }
+                        }
+                    }
+
+                    // 1.3 Captura de Tecla (Key Listener) ao lado do bloco de arquivo
+                    VerticalLayout {
+                        spacing: 4px;
+                        width: 235px;
+
+                        Text {
+                            text: "TECLA DA BIND (KEY LISTENER)";
+                            font-size: 10px;
+                            font-weight: 800;
+                            letter-spacing: 0.5px;
+                            color: root.is-listening-key ? CS2Theme.text-cyan : CS2Theme.text-muted;
+                        }
+
+                        key-listener-box := Rectangle {
+                            height: 36px;
+                            background: root.is-listening-key
+                                ? CS2Theme.accent-ct-soft
+                                : (key-touch.has-hover ? CS2Theme.bg-card-hover : CS2Theme.bg-main);
+                            border-radius: CS2Theme.radius-sm;
+                            border-width: root.is-listening-key ? 2px : 1px;
+                            border-color: root.is-listening-key
+                                ? CS2Theme.accent-ct-cyan
+                                : (root.bound-key != "" ? CS2Theme.accent-ct-blue : (key-touch.has-hover ? CS2Theme.border-hover : CS2Theme.border));
+                            animate background { duration: 100ms; }
+                            animate border-color { duration: 100ms; }
+
+                            key-listener-scope := FocusScope {
+                                changed has-focus => {
+                                    if !self.has-focus && root.is-listening-key {
+                                        root.is-listening-key = false;
+                                    }
+                                }
+                                key-pressed(event) => {
+                                    return root.capture-next-key(event);
+                                }
+                            }
+
+                            key-touch := TouchArea {
+                                mouse-cursor: pointer;
+                                clicked => {
+                                    root.activate-key-listener();
+                                }
+                                pointer-event(ev) => {
+                                    if root.is-listening-key && ev.kind == PointerEventKind.down {
+                                        if ev.button == PointerEventButton.right {
+                                            root.apply-captured-key("mouse2");
+                                        } else if ev.button == PointerEventButton.middle {
+                                            root.apply-captured-key("mouse3");
+                                        } else if ev.button == PointerEventButton.back {
+                                            root.apply-captured-key("mouse4");
+                                        } else if ev.button == PointerEventButton.forward {
+                                            root.apply-captured-key("mouse5");
+                                        }
+                                    }
+                                }
+                                scroll-event(ev) => {
+                                    if root.is-listening-key {
+                                        if ev.delta-y > 0px {
+                                            root.apply-captured-key("mwheelup");
+                                            return accept;
+                                        } else if ev.delta-y < 0px {
+                                            root.apply-captured-key("mwheeldown");
+                                            return accept;
+                                        }
+                                    }
+                                    return reject;
+                                }
+                            }
+
+                            HorizontalLayout {
+                                padding-left: 10px;
+                                padding-right: 8px;
+                                spacing: 8px;
+                                alignment: space-between;
+
+                                HorizontalLayout {
+                                    spacing: 8px;
+                                    horizontal-stretch: 1;
+
+                                    VerticalLayout {
+                                        alignment: center;
+                                        Rectangle {
+                                            width: 7px;
+                                            height: 7px;
+                                            border-radius: 3.5px;
+                                            background: root.is-listening-key
+                                                ? CS2Theme.accent-ct-cyan
+                                                : (root.bound-key != "" ? CS2Theme.status-success : CS2Theme.text-dim);
+                                        }
+                                    }
+
+                                    Text {
+                                        text: root.is-listening-key
+                                            ? "Pressione uma tecla..."
+                                            : (root.bound-key != "" ? root.bound-key : "Clique p/ capturar tecla");
+                                        font-size: 12px;
+                                        font-weight: root.is-listening-key || root.bound-key != "" ? 800 : 500;
+                                        color: root.is-listening-key
+                                            ? CS2Theme.text-cyan
+                                            : (root.bound-key != "" ? CS2Theme.text-primary : CS2Theme.text-muted);
+                                        vertical-alignment: center;
+                                        overflow: elide;
+                                        horizontal-stretch: 1;
+                                    }
+                                }
+
+                                if root.bound-key != "" && !root.is-listening-key : Rectangle {
+                                    width: 22px;
+                                    height: 22px;
+                                    y: (parent.height - self.height) / 2;
+                                    border-radius: CS2Theme.radius-xs;
+                                    background: clear-key-touch.has-hover ? CS2Theme.bg-card-selected : transparent;
+
+                                    Path {
+                                        width: 8px;
+                                        height: 8px;
+                                        x: (parent.width - self.width) / 2;
+                                        y: (parent.height - self.height) / 2;
+                                        viewbox-width: 10;
+                                        viewbox-height: 10;
+                                        stroke: clear-key-touch.has-hover ? CS2Theme.text-primary : CS2Theme.text-muted;
+                                        stroke-width: 1.8px;
+                                        commands: "M 1.5 1.5 L 8.5 8.5 M 8.5 1.5 L 1.5 8.5";
+                                    }
+
+                                    clear-key-touch := TouchArea {
+                                        mouse-cursor: pointer;
+                                        clicked => {
+                                            root.bound-key = "";
+                                            root.key-captured("");
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // 1.4 Botão de Ação Salvar Bind
+                    VerticalLayout {
+                        spacing: 4px;
+                        width: 185px;
+
+                        Text {
+                            text: "AÇÃO";
+                            font-size: 10px;
+                            font-weight: 800;
+                            letter-spacing: 0.5px;
+                            color: CS2Theme.text-muted;
+                        }
+
+                        Rectangle {
+                            height: 36px;
+                            background: save-touch.has-hover ? CS2Theme.accent-orange-bright : CS2Theme.accent-orange;
+                            border-radius: CS2Theme.radius-sm;
+                            border-width: 1px;
+                            border-color: save-touch.has-hover ? #fb923c : #c2410c;
+                            animate background { duration: 100ms; }
+                            animate border-color { duration: 100ms; }
+
+                            HorizontalLayout {
+                                padding-left: 12px;
+                                padding-right: 12px;
+                                spacing: 8px;
+                                alignment: center;
+
+                                Image {
+                                    source: @image-url("assets/icons/save.svg");
+                                    width: 15px;
+                                    height: 15px;
+                                    colorize: #ffffff;
+                                    y: (parent.height - self.height) / 2;
+                                }
+
+                                Text {
+                                    text: root.selected-commands-count > 0
+                                        ? "SALVAR BIND (" + root.selected-commands-count + ")"
+                                        : "SALVAR BIND";
+                                    font-size: 11px;
+                                    font-weight: 900;
+                                    letter-spacing: 0.6px;
+                                    color: #ffffff;
+                                    vertical-alignment: center;
+                                }
+                            }
+
+                            save-touch := TouchArea {
+                                mouse-cursor: pointer;
+                                clicked => {
+                                    root.selector-dropdown-open = false;
+                                    root.is-listening-key = false;
+                                    root.save-bind-clicked();
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Linha secundária: Prévia em tempo real da bind + Status / Ação limpar seleção
+                HorizontalLayout {
+                    spacing: 12px;
+                    alignment: space-between;
+
+                    HorizontalLayout {
+                        spacing: 8px;
+                        horizontal-stretch: 1;
+
+                        VerticalLayout {
+                            alignment: center;
+                            Rectangle {
+                                width: 6px;
+                                height: 6px;
+                                border-radius: 3px;
+                                background: root.status-kind == "success"
+                                    ? CS2Theme.status-success
+                                    : (root.status-kind == "warning"
+                                        ? CS2Theme.accent-t-gold
+                                        : (root.status-kind == "error" ? CS2Theme.status-danger : CS2Theme.accent-ct-cyan));
+                            }
+                        }
+
+                        Text {
+                            text: root.bind-preview-line != "" && root.status-kind == "info"
+                                ? "Prévia: " + root.bind-preview-line
+                                : root.status-message;
+                            font-size: 11px;
+                            font-weight: 600;
+                            color: root.status-kind == "success"
+                                ? CS2Theme.text-green
+                                : (root.status-kind == "warning"
+                                    ? CS2Theme.text-gold
+                                    : (root.status-kind == "error" ? CS2Theme.status-danger : CS2Theme.text-muted));
+                            vertical-alignment: center;
+                            overflow: elide;
+                            horizontal-stretch: 1;
+                        }
+                    }
+
+                    if root.selected-commands-count > 0 : Rectangle {
+                        height: 22px;
+                        border-radius: CS2Theme.radius-xs;
+                        background: clear-cmds-touch.has-hover ? CS2Theme.bg-card-hover : CS2Theme.bg-main;
+                        border-width: 1px;
+                        border-color: clear-cmds-touch.has-hover ? CS2Theme.border-hover : CS2Theme.border;
+
+                        HorizontalLayout {
+                            padding-left: 8px;
+                            padding-right: 8px;
+                            Text {
+                                text: "Limpar marcados (" + root.selected-commands-count + ")";
+                                font-size: 10px;
+                                font-weight: 700;
+                                color: CS2Theme.text-muted;
+                                vertical-alignment: center;
+                            }
+                        }
+
+                        clear-cmds-touch := TouchArea {
+                            mouse-cursor: pointer;
+                            clicked => {
+                                root.selected-commands-count = 0;
+                                root.clear-selected-commands();
+                            }
+                        }
+                    }
+                }
+
+                // Confirmação inline quando a tecla já existe no arquivo selecionado
+                if root.show-conflict-prompt : Rectangle {
+                    background: CS2Theme.accent-t-soft;
+                    border-radius: CS2Theme.radius-sm;
+                    border-width: 1px;
+                    border-color: CS2Theme.accent-t-gold;
+
+                    HorizontalLayout {
+                        padding-left: 12px;
+                        padding-right: 12px;
+                        padding-top: 8px;
+                        padding-bottom: 8px;
+                        spacing: 12px;
+                        alignment: space-between;
+
+                        Text {
+                            text: root.conflict-message;
+                            font-size: 11px;
+                            font-weight: 700;
+                            color: CS2Theme.text-primary;
+                            wrap: word-wrap;
+                            vertical-alignment: center;
+                            horizontal-stretch: 1;
+                        }
+
+                        HorizontalLayout {
+                            spacing: 8px;
+
+                            Rectangle {
+                                height: 28px;
+                                background: conflict-cancel-touch.has-hover ? CS2Theme.bg-card-hover : CS2Theme.bg-main;
+                                border-radius: CS2Theme.radius-xs;
+                                border-width: 1px;
+                                border-color: CS2Theme.border-hover;
+
+                                HorizontalLayout {
+                                    padding-left: 10px;
+                                    padding-right: 10px;
+                                    Text {
+                                        text: "CANCELAR";
+                                        font-size: 10px;
+                                        font-weight: 800;
+                                        color: CS2Theme.text-primary;
+                                        vertical-alignment: center;
+                                    }
+                                }
+
+                                conflict-cancel-touch := TouchArea {
+                                    mouse-cursor: pointer;
+                                    clicked => {
+                                        root.show-conflict-prompt = false;
+                                        root.cancel-conflict-overwrite();
+                                    }
+                                }
+                            }
+
+                            Rectangle {
+                                height: 28px;
+                                background: conflict-ok-touch.has-hover ? CS2Theme.accent-orange-bright : CS2Theme.accent-orange;
+                                border-radius: CS2Theme.radius-xs;
+
+                                HorizontalLayout {
+                                    padding-left: 12px;
+                                    padding-right: 12px;
+                                    Text {
+                                        text: "SUBSTITUIR TECLA";
+                                        font-size: 10px;
+                                        font-weight: 900;
+                                        color: #ffffff;
+                                        vertical-alignment: center;
+                                    }
+                                }
+
+                                conflict-ok-touch := TouchArea {
+                                    mouse-cursor: pointer;
+                                    clicked => {
+                                        root.show-conflict-prompt = false;
+                                        root.confirm-conflict-overwrite();
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Separador estrutural do Header Fixo
+        Rectangle {
+            height: 1px;
+            background: CS2Theme.border;
+        }
+
+        // =====================================================================
+        // 2. LISTAGEM ROLÁVEL DE COMANDOS POR CATEGORIA
+        // =====================================================================
+        ScrollView {
+            vertical-stretch: 1;
+
+            VerticalLayout {
+                padding-left: 20px;
+                padding-right: 20px;
+                padding-top: 8px;
+                padding-bottom: 24px;
+                spacing: 4px;
+
+                for row[idx] in root.catalog-rows : VerticalLayout {
+                    // 2.1 Cabeçalho de Categoria
+                    if row.row-kind == 0 : VerticalLayout {
+                        padding-top: idx == 0 ? 6px : 18px;
+                        padding-bottom: 4px;
+                        spacing: 6px;
+
+                        HorizontalLayout {
+                            spacing: 10px;
+                            alignment: start;
+
+                            Text {
+                                text: row.title;
+                                font-size: 15px;
+                                font-weight: 900;
+                                letter-spacing: 0.4px;
+                                color: CS2Theme.text-primary;
+                                vertical-alignment: center;
+                            }
+
+                            if row.subtitle != "" : Rectangle {
+                                height: 20px;
+                                border-radius: CS2Theme.radius-xs;
+                                background: CS2Theme.bg-surface-elevated;
+                                border-width: 1px;
+                                border-color: CS2Theme.border;
+
+                                HorizontalLayout {
+                                    padding-left: 8px;
+                                    padding-right: 8px;
+                                    Text {
+                                        text: row.subtitle;
+                                        font-size: 10px;
+                                        font-weight: 600;
+                                        color: CS2Theme.text-muted;
+                                        vertical-alignment: center;
+                                    }
+                                }
+                            }
+                        }
+
+                        Rectangle {
+                            height: 1px;
+                            background: CS2Theme.border;
+                        }
+                    }
+
+                    // 2.2 Cabeçalho de Subcategoria
+                    if row.row-kind == 1 : VerticalLayout {
+                        padding-top: 8px;
+                        padding-bottom: 2px;
+
+                        Text {
+                            text: row.title;
+                            font-size: 11px;
+                            font-weight: 800;
+                            letter-spacing: 0.4px;
+                            color: CS2Theme.text-cyan;
+                        }
+                    }
+
+                    // 2.3 Item de Comando com Checkbox
+                    if row.row-kind == 2 : Rectangle {
+                        min-height: 36px;
+                        background: row.checked
+                            ? CS2Theme.bg-card-selected
+                            : (item-touch.has-hover ? CS2Theme.bg-card-hover : CS2Theme.bg-card);
+                        border-radius: CS2Theme.radius-xs;
+                        border-width: 1px;
+                        border-color: row.checked
+                            ? CS2Theme.accent-ct-cyan
+                            : (item-touch.has-hover ? CS2Theme.border-hover : CS2Theme.border);
+                        animate background { duration: 90ms; }
+                        animate border-color { duration: 90ms; }
+
+                        HorizontalLayout {
+                            padding-left: 12px;
+                            padding-right: 12px;
+                            padding-top: 7px;
+                            padding-bottom: 7px;
+                            spacing: 12px;
+
+                            VerticalLayout {
+                                alignment: center;
+                                VectorCheckmark {
+                                    checked: row.checked;
+                                }
+                            }
+
+                            Rectangle {
+                                min-width: 240px;
+                                max-width: 340px;
+                                border-radius: CS2Theme.radius-xs;
+                                background: row.checked ? CS2Theme.accent-ct-soft : CS2Theme.bg-main;
+                                border-width: 1px;
+                                border-color: row.checked ? CS2Theme.accent-ct-blue : CS2Theme.border;
+
+                                HorizontalLayout {
+                                    padding-left: 8px;
+                                    padding-right: 8px;
+                                    padding-top: 3px;
+                                    padding-bottom: 3px;
+
+                                    Text {
+                                        text: row.title;
+                                        font-size: 11px;
+                                        font-weight: 700;
+                                        color: row.checked ? #ffffff : CS2Theme.text-cyan;
+                                        wrap: word-wrap;
+                                        vertical-alignment: center;
+                                    }
+                                }
+                            }
+
+                            Text {
+                                text: row.subtitle;
+                                font-size: 12px;
+                                font-weight: 400;
+                                color: row.checked ? CS2Theme.text-primary : CS2Theme.text-muted;
+                                wrap: word-wrap;
+                                vertical-alignment: center;
+                                horizontal-stretch: 1;
+                            }
+                        }
+
+                        item-touch := TouchArea {
+                            mouse-cursor: pointer;
+                            clicked => {
+                                root.selector-dropdown-open = false;
+                                row.checked = !row.checked;
+                                if row.checked {
+                                    root.selected-commands-count += 1;
+                                } else {
+                                    root.selected-commands-count = max(0, root.selected-commands-count - 1);
+                                }
+                                root.command-toggled(idx, row.checked);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // =========================================================================
+    // 3. OVERLAY DO SELETOR DE ARQUIVOS EXISTENTES (.CFG)
+    // =========================================================================
+    if root.selector-dropdown-open : TouchArea {
+        clicked => {
+            root.selector-dropdown-open = false;
+        }
+    }
+
+    if root.selector-dropdown-open : Rectangle {
+        x: clamp(selector-anchor.absolute-position.x, 12px, root.width - self.width - 12px);
+        y: selector-anchor.absolute-position.y + selector-anchor.height + 4px;
+        width: 260px;
+        height: min(260px, 46px + max(1, root.existing-cfg-files.length) * 32px);
+        background: CS2Theme.bg-surface-elevated;
+        border-radius: CS2Theme.radius-sm;
+        border-width: 1px;
+        border-color: CS2Theme.accent-ct-cyan;
+        drop-shadow-color: rgba(0, 0, 0, 0.55);
+        drop-shadow-blur: 14px;
+        drop-shadow-offset-y: 6px;
+        clip: true;
+
+        // Bloqueia propagação de cliques no fundo do menu
+        TouchArea { }
+
+        VerticalLayout {
+            padding: 4px;
+            spacing: 2px;
+
+            // Opção para limpar seleção e criar um novo arquivo
+            Rectangle {
+                height: 30px;
+                border-radius: CS2Theme.radius-xs;
+                background: clear-sel-touch.has-hover ? CS2Theme.bg-card-hover : transparent;
+
+                HorizontalLayout {
+                    padding-left: 10px;
+                    padding-right: 10px;
+                    Text {
+                        text: "+ Novo arquivo (limpar seleção)";
+                        font-size: 11px;
+                        font-weight: 700;
+                        color: CS2Theme.text-gold;
+                        vertical-alignment: center;
+                    }
+                }
+
+                clear-sel-touch := TouchArea {
+                    mouse-cursor: pointer;
+                    clicked => {
+                        root.selected-existing-file = "";
+                        root.selector-dropdown-open = false;
+                        root.sync-local-save-mode();
+                        root.existing-file-selected("");
+                    }
+                }
+            }
+
+            Rectangle {
+                height: 1px;
+                background: CS2Theme.border;
+            }
+
+            if root.existing-cfg-files.length == 0 : Rectangle {
+                height: 32px;
+                Text {
+                    text: "Nenhum arquivo .cfg encontrado";
+                    font-size: 11px;
+                    color: CS2Theme.text-muted;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+            }
+
+            if root.existing-cfg-files.length > 0 : ScrollView {
+                vertical-stretch: 1;
+
+                VerticalLayout {
+                    spacing: 2px;
+
+                    for cfg-name in root.existing-cfg-files : Rectangle {
+                        property <bool> is-current: cfg-name == root.selected-existing-file;
+                        height: 30px;
+                        border-radius: CS2Theme.radius-xs;
+                        background: is-current
+                            ? CS2Theme.accent-ct-soft
+                            : (cfg-item-touch.has-hover ? CS2Theme.bg-card-hover : transparent);
+
+                        HorizontalLayout {
+                            padding-left: 10px;
+                            padding-right: 10px;
+                            alignment: space-between;
+
+                            Text {
+                                text: cfg-name;
+                                font-size: 11px;
+                                font-weight: is-current ? 800 : 600;
+                                color: is-current ? CS2Theme.text-cyan : CS2Theme.text-primary;
+                                vertical-alignment: center;
+                                overflow: elide;
+                                horizontal-stretch: 1;
+                            }
+
+                            if is-current : Text {
+                                text: "ATIVO";
+                                font-size: 8px;
+                                font-weight: 900;
+                                color: CS2Theme.text-cyan;
+                                vertical-alignment: center;
+                            }
+                        }
+
+                        cfg-item-touch := TouchArea {
+                            mouse-cursor: pointer;
+                            clicked => {
+                                root.selected-existing-file = cfg-name;
+                                root.file-name-input = cfg-name;
+                                root.selector-dropdown-open = false;
+                                root.show-conflict-prompt = false;
+                                root.sync-local-save-mode();
+                                root.existing-file-selected(cfg-name);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
