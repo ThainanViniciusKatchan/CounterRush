@@ -275,9 +275,94 @@ static CS2_BIND_CATALOG: &[BindCommandEntry] = &[
     cmd!(CAT_7, NOTE_7, SUB_7_4, "binddefaults", "Restaura todas as teclas para a configuração original de fábrica da Valve."),
 ];
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BindCategoryInfo {
+    pub index: usize,
+    pub title: &'static str,
+    pub tab_label: &'static str,
+    pub subtitle: &'static str,
+    pub command_count: usize,
+}
+
+fn category_tab_label(title: &'static str) -> &'static str {
+    match title {
+        CAT_1 => "Movimentação",
+        CAT_2 => "Treinamento",
+        CAT_3 => "Jogabilidade",
+        CAT_4 => "Comunicação",
+        CAT_5 => "Armas e Granadas",
+        CAT_6 => "Monitoramento",
+        CAT_7 => "Outros",
+        _ => title,
+    }
+}
+
 /// Retorna o catálogo completo de binds do CS2 na ordem exata de `guia_completo_de_binds_no_cs2.md`.
 pub fn cs2_bind_catalog() -> &'static [BindCommandEntry] {
     CS2_BIND_CATALOG
+}
+
+/// Retorna os metadados das categorias do catálogo na ordem oficial, derivados de `CS2_BIND_CATALOG`.
+pub fn cs2_bind_categories() -> Vec<BindCategoryInfo> {
+    let mut categories: Vec<BindCategoryInfo> = Vec::new();
+    for entry in CS2_BIND_CATALOG {
+        if let Some(last) = categories.last_mut() {
+            if last.title == entry.category {
+                last.command_count += 1;
+                continue;
+            }
+        }
+        let index = categories.len();
+        categories.push(BindCategoryInfo {
+            index,
+            title: entry.category,
+            tab_label: category_tab_label(entry.category),
+            subtitle: entry.category_note,
+            command_count: 1,
+        });
+    }
+    categories
+}
+
+/// Normaliza texto para busca insensível a maiúsculas/minúsculas e diacríticos comuns em PT-BR.
+pub fn normalize_search_text(input: &str) -> String {
+    let mut normalized = String::with_capacity(input.len());
+    for ch in input.chars().flat_map(char::to_lowercase) {
+        let folded = match ch {
+            'á' | 'à' | 'â' | 'ã' | 'ä' => 'a',
+            'é' | 'è' | 'ê' | 'ë' => 'e',
+            'í' | 'ì' | 'î' | 'ï' => 'i',
+            'ó' | 'ò' | 'ô' | 'õ' | 'ö' => 'o',
+            'ú' | 'ù' | 'û' | 'ü' => 'u',
+            'ç' => 'c',
+            'ñ' => 'n',
+            other => other,
+        };
+        normalized.push(folded);
+    }
+    normalized
+}
+
+/// Verifica se um comando do catálogo corresponde a todos os termos da pesquisa no comando ou descrição.
+pub fn matches_bind_search(entry: &BindCommandEntry, query: &str) -> bool {
+    let trimmed = query.trim();
+    if trimmed.is_empty() {
+        return true;
+    }
+
+    let normalized_query = normalize_search_text(trimmed);
+    let terms: Vec<&str> = normalized_query.split_whitespace().collect();
+    if terms.is_empty() {
+        return true;
+    }
+
+    let norm_display = normalize_search_text(entry.display_command);
+    let norm_cfg = normalize_search_text(entry.cfg_command);
+    let norm_desc = normalize_search_text(entry.description);
+
+    terms.iter().all(|term| {
+        norm_display.contains(term) || norm_cfg.contains(term) || norm_desc.contains(term)
+    })
 }
 
 /// Converte o texto ou identificador de uma tecla capturada para o código oficial do CS2 (Source 2).
@@ -419,5 +504,64 @@ mod tests {
         );
         assert_eq!(normalize_captured_key_to_cs2("\""), None);
         assert_eq!(normalize_captured_key_to_cs2(""), None);
+    }
+
+    #[test]
+    fn test_cs2_bind_categories_integrity() {
+        let categories = cs2_bind_categories();
+        assert_eq!(categories.len(), 7);
+        assert_eq!(
+            categories
+                .iter()
+                .map(|c| c.tab_label)
+                .collect::<Vec<_>>(),
+            vec![
+                "Movimentação",
+                "Treinamento",
+                "Jogabilidade",
+                "Comunicação",
+                "Armas e Granadas",
+                "Monitoramento",
+                "Outros",
+            ]
+        );
+        assert!(categories.iter().all(|c| !c.subtitle.is_empty()));
+        let total: usize = categories.iter().map(|c| c.command_count).sum();
+        assert_eq!(total, 186);
+    }
+
+    #[test]
+    fn test_matches_bind_search_command_and_description() {
+        let catalog = cs2_bind_catalog();
+
+        let noclip = catalog.iter().find(|e| e.cfg_command == "noclip").unwrap();
+        assert!(matches_bind_search(noclip, ""));
+        assert!(matches_bind_search(noclip, "noclip"));
+        assert!(matches_bind_search(noclip, "NOCLIP"));
+        assert!(matches_bind_search(noclip, "voo livre"));
+        assert!(!matches_bind_search(noclip, "granada"));
+
+        let smoke_slot = catalog.iter().find(|e| e.cfg_command == "slot8").unwrap();
+        assert!(matches_bind_search(smoke_slot, "slot8"));
+        assert!(matches_bind_search(smoke_slot, "fumaça"));
+        assert!(matches_bind_search(smoke_slot, "fumaca"));
+
+        let infinite_ammo = catalog
+            .iter()
+            .find(|e| e.cfg_command == "toggle sv_infinite_ammo 0 1 2")
+            .unwrap();
+        assert!(matches_bind_search(infinite_ammo, "munição"));
+        assert!(matches_bind_search(infinite_ammo, "municao granadas"));
+
+        let say_entry = catalog
+            .iter()
+            .find(|e| e.cfg_command == "say GGWP!")
+            .unwrap();
+        assert!(matches_bind_search(say_entry, "ggwp"));
+        assert!(matches_bind_search(say_entry, "say texto"));
+
+        assert!(!catalog
+            .iter()
+            .any(|e| matches_bind_search(e, "comando_inexistente_xyz")));
     }
 }

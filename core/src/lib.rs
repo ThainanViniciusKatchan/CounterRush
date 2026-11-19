@@ -22,7 +22,10 @@ pub enum CoreError {
 pub mod classifier;
 pub use classifier::{classify_pc, PcCategory};
 pub mod bind_catalog;
-pub use bind_catalog::{cs2_bind_catalog, normalize_captured_key_to_cs2, BindCommandEntry};
+pub use bind_catalog::{
+    cs2_bind_catalog, cs2_bind_categories, matches_bind_search, normalize_captured_key_to_cs2,
+    BindCategoryInfo, BindCommandEntry,
+};
 pub mod binds;
 pub use binds::{
     determine_bind_save_mode, find_key_conflict_in_content, format_bind_commands,

@@ -1,39 +1,31 @@
 import { ScrollView } from "std-widgets.slint";
 import { CS2Theme } from "theme.slint";
+import { BindCommandCard } from "components/bind_command_card.slint";
+
+export struct BindCategoryTab {
+    index: int,
+    tab-label: string,
+    title: string,
+    subtitle: string,
+    total-count: int,
+    selected-count: int,
+    match-count: int,
+}
 
 export struct BindCatalogRow {
-    // 0 = Categoria, 1 = Subcategoria, 2 = Comando com checkbox
+    // 0 = Categoria, 1 = Subcategoria, 2 = Comando em lista, 3 = Par de comandos em grade
     row-kind: int,
     command-index: int,
     title: string,
     subtitle: string,
     command-value: string,
     checked: bool,
-}
-
-component VectorCheckmark inherits Rectangle {
-    in property <bool> checked: false;
-
-    width: 16px;
-    height: 16px;
-    border-radius: 3px;
-    border-width: 1px;
-    border-color: root.checked ? CS2Theme.accent-ct-blue : CS2Theme.border-hover;
-    background: root.checked ? CS2Theme.accent-ct-blue : CS2Theme.bg-main;
-    animate background { duration: 100ms; }
-    animate border-color { duration: 100ms; }
-
-    if root.checked : Path {
-        width: 10px;
-        height: 8px;
-        x: (parent.width - self.width) / 2;
-        y: (parent.height - self.height) / 2;
-        viewbox-width: 12;
-        viewbox-height: 10;
-        stroke: #ffffff;
-        stroke-width: 2.2px;
-        commands: "M 1.5 5.2 L 4.6 8.3 L 10.5 1.8";
-    }
+    has-second: bool,
+    second-command-index: int,
+    second-title: string,
+    second-subtitle: string,
+    second-command-value: string,
+    second-checked: bool,
 }
 
 export component BindsTestWindow inherits Window {
@@ -55,7 +47,12 @@ export component BindsTestWindow inherits Window {
     in-out property <string> save-mode-badge: "NOVO ARQUIVO";
     in-out property <bool> is-creating-new-file: true;
 
-    // Estado da listagem, prévia e feedback
+    // Estado da listagem, navegação, visualização, pesquisa e prévia
+    in-out property <bool> backend-connected: false;
+    in-out property <int> active-category-index: 1;
+    in-out property <bool> is-grid-view: false;
+    in-out property <string> search-query: "";
+    in-out property <int> filtered-commands-count: 5;
     in-out property <int> selected-commands-count: 0;
     in-out property <string> bind-preview-line: "";
     in-out property <string> status-message: "Selecione ou digite um arquivo .cfg, capture uma tecla e marque os comandos desejados.";
@@ -63,221 +60,25 @@ export component BindsTestWindow inherits Window {
     in-out property <bool> show-conflict-prompt: false;
     in-out property <string> conflict-message: "";
 
+    in-out property <[BindCategoryTab]> category-tabs: [
+        { index: 0, tab-label: "Movimentação", title: "1. Movimentação", subtitle: "Deslocamento, saltos, postura e controle de câmera (Source 2)", total-count: 13, selected-count: 0, match-count: 0 },
+        { index: 1, tab-label: "Treinamento", title: "2. Treinamento", subtitle: "Exigem sv_cheats 1", total-count: 23, selected-count: 0, match-count: 0 },
+        { index: 2, tab-label: "Jogabilidade", title: "3. Jogabilidade", subtitle: "Permitidos em partidas competitivas", total-count: 18, selected-count: 0, match-count: 0 },
+        { index: 3, tab-label: "Comunicação", title: "4. Comunicação", subtitle: "Voz, clutch binds, pings 3D, rodas e rádio", total-count: 33, selected-count: 0, match-count: 0 },
+        { index: 4, tab-label: "Armas e Granadas", title: "5. Armas e Granadas", subtitle: "Seleção via slots e compras rápidas Source 2", total-count: 64, selected-count: 0, match-count: 0 },
+        { index: 5, tab-label: "Monitoramento", title: "6. Monitoramento (FPS, Telemetria e Rede)", subtitle: "Telemetria nativa do HUD CS2 e diagnósticos", total-count: 10, selected-count: 0, match-count: 0 },
+        { index: 6, tab-label: "Outros", title: "7. Outros (Áudio, Demos/Replays, HUD e Sistema)", subtitle: "Som, análise de demos GOTV, HUD e manutenção", total-count: 25, selected-count: 0, match-count: 0 },
+    ];
+
     in-out property <[BindCatalogRow]> catalog-rows: [
-        { row-kind: 0, command-index: -1, title: "1. Movimentação", subtitle: "Deslocamento, saltos, postura e controle de câmera (Source 2)", command-value: "", checked: false },
-        { row-kind: 1, command-index: -1, title: "Comandos Principais", subtitle: "", command-value: "", checked: false },
-        { row-kind: 2, command-index: 0, title: "+forward", subtitle: "Move para frente (W).", command-value: "+forward", checked: false },
-        { row-kind: 2, command-index: 1, title: "+back", subtitle: "Move para trás (S).", command-value: "+back", checked: false },
-        { row-kind: 2, command-index: 2, title: "+left", subtitle: "Move lateralmente / strafe para a esquerda (A).", command-value: "+left", checked: false },
-        { row-kind: 2, command-index: 3, title: "+right", subtitle: "Move lateralmente / strafe para a direita (D).", command-value: "+right", checked: false },
-        { row-kind: 2, command-index: 4, title: "+jump", subtitle: "Executa o pulo (muito utilizado no scroll do mouse para facilitar o Bunnyhop).", command-value: "+jump", checked: false },
-        { row-kind: 2, command-index: 5, title: "+duck", subtitle: "Agacha o personagem (CTRL).", command-value: "+duck", checked: false },
-        { row-kind: 2, command-index: 6, title: "+sprint", subtitle: "Caminha devagar e sem emitir som de passos (SHIFT).", command-value: "+sprint", checked: false },
-        { row-kind: 2, command-index: 7, title: "toggle option_duck_method 0 1", subtitle: "Alterna o modo de agachar entre segurar a tecla (0) e manter agachado (1).", command-value: "toggle option_duck_method 0 1", checked: false },
-        { row-kind: 2, command-index: 8, title: "toggle option_speed_method 0 1", subtitle: "Alterna o caminhar silencioso entre segurar (0) e alternar com um toque (1).", command-value: "toggle option_speed_method 0 1", checked: false },
-        { row-kind: 2, command-index: 9, title: "+turnleft", subtitle: "Gira a câmera horizontalmente para a esquerda (Surf, KZ e Bhop).", command-value: "+turnleft", checked: false },
-        { row-kind: 2, command-index: 10, title: "+turnright", subtitle: "Gira a câmera horizontalmente para a direita (Surf, KZ e Bhop).", command-value: "+turnright", checked: false },
-        { row-kind: 2, command-index: 11, title: "+lookup", subtitle: "Move o ângulo de visão verticalmente para cima via teclado.", command-value: "+lookup", checked: false },
-        { row-kind: 2, command-index: 12, title: "+lookdown", subtitle: "Move o ângulo de visão verticalmente para baixo via teclado.", command-value: "+lookdown", checked: false },
-        { row-kind: 0, command-index: -1, title: "2. Treinamento", subtitle: "Exigem sv_cheats 1", command-value: "", checked: false },
-        { row-kind: 1, command-index: -1, title: "Movimentação Livre e Teleporte de Precisão", subtitle: "", command-value: "", checked: false },
-        { row-kind: 2, command-index: 13, title: "noclip", subtitle: "Liga/desliga o voo livre atravessando paredes e objetos.", command-value: "noclip", checked: false },
-        { row-kind: 2, command-index: 14, title: "getpos", subtitle: "Imprime no console as coordenadas exatas (setpos e setang) da posição e mira atuais.", command-value: "getpos", checked: false },
-        { row-kind: 2, command-index: 15, title: "toggle host_timescale 1 0.5 2", subtitle: "Alterna a velocidade do servidor entre normal (1), câmera lenta (0.5) e acelerada (2).", command-value: "toggle host_timescale 1 0.5 2", checked: false },
-        { row-kind: 1, command-index: -1, title: "Treino Avançado de Granadas", subtitle: "", command-value: "", checked: false },
-        { row-kind: 2, command-index: 16, title: "sv_rethrow_last_grenade", subtitle: "Arremessa novamente a última granada jogada no servidor.", command-value: "sv_rethrow_last_grenade", checked: false },
-        { row-kind: 2, command-index: 17, title: "toggle sv_grenade_trajectory_prac_pipreview 0 1", subtitle: "Abre ou fecha a janelinha Picture-in-Picture mostrando onde sua granada vai cair.", command-value: "toggle sv_grenade_trajectory_prac_pipreview 0 1", checked: false },
-        { row-kind: 2, command-index: 18, title: "cl_sim_grenade_trajectory", subtitle: "Congela a linha de trajetória atual da granada na sua mão por alguns segundos.", command-value: "cl_sim_grenade_trajectory", checked: false },
-        { row-kind: 2, command-index: 19, title: "ent_fire smokegrenade_projectile kill; ent_fire molotov_projectile kill; ent_fire inferno kill; ent_fire flashbang_projectile kill; ent_fire hegrenade_projectile kill; ent_fire decoy_projectile kill; stopsound", subtitle: "Apaga instantaneamente todas as smokes, Molotovs, granadas no ar e corta efeitos sonoros ativos.", command-value: "ent_fire smokegrenade_projectile kill; ent_fire molotov_projectile kill; ent_fire inferno kill; ent_fire flashbang_projectile kill; ent_fire hegrenade_projectile kill; ent_fire decoy_projectile kill; stopsound", checked: false },
-        { row-kind: 1, command-index: -1, title: "Controle de Bots", subtitle: "", command-value: "", checked: false },
-        { row-kind: 2, command-index: 20, title: "bot_place", subtitle: "Posiciona um bot imediatamente no local onde sua mira aponta.", command-value: "bot_place", checked: false },
-        { row-kind: 2, command-index: 21, title: "bot_add_ct", subtitle: "Adiciona um bot ao lado Contraterrorista (CT).", command-value: "bot_add_ct", checked: false },
-        { row-kind: 2, command-index: 22, title: "bot_add_t", subtitle: "Adiciona um bot ao lado Terrorista (TR).", command-value: "bot_add_t", checked: false },
-        { row-kind: 2, command-index: 23, title: "bot_kick", subtitle: "Remove todos os bots da partida.", command-value: "bot_kick", checked: false },
-        { row-kind: 2, command-index: 24, title: "toggle bot_crouch 0 1", subtitle: "Faz todos os bots ficarem agachados ou em pé.", command-value: "toggle bot_crouch 0 1", checked: false },
-        { row-kind: 2, command-index: 25, title: "toggle bot_stop 0 1", subtitle: "Congela ou libera a movimentação dos bots.", command-value: "toggle bot_stop 0 1", checked: false },
-        { row-kind: 2, command-index: 26, title: "toggle bot_mimic 0 1", subtitle: "Faz os bots copiarem todos os seus movimentos e disparos em tempo real.", command-value: "toggle bot_mimic 0 1", checked: false },
-        { row-kind: 2, command-index: 27, title: "toggle bot_dont_shoot 0 1", subtitle: "Impede ou permite que os bots atirem.", command-value: "toggle bot_dont_shoot 0 1", checked: false },
-        { row-kind: 1, command-index: -1, title: "Combate, Hitboxes e Partida", subtitle: "", command-value: "", checked: false },
-        { row-kind: 2, command-index: 28, title: "toggle sv_showimpacts 0 1 2", subtitle: "Mostra quadrados coloridos de impacto dos tiros (1 = cliente + servidor, 2 = apenas cliente).", command-value: "toggle sv_showimpacts 0 1 2", checked: false },
-        { row-kind: 2, command-index: 29, title: "toggle sv_infinite_ammo 0 1 2", subtitle: "Alterna munição e granadas infinitas (1 = sem recarregar, 2 = reserva infinita).", command-value: "toggle sv_infinite_ammo 0 1 2", checked: false },
-        { row-kind: 2, command-index: 30, title: "god", subtitle: "Ativa invencibilidade total.", command-value: "god", checked: false },
-        { row-kind: 2, command-index: 31, title: "buddha", subtitle: "Permite sofrer dano até ficar com 1 de HP sem nunca morrer.", command-value: "buddha", checked: false },
-        { row-kind: 2, command-index: 32, title: "cl_ent_hitbox", subtitle: "Exibe as hitboxes do modelo para o qual você está apontando.", command-value: "cl_ent_hitbox", checked: false },
-        { row-kind: 2, command-index: 33, title: "toggle r_drawothermodels 1 2", subtitle: "Alterna renderização de personagens entre normal (1) e modo wireframe através das paredes (2).", command-value: "toggle r_drawothermodels 1 2", checked: false },
-        { row-kind: 2, command-index: 34, title: "impulse 101", subtitle: "Concede dinheiro máximo instantaneamente.", command-value: "impulse 101", checked: false },
-        { row-kind: 2, command-index: 35, title: "mp_restartgame 1", subtitle: "Reinicia o mapa/partida em 1 segundo.", command-value: "mp_restartgame 1", checked: false },
-        { row-kind: 0, command-index: -1, title: "3. Jogabilidade", subtitle: "Permitidos em partidas competitivas", command-value: "", checked: false },
-        { row-kind: 1, command-index: -1, title: "Interação, Visão e Bomba (C4)", subtitle: "", command-value: "", checked: false },
-        { row-kind: 2, command-index: 36, title: "+attack", subtitle: "Disparo primário (MOUSE1).", command-value: "+attack", checked: false },
-        { row-kind: 2, command-index: 37, title: "+attack2", subtitle: "Ação secundária como zoom, silenciador ou arremesso curto (MOUSE2).", command-value: "+attack2", checked: false },
-        { row-kind: 2, command-index: 38, title: "+reload", subtitle: "Recarregar a arma (R).", command-value: "+reload", checked: false },
-        { row-kind: 2, command-index: 39, title: "+use", subtitle: "Interagir, abrir portas, pegar armas no chão e desarmar a C4 (E).", command-value: "+use", checked: false },
-        { row-kind: 2, command-index: 40, title: "switchhands", subtitle: "Alterna instantaneamente a arma entre a mão direita e a esquerda.", command-value: "switchhands", checked: false },
-        { row-kind: 2, command-index: 41, title: "+lookatweapon", subtitle: "Inspeciona a arma/faca equipada (F).", command-value: "+lookatweapon", checked: false },
-        { row-kind: 2, command-index: 42, title: "+spray_menu", subtitle: "Abre o menu para aplicar grafite nas superfícies (T).", command-value: "+spray_menu", checked: false },
-        { row-kind: 2, command-index: 43, title: "slot5; drop", subtitle: "Equipa e larga a C4 rapidamente.", command-value: "slot5; drop", checked: false },
-        { row-kind: 1, command-index: -1, title: "Radar Inteligente", subtitle: "", command-value: "", checked: false },
-        { row-kind: 2, command-index: 44, title: "incrementvar cl_radar_scale 0.25 1.0 0.15", subtitle: "Aumenta o zoom do minimapa em etapas e volta ao mínimo ao atingir o limite.", command-value: "incrementvar cl_radar_scale 0.25 1.0 0.15", checked: false },
-        { row-kind: 2, command-index: 45, title: "toggle cl_radar_scale 0.35 0.75", subtitle: "Alterna entre visão panorâmica do mapa (0.35) e aproximada no bombsite (0.75).", command-value: "toggle cl_radar_scale 0.35 0.75", checked: false },
-        { row-kind: 2, command-index: 46, title: "toggle cl_radar_always_centered 0 1", subtitle: "Alterna entre manter o personagem sempre no centro do radar ou usar todo o espaço.", command-value: "toggle cl_radar_always_centered 0 1", checked: false },
-        { row-kind: 2, command-index: 47, title: "toggle cl_radar_rotate 0 1", subtitle: "Alterna entre radar giratório e radar fixo.", command-value: "toggle cl_radar_rotate 0 1", checked: false },
-        { row-kind: 1, command-index: -1, title: "Mira Dinâmica e Alinhamento (Crosshair)", subtitle: "", command-value: "", checked: false },
-        { row-kind: 2, command-index: 48, title: "toggle cl_crosshair_recoil 0 1", subtitle: "Ativa ou desativa a mira que segue o padrão de recuo (Follow Recoil).", command-value: "toggle cl_crosshair_recoil 0 1", checked: false },
-        { row-kind: 2, command-index: 49, title: "toggle cl_crosshairsize 2 1000", subtitle: "Estende as linhas da mira até as bordas do monitor (1000) para alinhar smokes e volta a 2.", command-value: "toggle cl_crosshairsize 2 1000", checked: false },
-        { row-kind: 2, command-index: 50, title: "toggle cl_crosshaircolor 1 2 4 5", subtitle: "Troca a cor da mira na hora (Verde, Amarelo, Ciano, Personalizada).", command-value: "toggle cl_crosshaircolor 1 2 4 5", checked: false },
-        { row-kind: 2, command-index: 51, title: "toggle cl_crosshairdot 0 1", subtitle: "Liga ou desliga o ponto central da mira.", command-value: "toggle cl_crosshairdot 0 1", checked: false },
-        { row-kind: 2, command-index: 52, title: "toggle crosshair 0 1", subtitle: "Oculta ou exibe completamente a mira.", command-value: "toggle crosshair 0 1", checked: false },
-        { row-kind: 2, command-index: 53, title: "toggle cl_grenadecrosshair_keepusercrosshair 0 1", subtitle: "Define se sua mira padrão permanece visível quando a retícula de granada entra na tela.", command-value: "toggle cl_grenadecrosshair_keepusercrosshair 0 1", checked: false },
-        { row-kind: 0, command-index: -1, title: "4. Comunicação", subtitle: "Voz, clutch binds, pings 3D, rodas e rádio", command-value: "", checked: false },
-        { row-kind: 1, command-index: -1, title: "Microfone e \"Clutch Binds\" (Voz)", subtitle: "", command-value: "", checked: false },
-        { row-kind: 2, command-index: 54, title: "+voicerecord", subtitle: "Aciona o microfone (Push-to-Talk).", command-value: "+voicerecord", checked: false },
-        { row-kind: 2, command-index: 55, title: "voice_modenable_toggle", subtitle: "Muta ou desmuta completamente a comunicação de voz da equipe com um clique.", command-value: "voice_modenable_toggle", checked: false },
-        { row-kind: 2, command-index: 56, title: "toggle snd_voipvolume 0.08 1.0", subtitle: "Reduz o volume das vozes do time para 8% (0.08) em clutch e retorna a 100% (1.0).", command-value: "toggle snd_voipvolume 0.08 1.0", checked: false },
-        { row-kind: 2, command-index: 57, title: "voice_toggle_open_mic", subtitle: "Alterna entre microfone aberto e Push-to-Talk.", command-value: "voice_toggle_open_mic", checked: false },
-        { row-kind: 1, command-index: -1, title: "Pings e Rodas de Chat (Chat Wheels)", subtitle: "", command-value: "", checked: false },
-        { row-kind: 2, command-index: 58, title: "player_ping", subtitle: "Cria um marcador visual 3D (ping) exatamente onde sua mira aponta.", command-value: "player_ping", checked: false },
-        { row-kind: 2, command-index: 59, title: "+radialradio", subtitle: "Mantém aberta a Roda de Comunicação 1.", command-value: "+radialradio", checked: false },
-        { row-kind: 2, command-index: 60, title: "+radialradio2", subtitle: "Mantém aberta a Roda de Comunicação 2.", command-value: "+radialradio2", checked: false },
-        { row-kind: 2, command-index: 61, title: "+radialradio3", subtitle: "Mantém aberta a Roda de Comunicação 3.", command-value: "+radialradio3", checked: false },
-        { row-kind: 1, command-index: -1, title: "Menus de Rádio e Falas Diretas de Personagem", subtitle: "", command-value: "", checked: false },
-        { row-kind: 2, command-index: 62, title: "radio", subtitle: "Abre o menu clássico principal de comandos de rádio na tela.", command-value: "radio", checked: false },
-        { row-kind: 2, command-index: 63, title: "radio1", subtitle: "Abre o menu clássico de comandos de rádio 1.", command-value: "radio1", checked: false },
-        { row-kind: 2, command-index: 64, title: "radio2", subtitle: "Abre o menu clássico de comandos de rádio 2.", command-value: "radio2", checked: false },
-        { row-kind: 2, command-index: 65, title: "radio3", subtitle: "Abre o menu clássico de comandos de rádio 3.", command-value: "radio3", checked: false },
-        { row-kind: 2, command-index: 66, title: "coverme", subtitle: "Fala direta tática: \"Me dê cobertura!\".", command-value: "coverme", checked: false },
-        { row-kind: 2, command-index: 67, title: "takepoint", subtitle: "Fala direta tática: \"Vá na frente\".", command-value: "takepoint", checked: false },
-        { row-kind: 2, command-index: 68, title: "holdpos", subtitle: "Fala direta tática: \"Mantenha a posição\".", command-value: "holdpos", checked: false },
-        { row-kind: 2, command-index: 69, title: "followme", subtitle: "Fala direta tática: \"Siga-me\".", command-value: "followme", checked: false },
-        { row-kind: 2, command-index: 70, title: "regroup", subtitle: "Fala direta tática: \"Reagrupar\".", command-value: "regroup", checked: false },
-        { row-kind: 2, command-index: 71, title: "fallback", subtitle: "Fala direta tática: \"Recuar!\".", command-value: "fallback", checked: false },
-        { row-kind: 2, command-index: 72, title: "sticktog", subtitle: "Fala direta tática: \"Fiquem juntos\".", command-value: "sticktog", checked: false },
-        { row-kind: 2, command-index: 73, title: "go", subtitle: "Fala direta tática: \"Vai, vai, vai!\".", command-value: "go", checked: false },
-        { row-kind: 2, command-index: 74, title: "enemyspot", subtitle: "Fala direta de informação: \"Inimigo avistado\".", command-value: "enemyspot", checked: false },
-        { row-kind: 2, command-index: 75, title: "needbackup", subtitle: "Fala direta de informação: \"Preciso de reforço\".", command-value: "needbackup", checked: false },
-        { row-kind: 2, command-index: 76, title: "sectorclear", subtitle: "Fala direta de informação: \"Setor limpo\".", command-value: "sectorclear", checked: false },
-        { row-kind: 2, command-index: 77, title: "inposition", subtitle: "Fala direta de informação: \"Em posição\".", command-value: "inposition", checked: false },
-        { row-kind: 2, command-index: 78, title: "enemydown", subtitle: "Fala direta de informação: \"Inimigo abatido\".", command-value: "enemydown", checked: false },
-        { row-kind: 2, command-index: 79, title: "getout", subtitle: "Fala direta de informação: \"Saiam daí, vai explodir!\".", command-value: "getout", checked: false },
-        { row-kind: 2, command-index: 80, title: "thanks", subtitle: "Fala direta social: \"Obrigado\".", command-value: "thanks", checked: false },
-        { row-kind: 2, command-index: 81, title: "compliment", subtitle: "Fala direta social: \"Boa!\".", command-value: "compliment", checked: false },
-        { row-kind: 2, command-index: 82, title: "cheer", subtitle: "Fala direta social: Comemorar.", command-value: "cheer", checked: false },
-        { row-kind: 1, command-index: -1, title: "Chat de Texto", subtitle: "", command-value: "", checked: false },
-        { row-kind: 2, command-index: 83, title: "messagemode", subtitle: "Abre a caixa de digitação para Todos (Y padrão).", command-value: "messagemode", checked: false },
-        { row-kind: 2, command-index: 84, title: "messagemode2", subtitle: "Abre a caixa de digitação apenas para a Equipe (U padrão).", command-value: "messagemode2", checked: false },
-        { row-kind: 2, command-index: 85, title: "say \"texto\"", subtitle: "Envia instantaneamente uma frase no chat geral (gravado sem aspas internas).", command-value: "say GGWP!", checked: false },
-        { row-kind: 2, command-index: 86, title: "say_team \"texto\"", subtitle: "Envia instantaneamente uma frase apenas para o seu time (gravado sem aspas internas).", command-value: "say_team Preciso de drop, por favor!", checked: false },
-        { row-kind: 0, command-index: -1, title: "5. Armas e Granadas", subtitle: "Seleção via slots e compras rápidas Source 2", command-value: "", checked: false },
-        { row-kind: 1, command-index: -1, title: "Slots de Armas e Equipamentos", subtitle: "", command-value: "", checked: false },
-        { row-kind: 2, command-index: 87, title: "slot1", subtitle: "Arma primária (Rifles, SMGs, Escopetas, Metralhadoras).", command-value: "slot1", checked: false },
-        { row-kind: 2, command-index: 88, title: "slot2", subtitle: "Arma secundária (Pistolas).", command-value: "slot2", checked: false },
-        { row-kind: 2, command-index: 89, title: "slot3", subtitle: "Faca (ou Zeus x27, se já estiver com a faca na mão).", command-value: "slot3", checked: false },
-        { row-kind: 2, command-index: 90, title: "slot4", subtitle: "Percorre sequencialmente todas as granadas no inventário.", command-value: "slot4", checked: false },
-        { row-kind: 2, command-index: 91, title: "slot5", subtitle: "Equipa diretamente o explosivo C4.", command-value: "slot5", checked: false },
-        { row-kind: 2, command-index: 92, title: "slot11", subtitle: "Equipa diretamente a Zeus x27 sem precisar apertar a faca duas vezes.", command-value: "slot11", checked: false },
-        { row-kind: 2, command-index: 93, title: "slot12", subtitle: "Equipa o Healthshot (seringa médica em modos Mata-Mata / Treino).", command-value: "slot12", checked: false },
-        { row-kind: 2, command-index: 94, title: "lastinv", subtitle: "Alterna para o último item equipado (Q padrão).", command-value: "lastinv", checked: false },
-        { row-kind: 2, command-index: 95, title: "invnext", subtitle: "Seleciona a próxima arma do inventário.", command-value: "invnext", checked: false },
-        { row-kind: 2, command-index: 96, title: "invprev", subtitle: "Seleciona a arma anterior do inventário.", command-value: "invprev", checked: false },
-        { row-kind: 2, command-index: 97, title: "drop", subtitle: "Joga no chão a arma ou utilitário atual (G padrão).", command-value: "drop", checked: false },
-        { row-kind: 1, command-index: -1, title: "Seleção Direta de Granadas (Altamente Recomendado)", subtitle: "", command-value: "", checked: false },
-        { row-kind: 2, command-index: 98, title: "slot6", subtitle: "Granada HE (Explosiva).", command-value: "slot6", checked: false },
-        { row-kind: 2, command-index: 99, title: "slot7", subtitle: "Flashbang (Luz).", command-value: "slot7", checked: false },
-        { row-kind: 2, command-index: 100, title: "slot8", subtitle: "Smoke (Fumaça).", command-value: "slot8", checked: false },
-        { row-kind: 2, command-index: 101, title: "slot9", subtitle: "Decoy (Distração).", command-value: "slot9", checked: false },
-        { row-kind: 2, command-index: 102, title: "slot10", subtitle: "Molotov / Granada Incendiária.", command-value: "slot10", checked: false },
-        { row-kind: 1, command-index: -1, title: "Comandos de Compra Rápida (buy e Reembolso)", subtitle: "", command-value: "", checked: false },
-        { row-kind: 2, command-index: 103, title: "autobuy", subtitle: "Compra automática (F3 padrão).", command-value: "autobuy", checked: false },
-        { row-kind: 2, command-index: 104, title: "rebuy", subtitle: "Recompra do round anterior (F4 padrão).", command-value: "rebuy", checked: false },
-        { row-kind: 2, command-index: 105, title: "sellbackall", subtitle: "Reembolsa instantaneamente todas as compras feitas no freezetime atual.", command-value: "sellbackall", checked: false },
-        { row-kind: 2, command-index: 106, title: "buy vest", subtitle: "Compra Colete.", command-value: "buy vest", checked: false },
-        { row-kind: 2, command-index: 107, title: "buy vesthelm", subtitle: "Compra Colete + Capacete.", command-value: "buy vesthelm", checked: false },
-        { row-kind: 2, command-index: 108, title: "buy defuser", subtitle: "Compra Kit Defuse (CT).", command-value: "buy defuser", checked: false },
-        { row-kind: 2, command-index: 109, title: "buy taser", subtitle: "Compra Zeus x27.", command-value: "buy taser", checked: false },
-        { row-kind: 2, command-index: 110, title: "buy smokegrenade", subtitle: "Compra Smoke.", command-value: "buy smokegrenade", checked: false },
-        { row-kind: 2, command-index: 111, title: "buy flashbang", subtitle: "Compra Flashbang.", command-value: "buy flashbang", checked: false },
-        { row-kind: 2, command-index: 112, title: "buy hegrenade", subtitle: "Compra Granada HE.", command-value: "buy hegrenade", checked: false },
-        { row-kind: 2, command-index: 113, title: "buy molotov; buy incgrenade", subtitle: "Compra Molotov (TR) ou Granada Incendiária (CT).", command-value: "buy molotov; buy incgrenade", checked: false },
-        { row-kind: 2, command-index: 114, title: "buy decoy", subtitle: "Compra Decoy.", command-value: "buy decoy", checked: false },
-        { row-kind: 2, command-index: 115, title: "buy glock; buy hkp2000; buy usp_silencer", subtitle: "Compra pistola inicial (Glock / P2000 / USP-S).", command-value: "buy glock; buy hkp2000; buy usp_silencer", checked: false },
-        { row-kind: 2, command-index: 116, title: "buy p250", subtitle: "Compra P250.", command-value: "buy p250", checked: false },
-        { row-kind: 2, command-index: 117, title: "buy tec9; buy fiveseven; buy cz75a", subtitle: "Compra Tec-9 / Five-SeveN / CZ75-Auto.", command-value: "buy tec9; buy fiveseven; buy cz75a", checked: false },
-        { row-kind: 2, command-index: 118, title: "buy deagle; buy revolver", subtitle: "Compra Desert Eagle / R8 Revolver.", command-value: "buy deagle; buy revolver", checked: false },
-        { row-kind: 2, command-index: 119, title: "buy elite", subtitle: "Compra Dual Berettas.", command-value: "buy elite", checked: false },
-        { row-kind: 2, command-index: 120, title: "buy galilar; buy famas", subtitle: "Compra Galil AR (TR) ou FAMAS (CT).", command-value: "buy galilar; buy famas", checked: false },
-        { row-kind: 2, command-index: 121, title: "buy ak47; buy m4a1; buy m4a1_silencer", subtitle: "Compra AK-47 (TR), M4A4 (m4a1) ou M4A1-S (m4a1_silencer).", command-value: "buy ak47; buy m4a1; buy m4a1_silencer", checked: false },
-        { row-kind: 2, command-index: 122, title: "buy ssg08", subtitle: "Compra SSG 08 (Scout).", command-value: "buy ssg08", checked: false },
-        { row-kind: 2, command-index: 123, title: "buy sg556; buy aug", subtitle: "Compra SG 553 (TR) ou AUG (CT).", command-value: "buy sg556; buy aug", checked: false },
-        { row-kind: 2, command-index: 124, title: "buy awp", subtitle: "Compra AWP.", command-value: "buy awp", checked: false },
-        { row-kind: 2, command-index: 125, title: "buy g3sg1; buy scar20", subtitle: "Compra G3SG1 (TR) ou SCAR-20 (CT).", command-value: "buy g3sg1; buy scar20", checked: false },
-        { row-kind: 2, command-index: 126, title: "buy mac10; buy mp9", subtitle: "Compra MAC-10 (TR) ou MP9 (CT).", command-value: "buy mac10; buy mp9", checked: false },
-        { row-kind: 2, command-index: 127, title: "buy mp7; buy mp5sd", subtitle: "Compra MP7 / MP5-SD.", command-value: "buy mp7; buy mp5sd", checked: false },
-        { row-kind: 2, command-index: 128, title: "buy ump45", subtitle: "Compra UMP-45.", command-value: "buy ump45", checked: false },
-        { row-kind: 2, command-index: 129, title: "buy p90", subtitle: "Compra P90.", command-value: "buy p90", checked: false },
-        { row-kind: 2, command-index: 130, title: "buy bizon", subtitle: "Compra PP-Bizon.", command-value: "buy bizon", checked: false },
-        { row-kind: 2, command-index: 131, title: "buy nova", subtitle: "Compra Nova.", command-value: "buy nova", checked: false },
-        { row-kind: 2, command-index: 132, title: "buy xm1014", subtitle: "Compra XM1014.", command-value: "buy xm1014", checked: false },
-        { row-kind: 2, command-index: 133, title: "buy mag7; buy sawedoff", subtitle: "Compra MAG-7 (CT) ou Sawed-Off (TR).", command-value: "buy mag7; buy sawedoff", checked: false },
-        { row-kind: 2, command-index: 134, title: "buy m249", subtitle: "Compra M249.", command-value: "buy m249", checked: false },
-        { row-kind: 2, command-index: 135, title: "buy negev", subtitle: "Compra Negev.", command-value: "buy negev", checked: false },
-        { row-kind: 2, command-index: 136, title: "buy secondary0", subtitle: "Compra pistola do espaço 0 do Loadout CS2.", command-value: "buy secondary0", checked: false },
-        { row-kind: 2, command-index: 137, title: "buy secondary1", subtitle: "Compra pistola do espaço 1 do Loadout CS2.", command-value: "buy secondary1", checked: false },
-        { row-kind: 2, command-index: 138, title: "buy secondary2", subtitle: "Compra pistola do espaço 2 do Loadout CS2.", command-value: "buy secondary2", checked: false },
-        { row-kind: 2, command-index: 139, title: "buy secondary3", subtitle: "Compra pistola do espaço 3 do Loadout CS2.", command-value: "buy secondary3", checked: false },
-        { row-kind: 2, command-index: 140, title: "buy secondary4", subtitle: "Compra pistola do espaço 4 do Loadout CS2.", command-value: "buy secondary4", checked: false },
-        { row-kind: 2, command-index: 141, title: "buy midtier0", subtitle: "Compra arma intermediária (Mid-Tier) do espaço 0 do Loadout CS2.", command-value: "buy midtier0", checked: false },
-        { row-kind: 2, command-index: 142, title: "buy midtier1", subtitle: "Compra arma intermediária (Mid-Tier) do espaço 1 do Loadout CS2.", command-value: "buy midtier1", checked: false },
-        { row-kind: 2, command-index: 143, title: "buy midtier2", subtitle: "Compra arma intermediária (Mid-Tier) do espaço 2 do Loadout CS2.", command-value: "buy midtier2", checked: false },
-        { row-kind: 2, command-index: 144, title: "buy midtier3", subtitle: "Compra arma intermediária (Mid-Tier) do espaço 3 do Loadout CS2.", command-value: "buy midtier3", checked: false },
-        { row-kind: 2, command-index: 145, title: "buy midtier4", subtitle: "Compra arma intermediária (Mid-Tier) do espaço 4 do Loadout CS2.", command-value: "buy midtier4", checked: false },
-        { row-kind: 2, command-index: 146, title: "buy rifle0", subtitle: "Compra rifle do espaço 0 do Loadout CS2.", command-value: "buy rifle0", checked: false },
-        { row-kind: 2, command-index: 147, title: "buy rifle1", subtitle: "Compra rifle do espaço 1 do Loadout CS2.", command-value: "buy rifle1", checked: false },
-        { row-kind: 2, command-index: 148, title: "buy rifle2", subtitle: "Compra rifle do espaço 2 do Loadout CS2.", command-value: "buy rifle2", checked: false },
-        { row-kind: 2, command-index: 149, title: "buy rifle3", subtitle: "Compra rifle do espaço 3 do Loadout CS2.", command-value: "buy rifle3", checked: false },
-        { row-kind: 2, command-index: 150, title: "buy rifle4", subtitle: "Compra rifle do espaço 4 do Loadout CS2.", command-value: "buy rifle4", checked: false },
-        { row-kind: 0, command-index: -1, title: "6. Monitoramento (FPS, Telemetria e Rede)", subtitle: "Telemetria nativa do HUD CS2 e diagnósticos", command-value: "", checked: false },
-        { row-kind: 1, command-index: -1, title: "Telemetria Nativa do CS2 (0 = Nunca, 1 = Problema, 2 = Sempre)", subtitle: "", command-value: "", checked: false },
-        { row-kind: 2, command-index: 151, title: "toggle cl_hud_telemetry_frametime_show 0 1 2", subtitle: "Exibe o contador de FPS e o tempo de quadro (Frametime em ms) no canto superior direito.", command-value: "toggle cl_hud_telemetry_frametime_show 0 1 2", checked: false },
-        { row-kind: 2, command-index: 152, title: "toggle cl_hud_telemetry_ping_show 0 1 2", subtitle: "Exibe o seu Ping (ms) em tempo real.", command-value: "toggle cl_hud_telemetry_ping_show 0 1 2", checked: false },
-        { row-kind: 2, command-index: 153, title: "toggle cl_hud_telemetry_net_misdelivery_show 0 1 2", subtitle: "Exibe alertas e porcentagem de perda ou atraso de pacotes (packet loss / jitter).", command-value: "toggle cl_hud_telemetry_net_misdelivery_show 0 1 2", checked: false },
-        { row-kind: 2, command-index: 154, title: "toggle cl_hud_telemetry_serverrecvmargin_graph_show 0 1 2", subtitle: "Mostra um micrográfico em tempo real da estabilidade de envio ao servidor.", command-value: "toggle cl_hud_telemetry_serverrecvmargin_graph_show 0 1 2", checked: false },
-        { row-kind: 1, command-index: -1, title: "Diagnósticos Clássicos e Placar", subtitle: "", command-value: "", checked: false },
-        { row-kind: 2, command-index: 155, title: "toggle cq_netgraph 0 1", subtitle: "Liga/desliga a barra gráfica de Command Queue (sub-tick) no canto superior direito.", command-value: "toggle cq_netgraph 0 1", checked: false },
-        { row-kind: 2, command-index: 156, title: "toggle cl_showfps 0 1 2 3 4", subtitle: "Contador direto de FPS da engine (1 = simples, 2 a 4 = latência detalhada).", command-value: "toggle cl_showfps 0 1 2 3 4", checked: false },
-        { row-kind: 2, command-index: 157, title: "toggle cl_showpos 0 1", subtitle: "Mostra coordenadas (pos), ângulo (ang) e velocidade horizontal (vel).", command-value: "toggle cl_showpos 0 1", checked: false },
-        { row-kind: 2, command-index: 158, title: "+showscores", subtitle: "Abre a tabela de pontuação / Placar (TAB).", command-value: "+showscores", checked: false },
-        { row-kind: 2, command-index: 159, title: "status", subtitle: "Imprime no console dados do servidor atual, mapa, ping e jogadores conectados.", command-value: "status", checked: false },
-        { row-kind: 2, command-index: 160, title: "sys_info", subtitle: "Gera no console um relatório completo de hardware, drivers e configurações ativas.", command-value: "sys_info", checked: false },
-        { row-kind: 0, command-index: -1, title: "7. Outros (Áudio, Demos/Replays, HUD e Sistema)", subtitle: "Som, análise de demos GOTV, HUD e manutenção", command-value: "", checked: false },
-        { row-kind: 1, command-index: -1, title: "Controle de Volume e Áudio", subtitle: "", command-value: "", checked: false },
-        { row-kind: 2, command-index: 161, title: "incrementvar volume 0 1 0.05", subtitle: "Aumenta o volume geral do jogo em passos de 5%.", command-value: "incrementvar volume 0 1 0.05", checked: false },
-        { row-kind: 2, command-index: 162, title: "incrementvar volume 0 1 -0.05", subtitle: "Diminui o volume geral do jogo em passos de 5%.", command-value: "incrementvar volume 0 1 -0.05", checked: false },
-        { row-kind: 2, command-index: 163, title: "toggle volume 0.08 0.55", subtitle: "Alterna entre Modo Aquecimento/DM (0.08) e Modo Competitivo (0.55).", command-value: "toggle volume 0.08 0.55", checked: false },
-        { row-kind: 2, command-index: 164, title: "toggle snd_mute_losefocus 0 1", subtitle: "Define se o áudio fica mudo ou continua tocando quando você dá Alt+Tab.", command-value: "toggle snd_mute_losefocus 0 1", checked: false },
-        { row-kind: 1, command-index: -1, title: "Replays e Análise de Demos (GOTV / Suas Partidas)", subtitle: "", command-value: "", checked: false },
-        { row-kind: 2, command-index: 165, title: "demoui", subtitle: "Abre ou fecha a barra de controle de reprodução de Demo (Shift+F2).", command-value: "demoui", checked: false },
-        { row-kind: 2, command-index: 166, title: "demo_togglepause", subtitle: "Pausa ou retoma a reprodução da Demo instantaneamente.", command-value: "demo_togglepause", checked: false },
-        { row-kind: 2, command-index: 167, title: "toggle demo_timescale 0.25 0.5 1 2 4 8", subtitle: "Alterna a velocidade do replay entre 0.25x e 8x.", command-value: "toggle demo_timescale 0.25 0.5 1 2 4 8", checked: false },
-        { row-kind: 2, command-index: 168, title: "demo_goto -960 1 0", subtitle: "Volta aproximadamente 15 segundos na linha do tempo da Demo.", command-value: "demo_goto -960 1 0", checked: false },
-        { row-kind: 2, command-index: 169, title: "demo_goto 960 1 0", subtitle: "Avança aproximadamente 15 segundos na linha do tempo da Demo.", command-value: "demo_goto 960 1 0", checked: false },
-        { row-kind: 2, command-index: 170, title: "toggle spec_show_xray 0 1", subtitle: "Liga ou desliga o Raio-X (X-Ray) durante análise do replay ou modo espectador.", command-value: "toggle spec_show_xray 0 1", checked: false },
-        { row-kind: 1, command-index: -1, title: "Personalização de HUD e Capturas", subtitle: "", command-value: "", checked: false },
-        { row-kind: 2, command-index: 171, title: "incrementvar cl_hud_color 0 11 1", subtitle: "Troca ciclicamente a cor de toda a interface (HUD) entre as 12 cores disponíveis.", command-value: "incrementvar cl_hud_color 0 11 1", checked: false },
-        { row-kind: 2, command-index: 172, title: "toggle cl_draw_only_deathnotices 0 1", subtitle: "Esconde HUD e radar deixando apenas a mira e o registro de abates (killfeed).", command-value: "toggle cl_draw_only_deathnotices 0 1", checked: false },
-        { row-kind: 2, command-index: 173, title: "toggle cl_drawhud 0 1", subtitle: "Oculta absolutamente toda a interface da tela (exige sv_cheats 1).", command-value: "toggle cl_drawhud 0 1", checked: false },
-        { row-kind: 2, command-index: 174, title: "screenshot", subtitle: "Captura uma foto imediata da tela.", command-value: "screenshot", checked: false },
-        { row-kind: 2, command-index: 175, title: "jpeg", subtitle: "Captura uma foto imediata da tela em formato JPEG.", command-value: "jpeg", checked: false },
-        { row-kind: 1, command-index: -1, title: "Console, Sistema e Gerenciamento de Binds", subtitle: "", command-value: "", checked: false },
-        { row-kind: 2, command-index: 176, title: "toggleconsole", subtitle: "Abre ou fecha o Console de Desenvolvedor (' ou ~).", command-value: "toggleconsole", checked: false },
-        { row-kind: 2, command-index: 177, title: "exec autoexec", subtitle: "Carrega imediatamente todas as configurações salvas no arquivo autoexec.cfg.", command-value: "exec autoexec", checked: false },
-        { row-kind: 2, command-index: 178, title: "callvote", subtitle: "Abre o menu de votações (pedir pausa, expulsar jogador, render-se).", command-value: "callvote", checked: false },
-        { row-kind: 2, command-index: 179, title: "disconnect", subtitle: "Desconecta imediatamente do servidor/partida atual e volta ao menu inicial.", command-value: "disconnect", checked: false },
-        { row-kind: 2, command-index: 180, title: "quit", subtitle: "Fecha o Counter-Strike 2 instantaneamente para a Área de Trabalho.", command-value: "quit", checked: false },
-        { row-kind: 2, command-index: 181, title: "key_listboundkeys", subtitle: "Lista no console todas as teclas que possuem binds ativas no momento.", command-value: "key_listboundkeys", checked: false },
-        { row-kind: 2, command-index: 182, title: "key_findbinding \"comando\"", subtitle: "Pesquisa qual tecla está associada a um comando específico (gravado sem aspas internas).", command-value: "key_findbinding +voicerecord", checked: false },
-        { row-kind: 2, command-index: 183, title: "find \"palavra\"", subtitle: "Busca qualquer comando ou variável existente no CS2 com o termo pesquisado (gravado sem aspas internas).", command-value: "find radar", checked: false },
-        { row-kind: 2, command-index: 184, title: "unbind \"TECLA\"", subtitle: "Remove o comando atribuído a uma tecla específica (gravado sem aspas internas).", command-value: "unbind v", checked: false },
-        { row-kind: 2, command-index: 185, title: "binddefaults", subtitle: "Restaura todas as teclas para a configuração original de fábrica da Valve.", command-value: "binddefaults", checked: false },
+        { row-kind: 0, command-index: -1, title: "2. Treinamento", subtitle: "Exigem sv_cheats 1", command-value: "", checked: false, has-second: false, second-command-index: -1, second-title: "", second-subtitle: "", second-command-value: "", second-checked: false },
+        { row-kind: 1, command-index: -1, title: "Movimentação Livre e Teleporte de Precisão", subtitle: "", command-value: "", checked: false, has-second: false, second-command-index: -1, second-title: "", second-subtitle: "", second-command-value: "", second-checked: false },
+        { row-kind: 2, command-index: 13, title: "noclip", subtitle: "Liga/desliga o voo livre atravessando paredes e objetos.", command-value: "noclip", checked: false, has-second: false, second-command-index: -1, second-title: "", second-subtitle: "", second-command-value: "", second-checked: false },
+        { row-kind: 2, command-index: 14, title: "getpos", subtitle: "Imprime no console as coordenadas exatas (setpos e setang) da posição e mira atuais.", command-value: "getpos", checked: false, has-second: false, second-command-index: -1, second-title: "", second-subtitle: "", second-command-value: "", second-checked: false },
+        { row-kind: 1, command-index: -1, title: "Treino Avançado de Granadas", subtitle: "", command-value: "", checked: false, has-second: false, second-command-index: -1, second-title: "", second-subtitle: "", second-command-value: "", second-checked: false },
+        { row-kind: 2, command-index: 16, title: "sv_rethrow_last_grenade", subtitle: "Arremessa novamente a última granada jogada no servidor.", command-value: "sv_rethrow_last_grenade", checked: false, has-second: false, second-command-index: -1, second-title: "", second-subtitle: "", second-command-value: "", second-checked: false },
+        { row-kind: 2, command-index: 19, title: "ent_fire smokegrenade_projectile kill; ent_fire molotov_projectile kill; ent_fire inferno kill; ent_fire flashbang_projectile kill; ent_fire hegrenade_projectile kill; ent_fire decoy_projectile kill; stopsound", subtitle: "Apaga instantaneamente todas as smokes, Molotovs, granadas no ar e corta efeitos sonoros ativos.", command-value: "ent_fire smokegrenade_projectile kill; ent_fire molotov_projectile kill; ent_fire inferno kill; ent_fire flashbang_projectile kill; ent_fire hegrenade_projectile kill; ent_fire decoy_projectile kill; stopsound", checked: false, has-second: false, second-command-index: -1, second-title: "", second-subtitle: "", second-command-value: "", second-checked: false },
+        { row-kind: 2, command-index: 20, title: "bot_place", subtitle: "Posiciona um bot imediatamente no local onde sua mira aponta.", command-value: "bot_place", checked: false, has-second: false, second-command-index: -1, second-title: "", second-subtitle: "", second-command-value: "", second-checked: false },
     ];
 
     // Callbacks para integração com o backend Rust
@@ -285,6 +86,9 @@ export component BindsTestWindow inherits Window {
     callback existing-file-selected(string);
     callback file-name-edited(string);
     callback key-captured(string);
+    callback category-tab-selected(int);
+    callback view-mode-changed(bool);
+    callback search-query-changed(string);
     callback command-toggled(int, bool);
     callback clear-selected-commands();
     callback save-bind-clicked();
@@ -986,56 +790,542 @@ export component BindsTestWindow inherits Window {
         }
 
         // =====================================================================
-        // 2. LISTAGEM ROLÁVEL DE COMANDOS POR CATEGORIA
+        // 2. PESQUISA, VISUALIZAÇÃO (LISTA/GRADE) E ABAS DE CATEGORIAS
         // =====================================================================
-        ScrollView {
-            vertical-stretch: 1;
+        Rectangle {
+            background: CS2Theme.bg-surface;
 
             VerticalLayout {
                 padding-left: 20px;
                 padding-right: 20px;
-                padding-top: 8px;
-                padding-bottom: 24px;
-                spacing: 4px;
+                padding-top: 10px;
+                padding-bottom: 0px;
+                spacing: 10px;
 
-                for row[idx] in root.catalog-rows : VerticalLayout {
-                    // 2.1 Cabeçalho de Categoria
-                    if row.row-kind == 0 : VerticalLayout {
-                        padding-top: idx == 0 ? 6px : 18px;
-                        padding-bottom: 4px;
-                        spacing: 6px;
+                // Barra de ferramentas: Pesquisa + Alternador Lista/Grade
+                HorizontalLayout {
+                    spacing: 10px;
+
+                    Rectangle {
+                        horizontal-stretch: 1;
+                        height: 34px;
+                        background: CS2Theme.bg-main;
+                        border-radius: CS2Theme.radius-sm;
+                        border-width: search-field.has-focus ? 2px : 1px;
+                        border-color: search-field.has-focus
+                            ? CS2Theme.accent-ct-cyan
+                            : (root.search-query != "" ? CS2Theme.accent-ct-blue : CS2Theme.border);
+                        animate border-color { duration: 100ms; }
 
                         HorizontalLayout {
-                            spacing: 10px;
-                            alignment: start;
+                            padding-left: 10px;
+                            padding-right: 8px;
+                            spacing: 8px;
 
-                            Text {
-                                text: row.title;
-                                font-size: 15px;
-                                font-weight: 900;
-                                letter-spacing: 0.4px;
-                                color: CS2Theme.text-primary;
+                            VerticalLayout {
+                                alignment: center;
+                                horizontal-stretch: 0;
+
+                                Path {
+                                    width: 14px;
+                                    height: 14px;
+                                    viewbox-width: 16;
+                                    viewbox-height: 16;
+                                    stroke: search-field.has-focus || root.search-query != ""
+                                        ? CS2Theme.accent-ct-cyan
+                                        : CS2Theme.text-muted;
+                                    stroke-width: 1.7px;
+                                    commands: "M 6.5 2 C 8.984 2 11 4.016 11 6.5 C 11 8.984 8.984 11 6.5 11 C 4.016 11 2 8.984 2 6.5 C 2 4.016 4.016 2 6.5 2 M 9.8 9.8 L 14 14";
+                                }
+                            }
+
+                            Rectangle {
+                                horizontal-stretch: 1;
+                                clip: true;
+
+                                search-field := TextInput {
+                                    width: parent.width;
+                                    height: parent.height;
+                                    text <=> root.search-query;
+                                    color: CS2Theme.text-primary;
+                                    font-size: 12px;
+                                    font-weight: 600;
+                                    vertical-alignment: center;
+                                    edited => {
+                                        root.is-listening-key = false;
+                                        root.selector-dropdown-open = false;
+                                        catalog-scroll.content-y = 0px;
+                                        root.search-query-changed(self.text);
+                                    }
+                                }
+
+                                if root.search-query == "" : Text {
+                                    width: parent.width;
+                                    height: parent.height;
+                                    text: "Pesquisar por comando ou descrição (ex: smoke, radar, +jump)...";
+                                    color: CS2Theme.text-muted;
+                                    font-size: 11px;
+                                    vertical-alignment: center;
+                                    overflow: elide;
+                                }
+                            }
+
+                            if root.search-query != "" : Text {
+                                text: root.filtered-commands-count + (root.filtered-commands-count == 1 ? " resultado" : " resultados");
+                                font-size: 10px;
+                                font-weight: 700;
+                                color: CS2Theme.text-cyan;
                                 vertical-alignment: center;
                             }
 
-                            if row.subtitle != "" : Rectangle {
-                                height: 20px;
+                            if root.search-query != "" : Rectangle {
+                                width: 22px;
+                                height: 22px;
+                                y: (parent.height - self.height) / 2;
                                 border-radius: CS2Theme.radius-xs;
-                                background: CS2Theme.bg-surface-elevated;
+                                background: search-clear-touch.has-hover ? CS2Theme.bg-card-selected : transparent;
+
+                                Path {
+                                    width: 8px;
+                                    height: 8px;
+                                    x: (parent.width - self.width) / 2;
+                                    y: (parent.height - self.height) / 2;
+                                    viewbox-width: 10;
+                                    viewbox-height: 10;
+                                    stroke: search-clear-touch.has-hover ? CS2Theme.text-primary : CS2Theme.text-muted;
+                                    stroke-width: 1.8px;
+                                    commands: "M 1.5 1.5 L 8.5 8.5 M 8.5 1.5 L 1.5 8.5";
+                                }
+
+                                search-clear-touch := TouchArea {
+                                    mouse-cursor: pointer;
+                                    clicked => {
+                                        root.is-listening-key = false;
+                                        root.selector-dropdown-open = false;
+                                        root.search-query = "";
+                                        catalog-scroll.content-y = 0px;
+                                        root.search-query-changed("");
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Alternador Lista / Grade
+                    Rectangle {
+                        horizontal-stretch: 0;
+                        height: 34px;
+                        background: CS2Theme.bg-main;
+                        border-radius: CS2Theme.radius-sm;
+                        border-width: 1px;
+                        border-color: CS2Theme.border;
+
+                        HorizontalLayout {
+                            padding: 3px;
+                            spacing: 3px;
+
+                            Rectangle {
+                                height: 26px;
+                                border-radius: CS2Theme.radius-xs;
+                                background: !root.is-grid-view
+                                    ? CS2Theme.accent-ct-soft
+                                    : (list-mode-touch.has-hover ? CS2Theme.bg-card-hover : transparent);
                                 border-width: 1px;
-                                border-color: CS2Theme.border;
+                                border-color: !root.is-grid-view ? CS2Theme.accent-ct-cyan : transparent;
+                                animate background { duration: 100ms; }
+                                animate border-color { duration: 100ms; }
 
                                 HorizontalLayout {
-                                    padding-left: 8px;
-                                    padding-right: 8px;
+                                    padding-left: 10px;
+                                    padding-right: 10px;
+                                    spacing: 6px;
+
+                                    VerticalLayout {
+                                        alignment: center;
+                                        Path {
+                                            width: 12px;
+                                            height: 10px;
+                                            viewbox-width: 14;
+                                            viewbox-height: 12;
+                                            stroke: !root.is-grid-view ? CS2Theme.accent-ct-cyan : CS2Theme.text-muted;
+                                            stroke-width: 1.7px;
+                                            commands: "M 1 2 L 13 2 M 1 6 L 13 6 M 1 10 L 13 10";
+                                        }
+                                    }
+
                                     Text {
-                                        text: row.subtitle;
-                                        font-size: 10px;
-                                        font-weight: 600;
-                                        color: CS2Theme.text-muted;
+                                        text: "Lista";
+                                        font-size: 11px;
+                                        font-weight: !root.is-grid-view ? 800 : 600;
+                                        color: !root.is-grid-view ? #ffffff : CS2Theme.text-muted;
                                         vertical-alignment: center;
                                     }
                                 }
+
+                                list-mode-touch := TouchArea {
+                                    mouse-cursor: pointer;
+                                    clicked => {
+                                        root.is-listening-key = false;
+                                        root.selector-dropdown-open = false;
+                                        if root.is-grid-view {
+                                            root.is-grid-view = false;
+                                            catalog-scroll.content-y = 0px;
+                                            root.view-mode-changed(false);
+                                        }
+                                    }
+                                }
+                            }
+
+                            Rectangle {
+                                height: 26px;
+                                border-radius: CS2Theme.radius-xs;
+                                background: root.is-grid-view
+                                    ? CS2Theme.accent-ct-soft
+                                    : (grid-mode-touch.has-hover ? CS2Theme.bg-card-hover : transparent);
+                                border-width: 1px;
+                                border-color: root.is-grid-view ? CS2Theme.accent-ct-cyan : transparent;
+                                animate background { duration: 100ms; }
+                                animate border-color { duration: 100ms; }
+
+                                HorizontalLayout {
+                                    padding-left: 10px;
+                                    padding-right: 10px;
+                                    spacing: 6px;
+
+                                    VerticalLayout {
+                                        alignment: center;
+                                        Path {
+                                            width: 11px;
+                                            height: 11px;
+                                            viewbox-width: 12;
+                                            viewbox-height: 12;
+                                            stroke: root.is-grid-view ? CS2Theme.accent-ct-cyan : CS2Theme.text-muted;
+                                            stroke-width: 1.4px;
+                                            fill: root.is-grid-view ? CS2Theme.accent-ct-cyan : transparent;
+                                            commands: "M 1 1 L 4.5 1 L 4.5 4.5 L 1 4.5 Z M 7.5 1 L 11 1 L 11 4.5 L 7.5 4.5 Z M 1 7.5 L 4.5 7.5 L 4.5 11 L 1 11 Z M 7.5 7.5 L 11 7.5 L 11 11 L 7.5 11 Z";
+                                        }
+                                    }
+
+                                    Text {
+                                        text: "Grade";
+                                        font-size: 11px;
+                                        font-weight: root.is-grid-view ? 800 : 600;
+                                        color: root.is-grid-view ? #ffffff : CS2Theme.text-muted;
+                                        vertical-alignment: center;
+                                    }
+                                }
+
+                                grid-mode-touch := TouchArea {
+                                    mouse-cursor: pointer;
+                                    clicked => {
+                                        root.is-listening-key = false;
+                                        root.selector-dropdown-open = false;
+                                        if !root.is-grid-view {
+                                            root.is-grid-view = true;
+                                            catalog-scroll.content-y = 0px;
+                                            root.view-mode-changed(true);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Abas de Categorias (1 aba por categoria)
+                HorizontalLayout {
+                    spacing: 4px;
+
+                    for tab in root.category-tabs : Rectangle {
+                        property <bool> is-searching: root.search-query != "";
+                        property <bool> is-active: !is-searching && tab.index == root.active-category-index;
+
+                        horizontal-stretch: 1;
+                        height: 34px;
+                        border-top-left-radius: CS2Theme.radius-sm;
+                        border-top-right-radius: CS2Theme.radius-sm;
+                        background: is-active
+                            ? CS2Theme.bg-card
+                            : (tab-touch.has-hover ? CS2Theme.bg-card-hover : transparent);
+                        animate background { duration: 100ms; }
+
+                        HorizontalLayout {
+                            padding-left: 6px;
+                            padding-right: 6px;
+                            spacing: 5px;
+                            alignment: center;
+
+                            Text {
+                                text: tab.tab-label;
+                                font-size: 11px;
+                                font-weight: is-active ? 800 : 600;
+                                color: is-active
+                                    ? #ffffff
+                                    : (is-searching && tab.match-count == 0
+                                        ? CS2Theme.text-dim
+                                        : (tab-touch.has-hover ? CS2Theme.text-primary : CS2Theme.text-muted));
+                                vertical-alignment: center;
+                                horizontal-alignment: center;
+                                overflow: elide;
+                            }
+
+                            if !is-searching && tab.selected-count > 0 : Rectangle {
+                                height: 16px;
+                                min-width: 16px;
+                                y: (parent.height - self.height) / 2;
+                                border-radius: CS2Theme.radius-xs;
+                                background: CS2Theme.accent-ct-soft;
+                                border-width: 1px;
+                                border-color: CS2Theme.accent-ct-blue;
+
+                                HorizontalLayout {
+                                    padding-left: 4px;
+                                    padding-right: 4px;
+                                    Text {
+                                        text: tab.selected-count;
+                                        font-size: 9px;
+                                        font-weight: 900;
+                                        color: CS2Theme.text-cyan;
+                                        vertical-alignment: center;
+                                        horizontal-alignment: center;
+                                    }
+                                }
+                            }
+
+                            if is-searching && tab.match-count > 0 : Rectangle {
+                                height: 16px;
+                                min-width: 16px;
+                                y: (parent.height - self.height) / 2;
+                                border-radius: CS2Theme.radius-xs;
+                                background: CS2Theme.bg-main;
+                                border-width: 1px;
+                                border-color: CS2Theme.border-hover;
+
+                                HorizontalLayout {
+                                    padding-left: 4px;
+                                    padding-right: 4px;
+                                    Text {
+                                        text: tab.match-count;
+                                        font-size: 9px;
+                                        font-weight: 800;
+                                        color: CS2Theme.text-primary;
+                                        vertical-alignment: center;
+                                        horizontal-alignment: center;
+                                    }
+                                }
+                            }
+                        }
+
+                        if is-active : Rectangle {
+                            x: 0px;
+                            y: parent.height - 2px;
+                            width: parent.width;
+                            height: 2px;
+                            background: CS2Theme.accent-ct-cyan;
+                        }
+
+                        tab-touch := TouchArea {
+                            mouse-cursor: pointer;
+                            clicked => {
+                                root.is-listening-key = false;
+                                root.selector-dropdown-open = false;
+                                root.search-query = "";
+                                root.active-category-index = tab.index;
+                                catalog-scroll.content-y = 0px;
+                                root.category-tab-selected(tab.index);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Rectangle {
+            height: 1px;
+            background: CS2Theme.border;
+        }
+
+        // =====================================================================
+        // 3. LISTAGEM / GRADE ROLÁVEL DE COMANDOS
+        // =====================================================================
+        catalog-scroll := ScrollView {
+            vertical-stretch: 1;
+            content-width: self.visible-width;
+
+            VerticalLayout {
+                width: catalog-scroll.visible-width;
+                padding-left: 20px;
+                padding-right: 20px;
+                padding-top: 12px;
+                padding-bottom: 24px;
+                spacing: 8px;
+                alignment: start;
+
+                if root.search-query != "" && root.catalog-rows.length > 0 : Rectangle {
+                    background: CS2Theme.bg-surface;
+                    border-radius: CS2Theme.radius-sm;
+                    border-width: 1px;
+                    border-color: CS2Theme.border;
+
+                    HorizontalLayout {
+                        padding-left: 12px;
+                        padding-right: 10px;
+                        padding-top: 7px;
+                        padding-bottom: 7px;
+                        spacing: 10px;
+                        alignment: space-between;
+
+                        Text {
+                            text: "Exibindo " + root.filtered-commands-count + (root.filtered-commands-count == 1 ? " comando" : " comandos") + " encontrados para \"" + root.search-query + "\" em todas as categorias";
+                            font-size: 11px;
+                            font-weight: 600;
+                            color: CS2Theme.text-muted;
+                            vertical-alignment: center;
+                            overflow: elide;
+                            horizontal-stretch: 1;
+                        }
+
+                        Rectangle {
+                            height: 22px;
+                            border-radius: CS2Theme.radius-xs;
+                            background: banner-clear-touch.has-hover ? CS2Theme.bg-card-hover : CS2Theme.bg-main;
+                            border-width: 1px;
+                            border-color: banner-clear-touch.has-hover ? CS2Theme.border-hover : CS2Theme.border;
+
+                            HorizontalLayout {
+                                padding-left: 8px;
+                                padding-right: 8px;
+                                Text {
+                                    text: "Limpar pesquisa";
+                                    font-size: 10px;
+                                    font-weight: 700;
+                                    color: CS2Theme.text-cyan;
+                                    vertical-alignment: center;
+                                }
+                            }
+
+                            banner-clear-touch := TouchArea {
+                                mouse-cursor: pointer;
+                                clicked => {
+                                    root.search-query = "";
+                                    catalog-scroll.content-y = 0px;
+                                    root.search-query-changed("");
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if root.search-query != "" && root.catalog-rows.length == 0 : Rectangle {
+                    vertical-stretch: 0;
+                    background: CS2Theme.bg-surface;
+                    border-radius: CS2Theme.radius-sm;
+                    border-width: 1px;
+                    border-color: CS2Theme.border;
+
+                    VerticalLayout {
+                        padding: 28px;
+                        spacing: 10px;
+                        alignment: center;
+
+                        HorizontalLayout {
+                            alignment: center;
+                            Rectangle {
+                                width: 36px;
+                                height: 36px;
+                                border-radius: CS2Theme.radius-sm;
+                                background: CS2Theme.bg-card;
+                                border-width: 1px;
+                                border-color: CS2Theme.border;
+
+                                Path {
+                                    width: 16px;
+                                    height: 16px;
+                                    x: (parent.width - self.width) / 2;
+                                    y: (parent.height - self.height) / 2;
+                                    viewbox-width: 16;
+                                    viewbox-height: 16;
+                                    stroke: CS2Theme.accent-ct-cyan;
+                                    stroke-width: 1.7px;
+                                    commands: "M 6.5 2 C 8.984 2 11 4.016 11 6.5 C 11 8.984 8.984 11 6.5 11 C 4.016 11 2 8.984 2 6.5 C 2 4.016 4.016 2 6.5 2 M 9.8 9.8 L 14 14";
+                                }
+                            }
+                        }
+
+                        Text {
+                            text: "Nenhum comando encontrado para \"" + root.search-query + "\"";
+                            font-size: 13px;
+                            font-weight: 800;
+                            color: CS2Theme.text-primary;
+                            horizontal-alignment: center;
+                        }
+
+                        Text {
+                            text: "Tente buscar pelo nome do comando (ex: noclip, slot8, buy) ou por palavras da descrição (ex: fumaça, radar, recuo).";
+                            font-size: 11px;
+                            color: CS2Theme.text-muted;
+                            wrap: word-wrap;
+                            horizontal-alignment: center;
+                        }
+
+                        HorizontalLayout {
+                            alignment: center;
+                            Rectangle {
+                                height: 30px;
+                                border-radius: CS2Theme.radius-xs;
+                                background: empty-clear-touch.has-hover ? CS2Theme.bg-card-hover : CS2Theme.accent-ct-soft;
+                                border-width: 1px;
+                                border-color: CS2Theme.accent-ct-cyan;
+
+                                HorizontalLayout {
+                                    padding-left: 14px;
+                                    padding-right: 14px;
+                                    Text {
+                                        text: "Limpar pesquisa";
+                                        font-size: 11px;
+                                        font-weight: 800;
+                                        color: #ffffff;
+                                        vertical-alignment: center;
+                                    }
+                                }
+
+                                empty-clear-touch := TouchArea {
+                                    mouse-cursor: pointer;
+                                    clicked => {
+                                        root.search-query = "";
+                                        catalog-scroll.content-y = 0px;
+                                        root.search-query-changed("");
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                for row[idx] in root.catalog-rows : VerticalLayout {
+                    // 3.1 Cabeçalho de Categoria (subtítulo abaixo do título, sem caixa)
+                    if row.row-kind == 0 : VerticalLayout {
+                        padding-top: idx == 0 ? 4px : 18px;
+                        padding-bottom: 4px;
+                        spacing: 6px;
+
+                        VerticalLayout {
+                            spacing: 3px;
+
+                            Text {
+                                text: row.title;
+                                font-size: 16px;
+                                font-weight: 800;
+                                letter-spacing: 0.3px;
+                                color: CS2Theme.text-primary;
+                            }
+
+                            if row.subtitle != "" : Text {
+                                text: row.subtitle;
+                                font-size: 12px;
+                                font-weight: 400;
+                                color: CS2Theme.text-muted;
+                                wrap: word-wrap;
                             }
                         }
 
@@ -1045,9 +1335,9 @@ export component BindsTestWindow inherits Window {
                         }
                     }
 
-                    // 2.2 Cabeçalho de Subcategoria
+                    // 3.2 Cabeçalho de Subcategoria
                     if row.row-kind == 1 : VerticalLayout {
-                        padding-top: 8px;
+                        padding-top: 10px;
                         padding-bottom: 2px;
 
                         Text {
@@ -1059,82 +1349,72 @@ export component BindsTestWindow inherits Window {
                         }
                     }
 
-                    // 2.3 Item de Comando com Checkbox
-                    if row.row-kind == 2 : Rectangle {
-                        min-height: 36px;
-                        background: row.checked
-                            ? CS2Theme.bg-card-selected
-                            : (item-touch.has-hover ? CS2Theme.bg-card-hover : CS2Theme.bg-card);
-                        border-radius: CS2Theme.radius-xs;
-                        border-width: 1px;
-                        border-color: row.checked
-                            ? CS2Theme.accent-ct-cyan
-                            : (item-touch.has-hover ? CS2Theme.border-hover : CS2Theme.border);
-                        animate background { duration: 90ms; }
-                        animate border-color { duration: 90ms; }
-
-                        HorizontalLayout {
-                            padding-left: 12px;
-                            padding-right: 12px;
-                            padding-top: 7px;
-                            padding-bottom: 7px;
-                            spacing: 12px;
-
-                            VerticalLayout {
-                                alignment: center;
-                                VectorCheckmark {
-                                    checked: row.checked;
-                                }
-                            }
-
-                            Rectangle {
-                                min-width: 240px;
-                                max-width: 340px;
-                                border-radius: CS2Theme.radius-xs;
-                                background: row.checked ? CS2Theme.accent-ct-soft : CS2Theme.bg-main;
-                                border-width: 1px;
-                                border-color: row.checked ? CS2Theme.accent-ct-blue : CS2Theme.border;
-
-                                HorizontalLayout {
-                                    padding-left: 8px;
-                                    padding-right: 8px;
-                                    padding-top: 3px;
-                                    padding-bottom: 3px;
-
-                                    Text {
-                                        text: row.title;
-                                        font-size: 11px;
-                                        font-weight: 700;
-                                        color: row.checked ? #ffffff : CS2Theme.text-cyan;
-                                        wrap: word-wrap;
-                                        vertical-alignment: center;
-                                    }
-                                }
-                            }
-
-                            Text {
-                                text: row.subtitle;
-                                font-size: 12px;
-                                font-weight: 400;
-                                color: row.checked ? CS2Theme.text-primary : CS2Theme.text-muted;
-                                wrap: word-wrap;
-                                vertical-alignment: center;
-                                horizontal-stretch: 1;
-                            }
-                        }
-
-                        item-touch := TouchArea {
-                            mouse-cursor: pointer;
-                            clicked => {
-                                root.selector-dropdown-open = false;
-                                row.checked = !row.checked;
-                                if row.checked {
+                    // 3.3 Item de Comando (Modo Lista)
+                    if row.row-kind == 2 : BindCommandCard {
+                        command-title: row.title;
+                        description: row.subtitle;
+                        checked: row.checked;
+                        toggled(new-val) => {
+                            root.selector-dropdown-open = false;
+                            row.checked = new-val;
+                            if !root.backend-connected {
+                                if new-val {
                                     root.selected-commands-count += 1;
                                 } else {
                                     root.selected-commands-count = max(0, root.selected-commands-count - 1);
                                 }
-                                root.command-toggled(idx, row.checked);
                             }
+                            root.command-toggled(row.command-index, new-val);
+                        }
+                    }
+
+                    // 3.4 Par de Comandos (Modo Grade 2 colunas)
+                    if row.row-kind == 3 : HorizontalLayout {
+                        property <length> col-width: max(200px, (catalog-scroll.visible-width - 50px) / 2);
+                        spacing: 10px;
+
+                        BindCommandCard {
+                            width: parent.col-width;
+                            is-grid-card: true;
+                            command-title: row.title;
+                            description: row.subtitle;
+                            checked: row.checked;
+                            toggled(new-val) => {
+                                root.selector-dropdown-open = false;
+                                row.checked = new-val;
+                                if !root.backend-connected {
+                                    if new-val {
+                                        root.selected-commands-count += 1;
+                                    } else {
+                                        root.selected-commands-count = max(0, root.selected-commands-count - 1);
+                                    }
+                                }
+                                root.command-toggled(row.command-index, new-val);
+                            }
+                        }
+
+                        if row.has-second : BindCommandCard {
+                            width: parent.col-width;
+                            is-grid-card: true;
+                            command-title: row.second-title;
+                            description: row.second-subtitle;
+                            checked: row.second-checked;
+                            toggled(new-val) => {
+                                root.selector-dropdown-open = false;
+                                row.second-checked = new-val;
+                                if !root.backend-connected {
+                                    if new-val {
+                                        root.selected-commands-count += 1;
+                                    } else {
+                                        root.selected-commands-count = max(0, root.selected-commands-count - 1);
+                                    }
+                                }
+                                root.command-toggled(row.second-command-index, new-val);
+                            }
+                        }
+
+                        if !row.has-second : Rectangle {
+                            width: parent.col-width;
                         }
                     }
                 }

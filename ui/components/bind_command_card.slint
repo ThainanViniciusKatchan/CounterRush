@@ -1,0 +1,119 @@
+import { CS2Theme } from "../theme.slint";
+
+export component VectorCheckmark inherits Rectangle {
+    in property <bool> checked: false;
+
+    width: 16px;
+    height: 16px;
+    border-radius: 3px;
+    border-width: 1px;
+    border-color: root.checked ? CS2Theme.accent-ct-blue : CS2Theme.border-hover;
+    background: root.checked ? CS2Theme.accent-ct-blue : CS2Theme.bg-main;
+    animate background { duration: 100ms; }
+    animate border-color { duration: 100ms; }
+
+    if root.checked : Path {
+        width: 10px;
+        height: 8px;
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        viewbox-width: 12;
+        viewbox-height: 10;
+        stroke: #ffffff;
+        stroke-width: 2.2px;
+        commands: "M 1.5 5.2 L 4.6 8.3 L 10.5 1.8";
+    }
+}
+
+export component BindCommandCard inherits Rectangle {
+    in property <string> command-title;
+    in property <string> description;
+    in property <bool> checked: false;
+    in property <bool> is-grid-card: false;
+    callback toggled(bool);
+
+    background: root.checked
+        ? CS2Theme.bg-card-selected
+        : (card-touch.has-hover ? CS2Theme.bg-card-hover : CS2Theme.bg-card);
+    border-radius: CS2Theme.radius-sm;
+    border-width: 1px;
+    border-color: root.checked
+        ? CS2Theme.accent-ct-cyan
+        : (card-touch.has-hover ? CS2Theme.border-hover : CS2Theme.border);
+    animate background { duration: 100ms; }
+    animate border-color { duration: 100ms; }
+
+    if root.checked : Rectangle {
+        x: 0px;
+        y: 0px;
+        width: parent.width;
+        height: 2px;
+        background: CS2Theme.accent-ct-cyan;
+        border-radius: CS2Theme.radius-xs;
+    }
+
+    HorizontalLayout {
+        padding-left: 12px;
+        padding-right: 12px;
+        padding-top: root.is-grid-card ? 11px : 9px;
+        padding-bottom: root.is-grid-card ? 11px : 9px;
+        spacing: 10px;
+
+        VerticalLayout {
+            padding-top: 4px;
+            alignment: start;
+            horizontal-stretch: 0;
+
+            VectorCheckmark {
+                checked: root.checked;
+            }
+        }
+
+        VerticalLayout {
+            horizontal-stretch: 1;
+            min-width: 0px;
+            spacing: 6px;
+            alignment: start;
+
+            Rectangle {
+                min-width: 0px;
+                border-radius: CS2Theme.radius-xs;
+                background: root.checked ? CS2Theme.accent-ct-soft : CS2Theme.bg-main;
+                border-width: 1px;
+                border-color: root.checked ? CS2Theme.accent-ct-blue : CS2Theme.border;
+                animate background { duration: 100ms; }
+                animate border-color { duration: 100ms; }
+
+                VerticalLayout {
+                    padding-left: 9px;
+                    padding-right: 9px;
+                    padding-top: 5px;
+                    padding-bottom: 5px;
+
+                    Text {
+                        text: root.command-title;
+                        font-size: 11px;
+                        font-weight: 700;
+                        color: root.checked ? #ffffff : CS2Theme.text-cyan;
+                        wrap: word-wrap;
+                    }
+                }
+            }
+
+            Text {
+                text: root.description;
+                font-size: 12px;
+                font-weight: 400;
+                color: root.checked ? CS2Theme.text-primary : CS2Theme.text-muted;
+                wrap: word-wrap;
+            }
+        }
+    }
+
+    card-touch := TouchArea {
+        mouse-cursor: pointer;
+        clicked => {
+            root.toggled(!root.checked);
+        }
+    }
+}
