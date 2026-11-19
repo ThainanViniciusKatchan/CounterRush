@@ -1,6 +1,7 @@
 import { ScrollView } from "std-widgets.slint";
 import { CS2Theme } from "theme.slint";
 import { BindCommandCard } from "components/bind_command_card.slint";
+import { TweakSwitch } from "components/tweak_switch.slint";
 
 export struct BindCategoryTab {
     index: int,
@@ -12,20 +13,66 @@ export struct BindCategoryTab {
     match-count: int,
 }
 
+export struct BindGridCell {
+    present: bool,
+    command-index: int,
+    title: string,
+    info: string,
+    description: string,
+    command-value: string,
+    checked: bool,
+}
+
 export struct BindCatalogRow {
-    // 0 = Categoria, 1 = Subcategoria, 2 = Comando em lista, 3 = Par de comandos em grade
+    // 0 = Categoria, 1 = Subcategoria, 2 = Comando em lista, 3 = Linha de grade (até 4 botões)
     row-kind: int,
     command-index: int,
     title: string,
     subtitle: string,
     command-value: string,
     checked: bool,
-    has-second: bool,
-    second-command-index: int,
-    second-title: string,
-    second-subtitle: string,
-    second-command-value: string,
-    second-checked: bool,
+    cell-0: BindGridCell,
+    cell-1: BindGridCell,
+    cell-2: BindGridCell,
+    cell-3: BindGridCell,
+}
+
+component BindGridSwitchSlot inherits Rectangle {
+    in property <BindGridCell> cell;
+    in property <length> slot-width;
+    callback toggled(int, bool);
+    callback hover-changed(bool, int, string, string, bool, length, length, length, length);
+
+    width: root.slot-width;
+    height: 50px;
+
+    if root.cell.present : TweakSwitch {
+        width: parent.width;
+        button-width: parent.width;
+        label: root.cell.title;
+        info: root.cell.info;
+        checked: root.cell.checked;
+        accent-color: CS2Theme.accent-ct-blue;
+        hover-color: #0284c7;
+        show-inline-tooltip: false;
+        auto-toggle: false;
+        toggled(new-val) => {
+            root.toggled(root.cell.command-index, new-val);
+        }
+        hover-changed(hovered, ax, ay, aw, ah) => {
+            root.hover-changed(
+                hovered,
+                root.cell.command-index,
+                root.cell.title,
+                root.cell.description,
+                root.cell.checked,
+                ax,
+                ay,
+                aw,
+                ah
+            );
+        }
+    }
 }
 
 export component BindsTestWindow inherits Window {
@@ -60,6 +107,17 @@ export component BindsTestWindow inherits Window {
     in-out property <bool> show-conflict-prompt: false;
     in-out property <string> conflict-message: "";
 
+    // Estado do popup flutuante de descrição da grade
+    in-out property <bool> tooltip-visible: false;
+    in-out property <int> tooltip-command-index: -1;
+    in-out property <string> tooltip-title: "";
+    in-out property <string> tooltip-description: "";
+    in-out property <bool> tooltip-checked: false;
+    in-out property <length> tooltip-anchor-x: 0px;
+    in-out property <length> tooltip-anchor-y: 0px;
+    in-out property <length> tooltip-anchor-w: 0px;
+    in-out property <length> tooltip-anchor-h: 0px;
+
     in-out property <[BindCategoryTab]> category-tabs: [
         { index: 0, tab-label: "Movimentação", title: "1. Movimentação", subtitle: "Deslocamento, saltos, postura e controle de câmera (Source 2)", total-count: 13, selected-count: 0, match-count: 0 },
         { index: 1, tab-label: "Treinamento", title: "2. Treinamento", subtitle: "Exigem sv_cheats 1", total-count: 23, selected-count: 0, match-count: 0 },
@@ -71,14 +129,14 @@ export component BindsTestWindow inherits Window {
     ];
 
     in-out property <[BindCatalogRow]> catalog-rows: [
-        { row-kind: 0, command-index: -1, title: "2. Treinamento", subtitle: "Exigem sv_cheats 1", command-value: "", checked: false, has-second: false, second-command-index: -1, second-title: "", second-subtitle: "", second-command-value: "", second-checked: false },
-        { row-kind: 1, command-index: -1, title: "Movimentação Livre e Teleporte de Precisão", subtitle: "", command-value: "", checked: false, has-second: false, second-command-index: -1, second-title: "", second-subtitle: "", second-command-value: "", second-checked: false },
-        { row-kind: 2, command-index: 13, title: "noclip", subtitle: "Liga/desliga o voo livre atravessando paredes e objetos.", command-value: "noclip", checked: false, has-second: false, second-command-index: -1, second-title: "", second-subtitle: "", second-command-value: "", second-checked: false },
-        { row-kind: 2, command-index: 14, title: "getpos", subtitle: "Imprime no console as coordenadas exatas (setpos e setang) da posição e mira atuais.", command-value: "getpos", checked: false, has-second: false, second-command-index: -1, second-title: "", second-subtitle: "", second-command-value: "", second-checked: false },
-        { row-kind: 1, command-index: -1, title: "Treino Avançado de Granadas", subtitle: "", command-value: "", checked: false, has-second: false, second-command-index: -1, second-title: "", second-subtitle: "", second-command-value: "", second-checked: false },
-        { row-kind: 2, command-index: 16, title: "sv_rethrow_last_grenade", subtitle: "Arremessa novamente a última granada jogada no servidor.", command-value: "sv_rethrow_last_grenade", checked: false, has-second: false, second-command-index: -1, second-title: "", second-subtitle: "", second-command-value: "", second-checked: false },
-        { row-kind: 2, command-index: 19, title: "ent_fire smokegrenade_projectile kill; ent_fire molotov_projectile kill; ent_fire inferno kill; ent_fire flashbang_projectile kill; ent_fire hegrenade_projectile kill; ent_fire decoy_projectile kill; stopsound", subtitle: "Apaga instantaneamente todas as smokes, Molotovs, granadas no ar e corta efeitos sonoros ativos.", command-value: "ent_fire smokegrenade_projectile kill; ent_fire molotov_projectile kill; ent_fire inferno kill; ent_fire flashbang_projectile kill; ent_fire hegrenade_projectile kill; ent_fire decoy_projectile kill; stopsound", checked: false, has-second: false, second-command-index: -1, second-title: "", second-subtitle: "", second-command-value: "", second-checked: false },
-        { row-kind: 2, command-index: 20, title: "bot_place", subtitle: "Posiciona um bot imediatamente no local onde sua mira aponta.", command-value: "bot_place", checked: false, has-second: false, second-command-index: -1, second-title: "", second-subtitle: "", second-command-value: "", second-checked: false },
+        { row-kind: 0, command-index: -1, title: "2. Treinamento", subtitle: "Exigem sv_cheats 1", command-value: "", checked: false },
+        { row-kind: 1, command-index: -1, title: "Movimentação Livre e Teleporte de Precisão", subtitle: "", command-value: "", checked: false },
+        { row-kind: 2, command-index: 13, title: "noclip", subtitle: "Liga/desliga o voo livre atravessando paredes e objetos.", command-value: "noclip", checked: false },
+        { row-kind: 2, command-index: 14, title: "getpos", subtitle: "Imprime no console as coordenadas exatas (setpos e setang) da posição e mira atuais.", command-value: "getpos", checked: false },
+        { row-kind: 1, command-index: -1, title: "Treino Avançado de Granadas", subtitle: "", command-value: "", checked: false },
+        { row-kind: 2, command-index: 16, title: "sv_rethrow_last_grenade", subtitle: "Arremessa novamente a última granada jogada no servidor.", command-value: "sv_rethrow_last_grenade", checked: false },
+        { row-kind: 2, command-index: 19, title: "ent_fire smokegrenade_projectile kill; ent_fire molotov_projectile kill; ent_fire inferno kill; ent_fire flashbang_projectile kill; ent_fire hegrenade_projectile kill; ent_fire decoy_projectile kill; stopsound", subtitle: "Apaga instantaneamente todas as smokes, Molotovs, granadas no ar e corta efeitos sonoros ativos.", command-value: "ent_fire smokegrenade_projectile kill; ent_fire molotov_projectile kill; ent_fire inferno kill; ent_fire flashbang_projectile kill; ent_fire hegrenade_projectile kill; ent_fire decoy_projectile kill; stopsound", checked: false },
+        { row-kind: 2, command-index: 20, title: "bot_place", subtitle: "Posiciona um bot imediatamente no local onde sua mira aponta.", command-value: "bot_place", checked: false },
     ];
 
     // Callbacks para integração com o backend Rust
@@ -99,8 +157,54 @@ export component BindsTestWindow inherits Window {
     public function activate-key-listener() {
         root.selector-dropdown-open = false;
         root.show-conflict-prompt = false;
+        root.hide-grid-tooltip();
         root.is-listening-key = true;
         key-listener-scope.focus();
+    }
+
+    function hide-grid-tooltip() {
+        root.tooltip-visible = false;
+    }
+
+    function handle-grid-hover(
+        hovered: bool,
+        cmd-idx: int,
+        title: string,
+        desc: string,
+        checked: bool,
+        ax: length,
+        ay: length,
+        aw: length,
+        ah: length
+    ) {
+        if hovered && !root.selector-dropdown-open {
+            root.tooltip-command-index = cmd-idx;
+            root.tooltip-title = title;
+            root.tooltip-description = desc;
+            root.tooltip-checked = checked;
+            root.tooltip-anchor-x = ax;
+            root.tooltip-anchor-y = ay;
+            root.tooltip-anchor-w = aw;
+            root.tooltip-anchor-h = ah;
+            root.tooltip-visible = true;
+        } else if !hovered && root.tooltip-command-index == cmd-idx {
+            root.tooltip-visible = false;
+        }
+    }
+
+    function sync-grid-toggle-state(cmd-idx: int, new-val: bool) {
+        root.selector-dropdown-open = false;
+        if root.tooltip-command-index == cmd-idx {
+            root.tooltip-checked = new-val;
+        }
+        if !root.backend-connected {
+            if new-val {
+                root.selected-commands-count += 1;
+            } else {
+                root.selected-commands-count = max(0, root.selected-commands-count - 1);
+            }
+        }
+        root.command-toggled(cmd-idx, new-val);
     }
 
     pure function fallback-resolve-key(text: string) -> string {
@@ -424,6 +528,7 @@ export component BindsTestWindow inherits Window {
                                 mouse-cursor: pointer;
                                 clicked => {
                                     root.is-listening-key = false;
+                                    root.hide-grid-tooltip();
                                     root.selector-dropdown-open = !root.selector-dropdown-open;
                                 }
                             }
@@ -854,6 +959,7 @@ export component BindsTestWindow inherits Window {
                                     edited => {
                                         root.is-listening-key = false;
                                         root.selector-dropdown-open = false;
+                                        root.hide-grid-tooltip();
                                         catalog-scroll.content-y = 0px;
                                         root.search-query-changed(self.text);
                                     }
@@ -902,6 +1008,7 @@ export component BindsTestWindow inherits Window {
                                     clicked => {
                                         root.is-listening-key = false;
                                         root.selector-dropdown-open = false;
+                                        root.hide-grid-tooltip();
                                         root.search-query = "";
                                         catalog-scroll.content-y = 0px;
                                         root.search-query-changed("");
@@ -967,6 +1074,7 @@ export component BindsTestWindow inherits Window {
                                     clicked => {
                                         root.is-listening-key = false;
                                         root.selector-dropdown-open = false;
+                                        root.hide-grid-tooltip();
                                         if root.is-grid-view {
                                             root.is-grid-view = false;
                                             catalog-scroll.content-y = 0px;
@@ -1020,6 +1128,7 @@ export component BindsTestWindow inherits Window {
                                     clicked => {
                                         root.is-listening-key = false;
                                         root.selector-dropdown-open = false;
+                                        root.hide-grid-tooltip();
                                         if !root.is-grid-view {
                                             root.is-grid-view = true;
                                             catalog-scroll.content-y = 0px;
@@ -1129,6 +1238,7 @@ export component BindsTestWindow inherits Window {
                             clicked => {
                                 root.is-listening-key = false;
                                 root.selector-dropdown-open = false;
+                                root.hide-grid-tooltip();
                                 root.search-query = "";
                                 root.active-category-index = tab.index;
                                 catalog-scroll.content-y = 0px;
@@ -1151,6 +1261,9 @@ export component BindsTestWindow inherits Window {
         catalog-scroll := ScrollView {
             vertical-stretch: 1;
             content-width: self.visible-width;
+            changed content-y => {
+                root.hide-grid-tooltip();
+            }
 
             VerticalLayout {
                 width: catalog-scroll.visible-width;
@@ -1158,7 +1271,7 @@ export component BindsTestWindow inherits Window {
                 padding-right: 20px;
                 padding-top: 12px;
                 padding-bottom: 24px;
-                spacing: 8px;
+                spacing: root.is-grid-view ? 12px : 8px;
                 alignment: start;
 
                 if root.search-query != "" && root.catalog-rows.length > 0 : Rectangle {
@@ -1207,6 +1320,7 @@ export component BindsTestWindow inherits Window {
                             banner-clear-touch := TouchArea {
                                 mouse-cursor: pointer;
                                 clicked => {
+                                    root.hide-grid-tooltip();
                                     root.search-query = "";
                                     catalog-scroll.content-y = 0px;
                                     root.search-query-changed("");
@@ -1292,6 +1406,7 @@ export component BindsTestWindow inherits Window {
                                 empty-clear-touch := TouchArea {
                                     mouse-cursor: pointer;
                                     clicked => {
+                                        root.hide-grid-tooltip();
                                         root.search-query = "";
                                         catalog-scroll.content-y = 0px;
                                         root.search-query-changed("");
@@ -1368,56 +1483,105 @@ export component BindsTestWindow inherits Window {
                         }
                     }
 
-                    // 3.4 Par de Comandos (Modo Grade 2 colunas)
+                    // 3.4 Grade estilo Otimizações (4 colunas com popup de descrição no hover)
                     if row.row-kind == 3 : HorizontalLayout {
-                        property <length> col-width: max(200px, (catalog-scroll.visible-width - 50px) / 2);
-                        spacing: 10px;
+                        property <length> col-width: max(180px, (catalog-scroll.visible-width - 76px) / 4);
+                        spacing: 12px;
 
-                        BindCommandCard {
-                            width: parent.col-width;
-                            is-grid-card: true;
-                            command-title: row.title;
-                            description: row.subtitle;
-                            checked: row.checked;
-                            toggled(new-val) => {
-                                root.selector-dropdown-open = false;
-                                row.checked = new-val;
-                                if !root.backend-connected {
-                                    if new-val {
-                                        root.selected-commands-count += 1;
-                                    } else {
-                                        root.selected-commands-count = max(0, root.selected-commands-count - 1);
-                                    }
-                                }
-                                root.command-toggled(row.command-index, new-val);
+                        BindGridSwitchSlot {
+                            cell: row.cell-0;
+                            slot-width: parent.col-width;
+                            toggled(cmd-idx, new-val) => {
+                                row.cell-0.checked = new-val;
+                                root.sync-grid-toggle-state(cmd-idx, new-val);
+                            }
+                            hover-changed(hovered, cmd-idx, title, desc, checked, ax, ay, aw, ah) => {
+                                root.handle-grid-hover(hovered, cmd-idx, title, desc, checked, ax, ay, aw, ah);
                             }
                         }
 
-                        if row.has-second : BindCommandCard {
-                            width: parent.col-width;
-                            is-grid-card: true;
-                            command-title: row.second-title;
-                            description: row.second-subtitle;
-                            checked: row.second-checked;
-                            toggled(new-val) => {
-                                root.selector-dropdown-open = false;
-                                row.second-checked = new-val;
-                                if !root.backend-connected {
-                                    if new-val {
-                                        root.selected-commands-count += 1;
-                                    } else {
-                                        root.selected-commands-count = max(0, root.selected-commands-count - 1);
-                                    }
-                                }
-                                root.command-toggled(row.second-command-index, new-val);
+                        BindGridSwitchSlot {
+                            cell: row.cell-1;
+                            slot-width: parent.col-width;
+                            toggled(cmd-idx, new-val) => {
+                                row.cell-1.checked = new-val;
+                                root.sync-grid-toggle-state(cmd-idx, new-val);
+                            }
+                            hover-changed(hovered, cmd-idx, title, desc, checked, ax, ay, aw, ah) => {
+                                root.handle-grid-hover(hovered, cmd-idx, title, desc, checked, ax, ay, aw, ah);
                             }
                         }
 
-                        if !row.has-second : Rectangle {
-                            width: parent.col-width;
+                        BindGridSwitchSlot {
+                            cell: row.cell-2;
+                            slot-width: parent.col-width;
+                            toggled(cmd-idx, new-val) => {
+                                row.cell-2.checked = new-val;
+                                root.sync-grid-toggle-state(cmd-idx, new-val);
+                            }
+                            hover-changed(hovered, cmd-idx, title, desc, checked, ax, ay, aw, ah) => {
+                                root.handle-grid-hover(hovered, cmd-idx, title, desc, checked, ax, ay, aw, ah);
+                            }
+                        }
+
+                        BindGridSwitchSlot {
+                            cell: row.cell-3;
+                            slot-width: parent.col-width;
+                            toggled(cmd-idx, new-val) => {
+                                row.cell-3.checked = new-val;
+                                root.sync-grid-toggle-state(cmd-idx, new-val);
+                            }
+                            hover-changed(hovered, cmd-idx, title, desc, checked, ax, ay, aw, ah) => {
+                                root.handle-grid-hover(hovered, cmd-idx, title, desc, checked, ax, ay, aw, ah);
+                            }
                         }
                     }
                 }
+            }
+        }
+    }
+
+    // =========================================================================
+    // 4. POPUP DE DESCRIÇÃO NO HOVER DA GRADE (ACIMA DO SCROLLVIEW)
+    // =========================================================================
+    if root.tooltip-visible && root.is-grid-view && !root.selector-dropdown-open : Rectangle {
+        property <length> above-y: root.tooltip-anchor-y - self.height - 8px;
+        property <length> below-y: root.tooltip-anchor-y + root.tooltip-anchor-h + 8px;
+
+        width: min(360px, root.width - 24px);
+        height: tooltip-content.preferred-height;
+        x: clamp(root.tooltip-anchor-x + (root.tooltip-anchor-w - self.width) / 2, 12px, root.width - self.width - 12px);
+        y: above-y >= catalog-scroll.absolute-position.y ? above-y : clamp(below-y, 12px, max(12px, root.height - self.height - 12px));
+        background: #0f172a;
+        border-width: 1px;
+        border-color: root.tooltip-checked ? CS2Theme.accent-ct-cyan : CS2Theme.accent-ct-blue;
+        border-radius: CS2Theme.radius-xs;
+        drop-shadow-color: rgba(0, 0, 0, 0.55);
+        drop-shadow-blur: 14px;
+        drop-shadow-offset-y: 6px;
+
+        tooltip-content := VerticalLayout {
+            width: parent.width;
+            padding-left: 12px;
+            padding-right: 12px;
+            padding-top: 8px;
+            padding-bottom: 8px;
+            spacing: 4px;
+
+            Text {
+                text: root.tooltip-title;
+                font-size: 11px;
+                font-weight: 800;
+                color: CS2Theme.accent-ct-cyan;
+                wrap: word-wrap;
+            }
+
+            Text {
+                text: root.tooltip-description;
+                font-size: 11px;
+                font-weight: 500;
+                color: #f8fafc;
+                wrap: word-wrap;
             }
         }
     }

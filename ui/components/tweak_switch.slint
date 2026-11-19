@@ -10,8 +10,11 @@ export component TweakSwitch inherits Rectangle {
     in-out property <bool> checked: false;
     in property <bool> enabled: true;
     in property <length> button-width: 0px;
+    in property <bool> show-inline-tooltip: true;
+    in property <bool> auto-toggle: true;
     callback toggled(bool);
     callback blocked-click();
+    callback hover-changed(bool, length, length, length, length);
 
     height: 50px;
     min-width: root.button-width > 0px ? root.button-width : 0px;
@@ -88,7 +91,7 @@ export component TweakSwitch inherits Rectangle {
     }
 
     // Balão informativo flutuante (Tooltip) com quebra de linha e dimensionamento adaptativo
-    if touch.has-hover : Rectangle {
+    if root.show-inline-tooltip && touch.has-hover : Rectangle {
         x: (parent.width - self.width) / 2;
         y: - self.height - 8px;
         width: root.tooltip-width;
@@ -126,10 +129,23 @@ export component TweakSwitch inherits Rectangle {
 
     touch := TouchArea {
         mouse-cursor: root.enabled ? pointer : default;
+        changed has-hover => {
+            root.hover-changed(
+                self.has-hover,
+                root.absolute-position.x,
+                root.absolute-position.y,
+                root.width,
+                root.height
+            );
+        }
         clicked => {
             if root.enabled {
-                root.checked = !root.checked;
-                root.toggled(root.checked);
+                if root.auto-toggle {
+                    root.checked = !root.checked;
+                    root.toggled(root.checked);
+                } else {
+                    root.toggled(!root.checked);
+                }
             } else {
                 root.blocked-click();
             }

@@ -30,6 +30,30 @@ impl BindsWindowState {
     }
 }
 
+fn make_empty_grid_cell() -> BindGridCell {
+    BindGridCell {
+        present: false,
+        command_index: -1,
+        title: SharedString::default(),
+        info: SharedString::default(),
+        description: SharedString::default(),
+        command_value: SharedString::default(),
+        checked: false,
+    }
+}
+
+fn make_grid_cell(idx: usize, entry: &BindCommandEntry, checked: bool) -> BindGridCell {
+    BindGridCell {
+        present: true,
+        command_index: idx as i32,
+        title: entry.display_command.into(),
+        info: entry.subcategory.into(),
+        description: entry.description.into(),
+        command_value: entry.cfg_command.into(),
+        checked,
+    }
+}
+
 fn make_header_row(row_kind: i32, title: &str, subtitle: &str) -> BindCatalogRow {
     BindCatalogRow {
         row_kind,
@@ -38,12 +62,10 @@ fn make_header_row(row_kind: i32, title: &str, subtitle: &str) -> BindCatalogRow
         subtitle: subtitle.into(),
         command_value: SharedString::default(),
         checked: false,
-        has_second: false,
-        second_command_index: -1,
-        second_title: SharedString::default(),
-        second_subtitle: SharedString::default(),
-        second_command_value: SharedString::default(),
-        second_checked: false,
+        cell_0: make_empty_grid_cell(),
+        cell_1: make_empty_grid_cell(),
+        cell_2: make_empty_grid_cell(),
+        cell_3: make_empty_grid_cell(),
     }
 }
 
@@ -55,51 +77,32 @@ fn make_list_row(cmd_idx: usize, entry: &BindCommandEntry, checked: bool) -> Bin
         subtitle: entry.description.into(),
         command_value: entry.cfg_command.into(),
         checked,
-        has_second: false,
-        second_command_index: -1,
-        second_title: SharedString::default(),
-        second_subtitle: SharedString::default(),
-        second_command_value: SharedString::default(),
-        second_checked: false,
+        cell_0: make_empty_grid_cell(),
+        cell_1: make_empty_grid_cell(),
+        cell_2: make_empty_grid_cell(),
+        cell_3: make_empty_grid_cell(),
     }
 }
 
-fn make_grid_pair_row(
-    first: (usize, &BindCommandEntry, bool),
-    second: Option<(usize, &BindCommandEntry, bool)>,
-) -> BindCatalogRow {
-    let (has_second, s_idx, s_title, s_sub, s_val, s_chk) = match second {
-        Some((idx, entry, checked)) => (
-            true,
-            idx as i32,
-            SharedString::from(entry.display_command),
-            SharedString::from(entry.description),
-            SharedString::from(entry.cfg_command),
-            checked,
-        ),
-        None => (
-            false,
-            -1,
-            SharedString::default(),
-            SharedString::default(),
-            SharedString::default(),
-            false,
-        ),
+fn make_grid_quad_row(chunk: &[(usize, &BindCommandEntry, bool)]) -> BindCatalogRow {
+    let cell_for = |slot: usize| -> BindGridCell {
+        chunk
+            .get(slot)
+            .map(|&(idx, entry, checked)| make_grid_cell(idx, entry, checked))
+            .unwrap_or_else(make_empty_grid_cell)
     };
 
     BindCatalogRow {
         row_kind: 3,
-        command_index: first.0 as i32,
-        title: first.1.display_command.into(),
-        subtitle: first.1.description.into(),
-        command_value: first.1.cfg_command.into(),
-        checked: first.2,
-        has_second,
-        second_command_index: s_idx,
-        second_title: s_title,
-        second_subtitle: s_sub,
-        second_command_value: s_val,
-        second_checked: s_chk,
+        command_index: -1,
+        title: SharedString::default(),
+        subtitle: SharedString::default(),
+        command_value: SharedString::default(),
+        checked: false,
+        cell_0: cell_for(0),
+        cell_1: cell_for(1),
+        cell_2: cell_for(2),
+        cell_3: cell_for(3),
     }
 }
 
@@ -113,8 +116,8 @@ fn flush_subcategory_rows(
     }
 
     if is_grid_view {
-        for pair in pending.chunks(2) {
-            out.push(make_grid_pair_row(pair[0], pair.get(1).copied()));
+        for chunk in pending.chunks(4) {
+            out.push(make_grid_quad_row(chunk));
         }
     } else {
         for &(idx, entry, checked) in pending.iter() {
@@ -402,16 +405,17 @@ fn sync_command_check_in_visible_rows(
     for idx in 0..model.row_count() {
         if let Some(mut row) = model.row_data(idx) {
             let mut changed = false;
-            if row.command_index == command_idx && row.checked != checked {
+            if row.row_kind == 2 && row.command_index == command_idx && row.checked != checked {
                 row.checked = checked;
                 changed = true;
             }
-            if row.has_second
-                && row.second_command_index == command_idx
-                && row.second_checked != checked
-            {
-                row.second_checked = checked;
-                changed = true;
+            if row.row_kind == 3 {
+                for cell in [&mut row.cell_0, &mut row.cell_1, &mut row.cell_2, &mut row.cell_3] {
+                    if cell.present && cell.command_index == command_idx && cell.checked != checked {
+                        cell.checked = checked;
+                        changed = true;
+                    }
+                }
             }
             if changed {
                 model.set_row_data(idx, row);
@@ -772,9 +776,18 @@ fn wire_binds_window(ui: &BindsTestWindow, dirs: BindDirectories) {
         }
         for idx in 0..model_for_clear.row_count() {
             if let Some(mut row) = model_for_clear.row_data(idx) {
-                if row.checked || row.second_checked {
+                let mut changed = false;
+                if row.checked {
                     row.checked = false;
-                    row.second_checked = false;
+                    changed = true;
+                }
+                for cell in [&mut row.cell_0, &mut row.cell_1, &mut row.cell_2, &mut row.cell_3] {
+                    if cell.checked {
+                        cell.checked = false;
+                        changed = true;
+                    }
+                }
+                if changed {
                     model_for_clear.set_row_data(idx, row);
                 }
             }
@@ -833,9 +846,10 @@ fn count_visible_commands_in_model(rows: &ModelRc<BindCatalogRow>) -> usize {
         match row.row_kind {
             2 => count += 1,
             3 => {
-                count += 1;
-                if row.has_second {
-                    count += 1;
+                for cell in [&row.cell_0, &row.cell_1, &row.cell_2, &row.cell_3] {
+                    if cell.present {
+                        count += 1;
+                    }
                 }
             }
             _ => {}
@@ -884,19 +898,27 @@ fn run_self_test() {
     }
     assert_eq!(total_across_tabs, 186, "Soma das 7 abas deve totalizar 186 comandos");
 
-    // 2. Validar alternância Lista <-> Grade mantendo contagem exata dos comandos
+    // 2. Validar alternância Lista <-> Grade (4 colunas estilo Otimizações) mantendo contagem e descrições
     ui.invoke_category_tab_selected(1); // 2. Treinamento (23 comandos)
     ui.invoke_view_mode_changed(true);
     let grid_rows = ui.get_catalog_rows();
-    let mut has_grid_pair = false;
+    let mut has_grid_row = false;
     for i in 0..grid_rows.row_count() {
         let row = grid_rows.row_data(i).unwrap();
         assert_ne!(row.row_kind, 2, "Modo grade não deve emitir row_kind == 2");
         if row.row_kind == 3 {
-            has_grid_pair = true;
+            has_grid_row = true;
+            for cell in [&row.cell_0, &row.cell_1, &row.cell_2, &row.cell_3] {
+                if cell.present {
+                    assert!(
+                        !cell.description.is_empty(),
+                        "Célula da grade deve trazer descrição completa para o popup"
+                    );
+                }
+            }
         }
     }
-    assert!(has_grid_pair, "Modo grade deve emitir linhas row_kind == 3");
+    assert!(has_grid_row, "Modo grade deve emitir linhas row_kind == 3");
     assert_eq!(count_visible_commands_in_model(&grid_rows), 23);
 
     ui.invoke_view_mode_changed(false);
