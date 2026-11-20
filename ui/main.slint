@@ -10,7 +10,7 @@ import { NoProfileDialog } from "components/no_profile_dialog.slint";
 import { InDevelopmentDialog } from "components/in_development_dialog.slint";
 import { AutoOptimizeDialog } from "components/auto_optimize_dialog.slint";
 import { AppTray } from "components/tray.slint";
-import { BindsTestWindow, BindCatalogRow, BindCategoryTab, BindGridCell } from "binds_window.slint";
+import { BindsView, BindsState, BindCatalogRow, BindCategoryTab, BindGridCell } from "components/binds_view.slint";
 
 export struct PresetModel {
     name: string,
@@ -22,7 +22,7 @@ export struct LanguageItem {
     display_name: string,
 }
 
-export { NewProfileData, AppTray, BindsTestWindow, BindCatalogRow, BindCategoryTab, BindGridCell }
+export { NewProfileData, AppTray, BindsState, BindCatalogRow, BindCategoryTab, BindGridCell }
 
 export component MainWindow inherits Window {
     title: @tr("CounterRush - CS2 Performance");
@@ -38,6 +38,7 @@ export component MainWindow inherits Window {
     // Propriedades e estados reativos
     in-out property <string> app-version: "0.20.0";
     in-out property <int> active-tab: 0;
+    in-out property <bool> show-binds-view: false;
     in-out property <string> status-message: @tr("Nenhum perfil de otimização ativo. Crie ou detecte um perfil para começar.");
     in-out property <bool> is-launching: false;
     in-out property <bool> cpu-tweak-active: false;
@@ -124,12 +125,20 @@ export component MainWindow inherits Window {
         root.tweak-requires-profile();
     }
 
+    function close-binds-view() {
+        root.show-binds-view = false;
+        BindsState.is-listening-key = false;
+        BindsState.selector-dropdown-open = false;
+        BindsState.tooltip-visible = false;
+    }
+
     HorizontalLayout {
         // 1. Barra Lateral Tática Sólida (Sem Bordas)
         Sidebar {
             active-tab <=> root.active-tab;
             app-version: root.app-version;
             tab-selected(idx) => {
+                root.close-binds-view();
                 if idx == 0 {
                     root.status-message = @tr("Visualizando Painel Geral");
                 } else if idx == 1 {
@@ -143,7 +152,7 @@ export component MainWindow inherits Window {
         }
 
         // 2. Área Central com Distribuição Limpa e Sem Fundos Pesados
-        if root.active-tab == 0 : VerticalLayout {
+        if root.active-tab == 0 && !root.show-binds-view : VerticalLayout {
             padding-left: 24px;
             padding-right: 24px;
             padding-top: 18px;
@@ -338,13 +347,6 @@ export component MainWindow inherits Window {
                             color: CS2Theme.text-muted;
                             wrap: word-wrap;
                         }
-                        Text {
-                            text: @tr("EM BREVE");
-                            font-size: 20px;
-                            font-weight: 900;
-                            color: CS2Theme.text-muted;
-                            wrap: word-wrap;
-                        }
                     }
 
                     // Botão com Cor Sólida Ciano
@@ -368,7 +370,9 @@ export component MainWindow inherits Window {
                         }
 
                         touch2 := TouchArea {
+                            mouse-cursor: pointer;
                             clicked => {
+                                root.show-binds-view = true;
                                 root.status-message = @tr("Abrindo gerador de atalhos e binds táticas...");
                                 root.card-action-clicked("binds");
                             }
@@ -498,6 +502,15 @@ export component MainWindow inherits Window {
                         horizontal-alignment: center;
                     }
                 }
+            }
+        }
+
+        // 2.1 View Interna: Gerenciador de Binds CS2 (renderizada dentro da janela principal)
+        if root.active-tab == 0 && root.show-binds-view : BindsView {
+            horizontal-stretch: 1;
+            back-clicked => {
+                root.close-binds-view();
+                root.status-message = @tr("Visualizando Painel Geral");
             }
         }
 
@@ -1699,6 +1712,7 @@ export component MainWindow inherits Window {
         }
         create-profile => {
             root.show-no-profile-modal = false;
+            root.close-binds-view();
             root.active-tab = 1;
             root.status-message = @tr("Ajustes Avançados de Hardware");
         }
@@ -1727,6 +1741,7 @@ export component MainWindow inherits Window {
         }
         play-cs2 => {
             root.show-auto-optimize-modal = false;
+            root.close-binds-view();
             root.active-tab = 0;
             root.status-message = @tr("Iniciando Counter-Strike 2 pela Steam com perfil otimizado...");
             root.is-launching = true;

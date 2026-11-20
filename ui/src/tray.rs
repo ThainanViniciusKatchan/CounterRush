@@ -148,6 +148,11 @@ pub fn setup_tray(
     let main_window_weak = main_window.as_weak();
     app_tray.on_open_tab(move |tab_idx| {
         if let Some(ui) = main_window_weak.upgrade() {
+            ui.set_show_binds_view(false);
+            let binds_state = ui.global::<crate::BindsState>();
+            binds_state.set_is_listening_key(false);
+            binds_state.set_selector_dropdown_open(false);
+            binds_state.set_tooltip_visible(false);
             ui.set_active_tab(tab_idx);
             let lang = ui.get_active_language();
             let localized_msg = match (tab_idx, lang.as_str()) {

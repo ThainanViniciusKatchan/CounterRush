@@ -2,6 +2,7 @@
 
 slint::include_modules!();
 
+mod binds;
 mod tray;
 
 fn scan_presets() -> Vec<PresetModel> {
@@ -1792,10 +1793,19 @@ fn main() -> Result<(), slint::PlatformError> {
         });
     });
 
+    // Inicializa controlador da view interna de gerenciamento de binds
+    let binds_dirs = counterrush_core::BindDirectories::default();
+    binds::wire_binds_view(&main_window, binds_dirs.clone());
+
     // Callback para clique nos cards de ação
     let window_handle = main_window.as_weak();
+    let binds_dirs_for_card = binds_dirs.clone();
     main_window.on_card_action_clicked(move |module_id| {
         if let Some(ui) = window_handle.upgrade() {
+            if module_id.as_str() == "binds" {
+                binds::refresh_existing_cfg_files(&ui, &binds_dirs_for_card);
+                ui.set_show_binds_view(true);
+            }
             let msg = match module_id.as_str() {
                 "custom_optimization" => "Acessando módulo: Otimização Personalizada",
                 "pro_cfg" => "Acessando módulo: Catálogo de .cfg Profissionais",

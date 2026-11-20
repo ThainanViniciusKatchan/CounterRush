@@ -1,7 +1,7 @@
 import { ScrollView } from "std-widgets.slint";
-import { CS2Theme } from "theme.slint";
-import { BindCommandCard } from "components/bind_command_card.slint";
-import { TweakSwitch } from "components/tweak_switch.slint";
+import { CS2Theme } from "../theme.slint";
+import { BindCommandCard } from "bind_command_card.slint";
+import { TweakSwitch } from "tweak_switch.slint";
 
 export struct BindCategoryTab {
     index: int,
@@ -37,53 +37,7 @@ export struct BindCatalogRow {
     cell-3: BindGridCell,
 }
 
-component BindGridSwitchSlot inherits Rectangle {
-    in property <BindGridCell> cell;
-    in property <length> slot-width;
-    callback toggled(int, bool);
-    callback hover-changed(bool, int, string, string, bool, length, length, length, length);
-
-    width: root.slot-width;
-    height: 50px;
-
-    if root.cell.present : TweakSwitch {
-        width: parent.width;
-        button-width: parent.width;
-        label: root.cell.title;
-        info: root.cell.info;
-        checked: root.cell.checked;
-        accent-color: CS2Theme.accent-ct-blue;
-        hover-color: #0284c7;
-        show-inline-tooltip: false;
-        auto-toggle: false;
-        toggled(new-val) => {
-            root.toggled(root.cell.command-index, new-val);
-        }
-        hover-changed(hovered, ax, ay, aw, ah) => {
-            root.hover-changed(
-                hovered,
-                root.cell.command-index,
-                root.cell.title,
-                root.cell.description,
-                root.cell.checked,
-                ax,
-                ay,
-                aw,
-                ah
-            );
-        }
-    }
-}
-
-export component BindsTestWindow inherits Window {
-    title: "CounterRush — Configuração de Binds CS2 (Janela Isolada de Testes)";
-    icon: @image-url("assets/icons/cfg.svg");
-    min-width: 960px;
-    preferred-width: 1120px;
-    min-height: 620px;
-    preferred-height: 740px;
-    background: CS2Theme.bg-main;
-
+export global BindsState {
     // Estado da barra superior fixa
     in-out property <string> file-name-input: "";
     in-out property <string> selected-existing-file: "";
@@ -152,18 +106,63 @@ export component BindsTestWindow inherits Window {
     callback save-bind-clicked();
     callback confirm-conflict-overwrite();
     callback cancel-conflict-overwrite();
+}
+
+component BindGridSwitchSlot inherits Rectangle {
+    in property <BindGridCell> cell;
+    in property <length> slot-width;
+    callback toggled(int, bool);
+    callback hover-changed(bool, int, string, string, bool, length, length, length, length);
+
+    width: root.slot-width;
+    height: 50px;
+
+    if root.cell.present : TweakSwitch {
+        width: parent.width;
+        button-width: parent.width;
+        label: root.cell.title;
+        info: root.cell.info;
+        checked: root.cell.checked;
+        accent-color: CS2Theme.accent-ct-blue;
+        hover-color: #0284c7;
+        show-inline-tooltip: false;
+        auto-toggle: false;
+        toggled(new-val) => {
+            root.toggled(root.cell.command-index, new-val);
+        }
+        hover-changed(hovered, ax, ay, aw, ah) => {
+            root.hover-changed(
+                hovered,
+                root.cell.command-index,
+                root.cell.title,
+                root.cell.description,
+                root.cell.checked,
+                ax,
+                ay,
+                aw,
+                ah
+            );
+        }
+    }
+}
+
+export component BindsView inherits Rectangle {
+    background: CS2Theme.bg-main;
+    clip: true;
+
+    callback back-clicked();
 
     // Função dedicada de ativação da escuta da próxima tecla
     public function activate-key-listener() {
-        root.selector-dropdown-open = false;
-        root.show-conflict-prompt = false;
+        BindsState.selector-dropdown-open = false;
+        BindsState.show-conflict-prompt = false;
         root.hide-grid-tooltip();
-        root.is-listening-key = true;
+        BindsState.is-listening-key = true;
         key-listener-scope.focus();
     }
 
     function hide-grid-tooltip() {
-        root.tooltip-visible = false;
+        BindsState.tooltip-visible = false;
     }
 
     function handle-grid-hover(
@@ -177,34 +176,34 @@ export component BindsTestWindow inherits Window {
         aw: length,
         ah: length
     ) {
-        if hovered && !root.selector-dropdown-open {
-            root.tooltip-command-index = cmd-idx;
-            root.tooltip-title = title;
-            root.tooltip-description = desc;
-            root.tooltip-checked = checked;
-            root.tooltip-anchor-x = ax;
-            root.tooltip-anchor-y = ay;
-            root.tooltip-anchor-w = aw;
-            root.tooltip-anchor-h = ah;
-            root.tooltip-visible = true;
-        } else if !hovered && root.tooltip-command-index == cmd-idx {
-            root.tooltip-visible = false;
+        if hovered && !BindsState.selector-dropdown-open {
+            BindsState.tooltip-command-index = cmd-idx;
+            BindsState.tooltip-title = title;
+            BindsState.tooltip-description = desc;
+            BindsState.tooltip-checked = checked;
+            BindsState.tooltip-anchor-x = ax;
+            BindsState.tooltip-anchor-y = ay;
+            BindsState.tooltip-anchor-w = aw;
+            BindsState.tooltip-anchor-h = ah;
+            BindsState.tooltip-visible = true;
+        } else if !hovered && BindsState.tooltip-command-index == cmd-idx {
+            BindsState.tooltip-visible = false;
         }
     }
 
     function sync-grid-toggle-state(cmd-idx: int, new-val: bool) {
-        root.selector-dropdown-open = false;
-        if root.tooltip-command-index == cmd-idx {
-            root.tooltip-checked = new-val;
+        BindsState.selector-dropdown-open = false;
+        if BindsState.tooltip-command-index == cmd-idx {
+            BindsState.tooltip-checked = new-val;
         }
-        if !root.backend-connected {
+        if !BindsState.backend-connected {
             if new-val {
-                root.selected-commands-count += 1;
+                BindsState.selected-commands-count += 1;
             } else {
-                root.selected-commands-count = max(0, root.selected-commands-count - 1);
+                BindsState.selected-commands-count = max(0, BindsState.selected-commands-count - 1);
             }
         }
-        root.command-toggled(cmd-idx, new-val);
+        BindsState.command-toggled(cmd-idx, new-val);
     }
 
     pure function fallback-resolve-key(text: string) -> string {
@@ -296,34 +295,34 @@ export component BindsTestWindow inherits Window {
     }
 
     function apply-captured-key(key-name: string) {
-        root.bound-key = key-name;
-        root.is-listening-key = false;
-        root.key-captured(root.bound-key);
+        BindsState.bound-key = key-name;
+        BindsState.is-listening-key = false;
+        BindsState.key-captured(BindsState.bound-key);
     }
 
     function sync-local-save-mode() {
-        if root.selected-existing-file == "" {
-            root.is-creating-new-file = true;
-            root.save-mode-badge = "NOVO ARQUIVO";
-        } else if root.file-name-input == "" {
-            root.is-creating-new-file = true;
-            root.save-mode-badge = "DIGITE O NOME";
-        } else if root.file-name-input == root.selected-existing-file {
-            root.is-creating-new-file = false;
-            root.save-mode-badge = "ATUALIZAR ATUAL";
+        if BindsState.selected-existing-file == "" {
+            BindsState.is-creating-new-file = true;
+            BindsState.save-mode-badge = "NOVO ARQUIVO";
+        } else if BindsState.file-name-input == "" {
+            BindsState.is-creating-new-file = true;
+            BindsState.save-mode-badge = "DIGITE O NOME";
+        } else if BindsState.file-name-input == BindsState.selected-existing-file {
+            BindsState.is-creating-new-file = false;
+            BindsState.save-mode-badge = "ATUALIZAR ATUAL";
         } else {
-            root.is-creating-new-file = true;
-            root.save-mode-badge = "CRIAR NOVO";
+            BindsState.is-creating-new-file = true;
+            BindsState.save-mode-badge = "CRIAR NOVO";
         }
     }
 
     // Função dedicada que escuta e associa automaticamente a próxima tecla pressionada
     function capture-next-key(event: KeyEvent) -> EventResult {
-        if !root.is-listening-key {
+        if !BindsState.is-listening-key {
             return reject;
         }
 
-        let mapped-from-backend = root.resolve-cs2-key(event.text);
+        let mapped-from-backend = BindsState.resolve-cs2-key(event.text);
         let mapped-key = mapped-from-backend != "" ? mapped-from-backend : root.fallback-resolve-key(event.text);
         if mapped-key == "" {
             return accept;
@@ -334,6 +333,9 @@ export component BindsTestWindow inherits Window {
     }
 
     VerticalLayout {
+        width: parent.width;
+        height: parent.height;
+
         // =====================================================================
         // 1. BARRA SUPERIOR FIXA (HEADER)
         // =====================================================================
@@ -341,68 +343,103 @@ export component BindsTestWindow inherits Window {
             background: CS2Theme.bg-surface;
 
             VerticalLayout {
-                padding-left: 20px;
-                padding-right: 20px;
-                padding-top: 14px;
-                padding-bottom: 12px;
-                spacing: 10px;
+                padding-left: 16px;
+                padding-right: 16px;
+                padding-top: 10px;
+                padding-bottom: 10px;
+                spacing: 8px;
 
-                // Linha superior: título enxuto + badge de ambiente isolado
+                // Linha superior: botão voltar para o Painel + título do módulo
                 HorizontalLayout {
-                    alignment: space-between;
+                    alignment: start;
+                    spacing: 10px;
+
+                    Rectangle {
+                        height: 26px;
+                        border-radius: CS2Theme.radius-sm;
+                        background: back-touch.has-hover ? CS2Theme.bg-card-hover : CS2Theme.bg-card;
+                        animate background { duration: 100ms; }
+
+                        HorizontalLayout {
+                            padding-left: 9px;
+                            padding-right: 10px;
+                            spacing: 6px;
+
+                            VerticalLayout {
+                                alignment: center;
+                                Path {
+                                    width: 10px;
+                                    height: 10px;
+                                    viewbox-width: 12;
+                                    viewbox-height: 12;
+                                    stroke: back-touch.has-hover ? CS2Theme.accent-ct-cyan : CS2Theme.text-primary;
+                                    stroke-width: 1.9px;
+                                    commands: "M 7.5 1.5 L 3 6 L 7.5 10.5 M 3.5 6 L 11 6";
+                                }
+                            }
+
+                            Text {
+                                text: "Voltar";
+                                font-size: 11px;
+                                font-weight: 700;
+                                color: back-touch.has-hover ? #ffffff : CS2Theme.text-primary;
+                                vertical-alignment: center;
+                            }
+                        }
+
+                        back-touch := TouchArea {
+                            mouse-cursor: pointer;
+                            clicked => {
+                                BindsState.is-listening-key = false;
+                                BindsState.selector-dropdown-open = false;
+                                root.hide-grid-tooltip();
+                                root.back-clicked();
+                            }
+                        }
+                    }
+
+                    VerticalLayout {
+                        alignment: center;
+                        Rectangle {
+                            width: 1px;
+                            height: 16px;
+                            background: CS2Theme.border;
+                        }
+                    }
 
                     HorizontalLayout {
-                        spacing: 10px;
+                        spacing: 8px;
 
-                        Image {
-                            source: @image-url("assets/icons/cfg.svg");
-                            width: 18px;
-                            height: 18px;
-                            colorize: CS2Theme.accent-ct-cyan;
-                            y: (parent.height - self.height) / 2;
+                        VerticalLayout {
+                            alignment: center;
+                            Image {
+                                source: @image-url("../assets/icons/cfg.svg");
+                                width: 16px;
+                                height: 16px;
+                                colorize: CS2Theme.accent-ct-cyan;
+                            }
                         }
 
                         Text {
                             text: "GERADOR DE BINDS CS2";
-                            font-size: 14px;
+                            font-size: 13px;
                             font-weight: 900;
                             letter-spacing: 0.7px;
                             color: CS2Theme.text-primary;
                             vertical-alignment: center;
                         }
                     }
-
-                    Rectangle {
-                        height: 22px;
-                        border-radius: CS2Theme.radius-xs;
-                        background: CS2Theme.accent-ct-soft;
-                        border-width: 1px;
-                        border-color: CS2Theme.border-accent-cyan;
-
-                        HorizontalLayout {
-                            padding-left: 8px;
-                            padding-right: 8px;
-                            Text {
-                                text: "JANELA ISOLADA DE TESTES";
-                                font-size: 9px;
-                                font-weight: 800;
-                                letter-spacing: 0.6px;
-                                color: CS2Theme.text-cyan;
-                                vertical-alignment: center;
-                            }
-                        }
-                    }
                 }
 
                 // Controles do Header lado a lado (fluxo 1 → 2 → Salvar, inputs sem borda em repouso)
                 HorizontalLayout {
-                    spacing: 12px;
+                    spacing: 10px;
 
                     // 1. Campo Composto de Arquivo (.cfg): nome editável + seletor acoplado de existentes
                     VerticalLayout {
-                        spacing: 5px;
-                        horizontal-stretch: 2.2;
-                        min-width: 300px;
+                        spacing: 4px;
+                        horizontal-stretch: 2;
+                        min-width: 280px;
 
                         HorizontalLayout {
                             height: 16px;
@@ -413,7 +450,7 @@ export component BindsTestWindow inherits Window {
                                 font-size: 10px;
                                 font-weight: 800;
                                 letter-spacing: 0.6px;
-                                color: file-name-field.has-focus || root.selector-dropdown-open
+                                color: file-name-field.has-focus || BindsState.selector-dropdown-open
                                     ? CS2Theme.text-cyan
                                     : CS2Theme.text-muted;
                                 vertical-alignment: center;
@@ -422,17 +459,17 @@ export component BindsTestWindow inherits Window {
                             Rectangle {
                                 height: 16px;
                                 border-radius: CS2Theme.radius-xs;
-                                background: root.is-creating-new-file ? CS2Theme.accent-t-soft : CS2Theme.accent-ct-soft;
+                                background: BindsState.is-creating-new-file ? CS2Theme.accent-t-soft : CS2Theme.accent-ct-soft;
 
                                 HorizontalLayout {
                                     padding-left: 6px;
                                     padding-right: 6px;
                                     Text {
-                                        text: root.save-mode-badge;
+                                        text: BindsState.save-mode-badge;
                                         font-size: 8px;
                                         font-weight: 900;
                                         letter-spacing: 0.5px;
-                                        color: root.is-creating-new-file ? CS2Theme.text-gold : CS2Theme.text-cyan;
+                                        color: BindsState.is-creating-new-file ? CS2Theme.text-gold : CS2Theme.text-cyan;
                                         vertical-alignment: center;
                                     }
                                 }
@@ -440,9 +477,9 @@ export component BindsTestWindow inherits Window {
                         }
 
                         file-control-box := Rectangle {
-                            property <bool> is-highlighted: file-name-field.has-focus || root.selector-dropdown-open;
+                            property <bool> is-highlighted: file-name-field.has-focus || BindsState.selector-dropdown-open;
 
-                            height: 38px;
+                            height: 36px;
                             background: is-highlighted
                                 ? CS2Theme.bg-main
                                 : (file-area-touch.has-hover || selector-touch.has-hover ? CS2Theme.bg-card-hover : CS2Theme.bg-card);
@@ -461,7 +498,7 @@ export component BindsTestWindow inherits Window {
                                     alignment: center;
                                     horizontal-stretch: 0;
                                     Image {
-                                        source: @image-url("assets/icons/cfg.svg");
+                                        source: @image-url("../assets/icons/cfg.svg");
                                         width: 14px;
                                         height: 14px;
                                         colorize: is-highlighted ? CS2Theme.accent-ct-cyan : CS2Theme.text-dim;
@@ -475,8 +512,8 @@ export component BindsTestWindow inherits Window {
                                     file-area-touch := TouchArea {
                                         mouse-cursor: text;
                                         clicked => {
-                                            root.is-listening-key = false;
-                                            root.selector-dropdown-open = false;
+                                            BindsState.is-listening-key = false;
+                                            BindsState.selector-dropdown-open = false;
                                             root.hide-grid-tooltip();
                                             file-name-field.focus();
                                         }
@@ -485,25 +522,25 @@ export component BindsTestWindow inherits Window {
                                     file-name-field := TextInput {
                                         width: parent.width;
                                         height: parent.height;
-                                        text <=> root.file-name-input;
+                                        text <=> BindsState.file-name-input;
                                         color: CS2Theme.text-primary;
                                         font-size: 12px;
                                         font-weight: 700;
                                         vertical-alignment: center;
                                         edited => {
-                                            root.is-listening-key = false;
-                                            root.selector-dropdown-open = false;
-                                            root.show-conflict-prompt = false;
+                                            BindsState.is-listening-key = false;
+                                            BindsState.selector-dropdown-open = false;
+                                            BindsState.show-conflict-prompt = false;
                                             root.hide-grid-tooltip();
                                             root.sync-local-save-mode();
-                                            root.file-name-edited(self.text);
+                                            BindsState.file-name-edited(self.text);
                                         }
                                     }
 
-                                    if root.file-name-input == "" : Text {
+                                    if BindsState.file-name-input == "" : Text {
                                         width: parent.width;
                                         height: parent.height;
-                                        text: "Digite um nome (ex: minhas_binds.cfg)";
+                                        text: "Ex: minhas_binds.cfg";
                                         color: CS2Theme.text-muted;
                                         font-size: 11px;
                                         vertical-alignment: center;
@@ -512,7 +549,7 @@ export component BindsTestWindow inherits Window {
                                     }
                                 }
 
-                                if root.file-name-input != "" : Rectangle {
+                                if BindsState.file-name-input != "" : Rectangle {
                                     width: 22px;
                                     height: 22px;
                                     y: (parent.height - self.height) / 2;
@@ -534,15 +571,15 @@ export component BindsTestWindow inherits Window {
                                     clear-file-touch := TouchArea {
                                         mouse-cursor: pointer;
                                         clicked => {
-                                            root.is-listening-key = false;
-                                            root.selector-dropdown-open = false;
-                                            root.show-conflict-prompt = false;
+                                            BindsState.is-listening-key = false;
+                                            BindsState.selector-dropdown-open = false;
+                                            BindsState.show-conflict-prompt = false;
                                             root.hide-grid-tooltip();
-                                            root.file-name-input = "";
-                                            root.selected-existing-file = "";
+                                            BindsState.file-name-input = "";
+                                            BindsState.selected-existing-file = "";
                                             root.sync-local-save-mode();
-                                            root.existing-file-selected("");
-                                            root.file-name-edited("");
+                                            BindsState.existing-file-selected("");
+                                            BindsState.file-name-edited("");
                                         }
                                     }
                                 }
@@ -560,26 +597,26 @@ export component BindsTestWindow inherits Window {
 
                                 selector-anchor := Rectangle {
                                     horizontal-stretch: 0;
-                                    height: 30px;
+                                    height: 28px;
                                     y: (parent.height - self.height) / 2;
                                     border-radius: CS2Theme.radius-xs;
-                                    background: root.selector-dropdown-open
+                                    background: BindsState.selector-dropdown-open
                                         ? CS2Theme.accent-ct-soft
                                         : (selector-touch.has-hover ? CS2Theme.bg-card-selected : CS2Theme.bg-surface);
                                     animate background { duration: 100ms; }
 
                                     HorizontalLayout {
-                                        padding-left: 9px;
-                                        padding-right: 9px;
-                                        spacing: 6px;
+                                        padding-left: 8px;
+                                        padding-right: 8px;
+                                        spacing: 5px;
 
                                         Text {
-                                            text: root.existing-cfg-files.length > 0
-                                                ? "Existentes (" + root.existing-cfg-files.length + ")"
+                                            text: BindsState.existing-cfg-files.length > 0
+                                                ? "Existentes (" + BindsState.existing-cfg-files.length + ")"
                                                 : "Existentes";
-                                            font-size: 11px;
+                                            font-size: 10.5px;
                                             font-weight: 700;
-                                            color: root.selector-dropdown-open || root.selected-existing-file != ""
+                                            color: BindsState.selector-dropdown-open || BindsState.selected-existing-file != ""
                                                 ? CS2Theme.text-cyan
                                                 : CS2Theme.text-muted;
                                             vertical-alignment: center;
@@ -592,9 +629,9 @@ export component BindsTestWindow inherits Window {
                                                 height: 5px;
                                                 viewbox-width: 10;
                                                 viewbox-height: 6;
-                                                stroke: root.selector-dropdown-open ? CS2Theme.accent-ct-cyan : CS2Theme.text-muted;
+                                                stroke: BindsState.selector-dropdown-open ? CS2Theme.accent-ct-cyan : CS2Theme.text-muted;
                                                 stroke-width: 1.8px;
-                                                commands: root.selector-dropdown-open ? "M 1 5 L 5 1 L 9 5" : "M 1 1 L 5 5 L 9 1";
+                                                commands: BindsState.selector-dropdown-open ? "M 1 5 L 5 1 L 9 5" : "M 1 1 L 5 5 L 9 1";
                                             }
                                         }
                                     }
@@ -602,9 +639,9 @@ export component BindsTestWindow inherits Window {
                                     selector-touch := TouchArea {
                                         mouse-cursor: pointer;
                                         clicked => {
-                                            root.is-listening-key = false;
+                                            BindsState.is-listening-key = false;
                                             root.hide-grid-tooltip();
-                                            root.selector-dropdown-open = !root.selector-dropdown-open;
+                                            BindsState.selector-dropdown-open = !BindsState.selector-dropdown-open;
                                         }
                                     }
                                 }
@@ -614,10 +651,10 @@ export component BindsTestWindow inherits Window {
 
                     // 2. Captura de Tecla de Atalho (sem borda em repouso; borda apenas quando em escuta)
                     VerticalLayout {
-                        spacing: 5px;
-                        horizontal-stretch: 1.15;
-                        min-width: 210px;
-                        max-width: 270px;
+                        spacing: 4px;
+                        horizontal-stretch: 1;
+                        min-width: 190px;
+                        max-width: 225px;
 
                         HorizontalLayout {
                             height: 16px;
@@ -627,26 +664,26 @@ export component BindsTestWindow inherits Window {
                                 font-size: 10px;
                                 font-weight: 800;
                                 letter-spacing: 0.6px;
-                                color: root.is-listening-key ? CS2Theme.text-cyan : CS2Theme.text-muted;
+                                color: BindsState.is-listening-key ? CS2Theme.text-cyan : CS2Theme.text-muted;
                                 vertical-alignment: center;
                             }
                         }
 
                         key-listener-box := Rectangle {
-                            height: 38px;
-                            background: root.is-listening-key
+                            height: 36px;
+                            background: BindsState.is-listening-key
                                 ? CS2Theme.accent-ct-soft
                                 : (key-touch.has-hover ? CS2Theme.bg-card-hover : CS2Theme.bg-card);
                             border-radius: CS2Theme.radius-sm;
                             border-width: 1.5px;
-                            border-color: root.is-listening-key ? CS2Theme.accent-ct-cyan : transparent;
+                            border-color: BindsState.is-listening-key ? CS2Theme.accent-ct-cyan : transparent;
                             animate background { duration: 120ms; }
                             animate border-color { duration: 120ms; }
 
                             key-listener-scope := FocusScope {
                                 changed has-focus => {
-                                    if !self.has-focus && root.is-listening-key {
-                                        root.is-listening-key = false;
+                                    if !self.has-focus && BindsState.is-listening-key {
+                                        BindsState.is-listening-key = false;
                                     }
                                 }
                                 key-pressed(event) => {
@@ -660,7 +697,7 @@ export component BindsTestWindow inherits Window {
                                     root.activate-key-listener();
                                 }
                                 pointer-event(ev) => {
-                                    if root.is-listening-key && ev.kind == PointerEventKind.down {
+                                    if BindsState.is-listening-key && ev.kind == PointerEventKind.down {
                                         if ev.button == PointerEventButton.right {
                                             root.apply-captured-key("mouse2");
                                         } else if ev.button == PointerEventButton.middle {
@@ -673,7 +710,7 @@ export component BindsTestWindow inherits Window {
                                     }
                                 }
                                 scroll-event(ev) => {
-                                    if root.is-listening-key {
+                                    if BindsState.is-listening-key {
                                         if ev.delta-y > 0px {
                                             root.apply-captured-key("mwheelup");
                                             return accept;
@@ -702,15 +739,15 @@ export component BindsTestWindow inherits Window {
                                             width: 7px;
                                             height: 7px;
                                             border-radius: 3.5px;
-                                            background: root.is-listening-key
+                                            background: BindsState.is-listening-key
                                                 ? CS2Theme.accent-ct-cyan
-                                                : (root.bound-key != "" ? CS2Theme.status-success : CS2Theme.text-dim);
+                                                : (BindsState.bound-key != "" ? CS2Theme.status-success : CS2Theme.text-dim);
                                         }
                                     }
 
-                                    if root.is-listening-key : Text {
-                                        text: "Aguardando tecla ou scroll...";
-                                        font-size: 11.5px;
+                                    if BindsState.is-listening-key : Text {
+                                        text: "Aguardando tecla/scroll...";
+                                        font-size: 11px;
                                         font-weight: 800;
                                         color: CS2Theme.text-cyan;
                                         vertical-alignment: center;
@@ -718,7 +755,7 @@ export component BindsTestWindow inherits Window {
                                         horizontal-stretch: 1;
                                     }
 
-                                    if !root.is-listening-key && root.bound-key != "" : HorizontalLayout {
+                                    if !BindsState.is-listening-key && BindsState.bound-key != "" : HorizontalLayout {
                                         spacing: 8px;
                                         horizontal-stretch: 1;
 
@@ -732,7 +769,7 @@ export component BindsTestWindow inherits Window {
                                                 padding-left: 9px;
                                                 padding-right: 9px;
                                                 Text {
-                                                    text: root.bound-key;
+                                                    text: BindsState.bound-key;
                                                     font-size: 12px;
                                                     font-weight: 900;
                                                     color: CS2Theme.text-primary;
@@ -752,9 +789,9 @@ export component BindsTestWindow inherits Window {
                                         }
                                     }
 
-                                    if !root.is-listening-key && root.bound-key == "" : Text {
-                                        text: "Clique e pressione uma tecla";
-                                        font-size: 11.5px;
+                                    if !BindsState.is-listening-key && BindsState.bound-key == "" : Text {
+                                        text: "Clique e pressione...";
+                                        font-size: 11px;
                                         font-weight: 500;
                                         color: CS2Theme.text-muted;
                                         vertical-alignment: center;
@@ -763,7 +800,7 @@ export component BindsTestWindow inherits Window {
                                     }
                                 }
 
-                                if root.bound-key != "" && !root.is-listening-key : Rectangle {
+                                if BindsState.bound-key != "" && !BindsState.is-listening-key : Rectangle {
                                     width: 22px;
                                     height: 22px;
                                     y: (parent.height - self.height) / 2;
@@ -785,8 +822,8 @@ export component BindsTestWindow inherits Window {
                                     clear-key-touch := TouchArea {
                                         mouse-cursor: pointer;
                                         clicked => {
-                                            root.bound-key = "";
-                                            root.key-captured("");
+                                            BindsState.bound-key = "";
+                                            BindsState.key-captured("");
                                         }
                                     }
                                 }
@@ -798,24 +835,24 @@ export component BindsTestWindow inherits Window {
                     VerticalLayout {
                         alignment: end;
                         horizontal-stretch: 0;
-                        min-width: 172px;
+                        min-width: 148px;
 
                         Rectangle {
-                            height: 38px;
+                            height: 36px;
                             background: save-touch.has-hover ? CS2Theme.accent-orange-bright : CS2Theme.accent-orange;
                             border-radius: CS2Theme.radius-sm;
                             animate background { duration: 100ms; }
 
                             HorizontalLayout {
-                                padding-left: 14px;
-                                padding-right: 14px;
-                                spacing: 8px;
+                                padding-left: 12px;
+                                padding-right: 12px;
+                                spacing: 7px;
                                 alignment: center;
 
                                 Image {
-                                    source: @image-url("assets/icons/save.svg");
-                                    width: 15px;
-                                    height: 15px;
+                                    source: @image-url("../assets/icons/save.svg");
+                                    width: 14px;
+                                    height: 14px;
                                     colorize: #ffffff;
                                     y: (parent.height - self.height) / 2;
                                 }
@@ -829,7 +866,7 @@ export component BindsTestWindow inherits Window {
                                     vertical-alignment: center;
                                 }
 
-                                if root.selected-commands-count > 0 : Rectangle {
+                                if BindsState.selected-commands-count > 0 : Rectangle {
                                     height: 18px;
                                     min-width: 18px;
                                     y: (parent.height - self.height) / 2;
@@ -840,7 +877,7 @@ export component BindsTestWindow inherits Window {
                                         padding-left: 5px;
                                         padding-right: 5px;
                                         Text {
-                                            text: root.selected-commands-count;
+                                            text: BindsState.selected-commands-count;
                                             font-size: 10px;
                                             font-weight: 900;
                                             color: #ffffff;
@@ -854,9 +891,9 @@ export component BindsTestWindow inherits Window {
                             save-touch := TouchArea {
                                 mouse-cursor: pointer;
                                 clicked => {
-                                    root.selector-dropdown-open = false;
-                                    root.is-listening-key = false;
-                                    root.save-bind-clicked();
+                                    BindsState.selector-dropdown-open = false;
+                                    BindsState.is-listening-key = false;
+                                    BindsState.save-bind-clicked();
                                 }
                             }
                         }
@@ -865,7 +902,7 @@ export component BindsTestWindow inherits Window {
 
                 // Linha secundária: Faixa tática de Prévia da bind / Status + Limpar marcados
                 Rectangle {
-                    height: 30px;
+                    height: 28px;
                     border-radius: CS2Theme.radius-sm;
                     background: CS2Theme.bg-main;
 
@@ -885,15 +922,15 @@ export component BindsTestWindow inherits Window {
                                     width: 6px;
                                     height: 6px;
                                     border-radius: 3px;
-                                    background: root.status-kind == "success"
+                                    background: BindsState.status-kind == "success"
                                         ? CS2Theme.status-success
-                                        : (root.status-kind == "warning"
+                                        : (BindsState.status-kind == "warning"
                                             ? CS2Theme.accent-t-gold
-                                            : (root.status-kind == "error" ? CS2Theme.status-danger : CS2Theme.accent-ct-cyan));
+                                            : (BindsState.status-kind == "error" ? CS2Theme.status-danger : CS2Theme.accent-ct-cyan));
                                 }
                             }
 
-                            if root.bind-preview-line != "" && root.status-kind == "info" : Rectangle {
+                            if BindsState.bind-preview-line != "" && BindsState.status-kind == "info" : Rectangle {
                                 height: 17px;
                                 y: (parent.height - self.height) / 2;
                                 border-radius: CS2Theme.radius-xs;
@@ -913,8 +950,8 @@ export component BindsTestWindow inherits Window {
                                 }
                             }
 
-                            if root.bind-preview-line != "" && root.status-kind == "info" : Text {
-                                text: root.bind-preview-line;
+                            if BindsState.bind-preview-line != "" && BindsState.status-kind == "info" : Text {
+                                text: BindsState.bind-preview-line;
                                 font-size: 11px;
                                 font-weight: 700;
                                 color: CS2Theme.text-primary;
@@ -923,33 +960,33 @@ export component BindsTestWindow inherits Window {
                                 horizontal-stretch: 1;
                             }
 
-                            if !(root.bind-preview-line != "" && root.status-kind == "info") : Text {
-                                text: root.status-message;
+                            if !(BindsState.bind-preview-line != "" && BindsState.status-kind == "info") : Text {
+                                text: BindsState.status-message;
                                 font-size: 11px;
                                 font-weight: 600;
-                                color: root.status-kind == "success"
+                                color: BindsState.status-kind == "success"
                                     ? CS2Theme.text-green
-                                    : (root.status-kind == "warning"
+                                    : (BindsState.status-kind == "warning"
                                         ? CS2Theme.text-gold
-                                        : (root.status-kind == "error" ? CS2Theme.status-danger : CS2Theme.text-muted));
+                                        : (BindsState.status-kind == "error" ? CS2Theme.status-danger : CS2Theme.text-muted));
                                 vertical-alignment: center;
                                 overflow: elide;
                                 horizontal-stretch: 1;
                             }
                         }
 
-                        if root.selected-commands-count > 0 : Rectangle {
-                            height: 22px;
+                        if BindsState.selected-commands-count > 0 : Rectangle {
+                            height: 20px;
                             y: (parent.height - self.height) / 2;
                             border-radius: CS2Theme.radius-xs;
                             background: clear-cmds-touch.has-hover ? CS2Theme.bg-card-hover : CS2Theme.bg-card;
                             animate background { duration: 100ms; }
 
                             HorizontalLayout {
-                                padding-left: 9px;
-                                padding-right: 9px;
+                                padding-left: 8px;
+                                padding-right: 8px;
                                 Text {
-                                    text: "Limpar marcados (" + root.selected-commands-count + ")";
+                                    text: "Limpar marcados (" + BindsState.selected-commands-count + ")";
                                     font-size: 10px;
                                     font-weight: 700;
                                     color: clear-cmds-touch.has-hover ? CS2Theme.text-primary : CS2Theme.text-muted;
@@ -960,8 +997,8 @@ export component BindsTestWindow inherits Window {
                             clear-cmds-touch := TouchArea {
                                 mouse-cursor: pointer;
                                 clicked => {
-                                    root.selected-commands-count = 0;
-                                    root.clear-selected-commands();
+                                    BindsState.selected-commands-count = 0;
+                                    BindsState.clear-selected-commands();
                                 }
                             }
                         }
@@ -969,7 +1006,7 @@ export component BindsTestWindow inherits Window {
                 }
 
                 // Confirmação inline quando a tecla já existe no arquivo selecionado
-                if root.show-conflict-prompt : Rectangle {
+                if BindsState.show-conflict-prompt : Rectangle {
                     background: CS2Theme.accent-t-soft;
                     border-radius: CS2Theme.radius-sm;
                     border-width: 1px;
@@ -984,7 +1021,7 @@ export component BindsTestWindow inherits Window {
                         alignment: space-between;
 
                         Text {
-                            text: root.conflict-message;
+                            text: BindsState.conflict-message;
                             font-size: 11px;
                             font-weight: 700;
                             color: CS2Theme.text-primary;
@@ -1018,8 +1055,8 @@ export component BindsTestWindow inherits Window {
                                 conflict-cancel-touch := TouchArea {
                                     mouse-cursor: pointer;
                                     clicked => {
-                                        root.show-conflict-prompt = false;
-                                        root.cancel-conflict-overwrite();
+                                        BindsState.show-conflict-prompt = false;
+                                        BindsState.cancel-conflict-overwrite();
                                     }
                                 }
                             }
@@ -1044,8 +1081,8 @@ export component BindsTestWindow inherits Window {
                                 conflict-ok-touch := TouchArea {
                                     mouse-cursor: pointer;
                                     clicked => {
-                                        root.show-conflict-prompt = false;
-                                        root.confirm-conflict-overwrite();
+                                        BindsState.show-conflict-prompt = false;
+                                        BindsState.confirm-conflict-overwrite();
                                     }
                                 }
                             }
@@ -1068,21 +1105,21 @@ export component BindsTestWindow inherits Window {
             background: CS2Theme.bg-surface;
 
             VerticalLayout {
-                padding-left: 20px;
-                padding-right: 20px;
-                padding-top: 10px;
+                padding-left: 16px;
+                padding-right: 16px;
+                padding-top: 8px;
                 padding-bottom: 0px;
-                spacing: 10px;
+                spacing: 8px;
 
                 // Barra de ferramentas: Pesquisa (borda apenas quando destacada) + Alternador Lista/Grade
                 HorizontalLayout {
                     spacing: 10px;
 
                     Rectangle {
-                        property <bool> is-highlighted: search-field.has-focus || root.search-query != "";
+                        property <bool> is-highlighted: search-field.has-focus || BindsState.search-query != "";
 
                         horizontal-stretch: 1;
-                        height: 36px;
+                        height: 34px;
                         background: is-highlighted
                             ? CS2Theme.bg-main
                             : (search-area-touch.has-hover ? CS2Theme.bg-card-hover : CS2Theme.bg-card);
@@ -1119,8 +1156,8 @@ export component BindsTestWindow inherits Window {
                                 search-area-touch := TouchArea {
                                     mouse-cursor: text;
                                     clicked => {
-                                        root.is-listening-key = false;
-                                        root.selector-dropdown-open = false;
+                                        BindsState.is-listening-key = false;
+                                        BindsState.selector-dropdown-open = false;
                                         root.hide-grid-tooltip();
                                         search-field.focus();
                                     }
@@ -1129,21 +1166,21 @@ export component BindsTestWindow inherits Window {
                                 search-field := TextInput {
                                     width: parent.width;
                                     height: parent.height;
-                                    text <=> root.search-query;
+                                    text <=> BindsState.search-query;
                                     color: CS2Theme.text-primary;
                                     font-size: 12px;
                                     font-weight: 600;
                                     vertical-alignment: center;
                                     edited => {
-                                        root.is-listening-key = false;
-                                        root.selector-dropdown-open = false;
+                                        BindsState.is-listening-key = false;
+                                        BindsState.selector-dropdown-open = false;
                                         root.hide-grid-tooltip();
                                         catalog-scroll.content-y = 0px;
-                                        root.search-query-changed(self.text);
+                                        BindsState.search-query-changed(self.text);
                                     }
                                 }
 
-                                if root.search-query == "" : Text {
+                                if BindsState.search-query == "" : Text {
                                     width: parent.width;
                                     height: parent.height;
                                     text: "Pesquisar por comando ou descrição (ex: smoke, radar, +jump)...";
@@ -1154,7 +1191,7 @@ export component BindsTestWindow inherits Window {
                                 }
                             }
 
-                            if root.search-query != "" : Rectangle {
+                            if BindsState.search-query != "" : Rectangle {
                                 height: 20px;
                                 y: (parent.height - self.height) / 2;
                                 border-radius: CS2Theme.radius-xs;
@@ -1164,7 +1201,7 @@ export component BindsTestWindow inherits Window {
                                     padding-left: 7px;
                                     padding-right: 7px;
                                     Text {
-                                        text: root.filtered-commands-count + (root.filtered-commands-count == 1 ? " resultado" : " resultados");
+                                        text: BindsState.filtered-commands-count + (BindsState.filtered-commands-count == 1 ? " resultado" : " resultados");
                                         font-size: 10px;
                                         font-weight: 700;
                                         color: CS2Theme.text-cyan;
@@ -1173,7 +1210,7 @@ export component BindsTestWindow inherits Window {
                                 }
                             }
 
-                            if root.search-query != "" : Rectangle {
+                            if BindsState.search-query != "" : Rectangle {
                                 width: 22px;
                                 height: 22px;
                                 y: (parent.height - self.height) / 2;
@@ -1195,12 +1232,12 @@ export component BindsTestWindow inherits Window {
                                 search-clear-touch := TouchArea {
                                     mouse-cursor: pointer;
                                     clicked => {
-                                        root.is-listening-key = false;
-                                        root.selector-dropdown-open = false;
+                                        BindsState.is-listening-key = false;
+                                        BindsState.selector-dropdown-open = false;
                                         root.hide-grid-tooltip();
-                                        root.search-query = "";
+                                        BindsState.search-query = "";
                                         catalog-scroll.content-y = 0px;
-                                        root.search-query-changed("");
+                                        BindsState.search-query-changed("");
                                     }
                                 }
                             }
@@ -1210,7 +1247,7 @@ export component BindsTestWindow inherits Window {
                     // Alternador Lista / Grade (sem bordas fixas)
                     Rectangle {
                         horizontal-stretch: 0;
-                        height: 36px;
+                        height: 34px;
                         background: CS2Theme.bg-main;
                         border-radius: CS2Theme.radius-sm;
 
@@ -1219,9 +1256,9 @@ export component BindsTestWindow inherits Window {
                             spacing: 3px;
 
                             Rectangle {
-                                height: 30px;
+                                height: 28px;
                                 border-radius: CS2Theme.radius-xs;
-                                background: !root.is-grid-view
+                                background: !BindsState.is-grid-view
                                     ? CS2Theme.accent-ct-soft
                                     : (list-mode-touch.has-hover ? CS2Theme.bg-card : transparent);
                                 animate background { duration: 100ms; }
@@ -1238,7 +1275,7 @@ export component BindsTestWindow inherits Window {
                                             height: 10px;
                                             viewbox-width: 14;
                                             viewbox-height: 12;
-                                            stroke: !root.is-grid-view ? CS2Theme.accent-ct-cyan : CS2Theme.text-muted;
+                                            stroke: !BindsState.is-grid-view ? CS2Theme.accent-ct-cyan : CS2Theme.text-muted;
                                             stroke-width: 1.7px;
                                             commands: "M 1 2 L 13 2 M 1 6 L 13 6 M 1 10 L 13 10";
                                         }
@@ -1247,8 +1284,8 @@ export component BindsTestWindow inherits Window {
                                     Text {
                                         text: "Lista";
                                         font-size: 11px;
-                                        font-weight: !root.is-grid-view ? 800 : 600;
-                                        color: !root.is-grid-view ? #ffffff : CS2Theme.text-muted;
+                                        font-weight: !BindsState.is-grid-view ? 800 : 600;
+                                        color: !BindsState.is-grid-view ? #ffffff : CS2Theme.text-muted;
                                         vertical-alignment: center;
                                     }
                                 }
@@ -1256,22 +1293,22 @@ export component BindsTestWindow inherits Window {
                                 list-mode-touch := TouchArea {
                                     mouse-cursor: pointer;
                                     clicked => {
-                                        root.is-listening-key = false;
-                                        root.selector-dropdown-open = false;
+                                        BindsState.is-listening-key = false;
+                                        BindsState.selector-dropdown-open = false;
                                         root.hide-grid-tooltip();
-                                        if root.is-grid-view {
-                                            root.is-grid-view = false;
+                                        if BindsState.is-grid-view {
+                                            BindsState.is-grid-view = false;
                                             catalog-scroll.content-y = 0px;
-                                            root.view-mode-changed(false);
+                                            BindsState.view-mode-changed(false);
                                         }
                                     }
                                 }
                             }
 
                             Rectangle {
-                                height: 30px;
+                                height: 28px;
                                 border-radius: CS2Theme.radius-xs;
-                                background: root.is-grid-view
+                                background: BindsState.is-grid-view
                                     ? CS2Theme.accent-ct-soft
                                     : (grid-mode-touch.has-hover ? CS2Theme.bg-card : transparent);
                                 animate background { duration: 100ms; }
@@ -1288,9 +1325,9 @@ export component BindsTestWindow inherits Window {
                                             height: 11px;
                                             viewbox-width: 12;
                                             viewbox-height: 12;
-                                            stroke: root.is-grid-view ? CS2Theme.accent-ct-cyan : CS2Theme.text-muted;
+                                            stroke: BindsState.is-grid-view ? CS2Theme.accent-ct-cyan : CS2Theme.text-muted;
                                             stroke-width: 1.4px;
-                                            fill: root.is-grid-view ? CS2Theme.accent-ct-cyan : transparent;
+                                            fill: BindsState.is-grid-view ? CS2Theme.accent-ct-cyan : transparent;
                                             commands: "M 1 1 L 4.5 1 L 4.5 4.5 L 1 4.5 Z M 7.5 1 L 11 1 L 11 4.5 L 7.5 4.5 Z M 1 7.5 L 4.5 7.5 L 4.5 11 L 1 11 Z M 7.5 7.5 L 11 7.5 L 11 11 L 7.5 11 Z";
                                         }
                                     }
@@ -1298,8 +1335,8 @@ export component BindsTestWindow inherits Window {
                                     Text {
                                         text: "Grade";
                                         font-size: 11px;
-                                        font-weight: root.is-grid-view ? 800 : 600;
-                                        color: root.is-grid-view ? #ffffff : CS2Theme.text-muted;
+                                        font-weight: BindsState.is-grid-view ? 800 : 600;
+                                        color: BindsState.is-grid-view ? #ffffff : CS2Theme.text-muted;
                                         vertical-alignment: center;
                                     }
                                 }
@@ -1307,13 +1344,13 @@ export component BindsTestWindow inherits Window {
                                 grid-mode-touch := TouchArea {
                                     mouse-cursor: pointer;
                                     clicked => {
-                                        root.is-listening-key = false;
-                                        root.selector-dropdown-open = false;
+                                        BindsState.is-listening-key = false;
+                                        BindsState.selector-dropdown-open = false;
                                         root.hide-grid-tooltip();
-                                        if !root.is-grid-view {
-                                            root.is-grid-view = true;
+                                        if !BindsState.is-grid-view {
+                                            BindsState.is-grid-view = true;
                                             catalog-scroll.content-y = 0px;
-                                            root.view-mode-changed(true);
+                                            BindsState.view-mode-changed(true);
                                         }
                                     }
                                 }
@@ -1324,14 +1361,14 @@ export component BindsTestWindow inherits Window {
 
                 // Abas de Categorias (1 aba por categoria)
                 HorizontalLayout {
-                    spacing: 4px;
+                    spacing: 3px;
 
-                    for tab in root.category-tabs : Rectangle {
-                        property <bool> is-searching: root.search-query != "";
-                        property <bool> is-active: !is-searching && tab.index == root.active-category-index;
+                    for tab in BindsState.category-tabs : Rectangle {
+                        property <bool> is-searching: BindsState.search-query != "";
+                        property <bool> is-active: !is-searching && tab.index == BindsState.active-category-index;
 
                         horizontal-stretch: 1;
-                        height: 34px;
+                        height: 32px;
                         border-top-left-radius: CS2Theme.radius-sm;
                         border-top-right-radius: CS2Theme.radius-sm;
                         background: is-active
@@ -1340,14 +1377,14 @@ export component BindsTestWindow inherits Window {
                         animate background { duration: 100ms; }
 
                         HorizontalLayout {
-                            padding-left: 6px;
-                            padding-right: 6px;
-                            spacing: 5px;
+                            padding-left: 4px;
+                            padding-right: 4px;
+                            spacing: 4px;
                             alignment: center;
 
                             Text {
                                 text: tab.tab-label;
-                                font-size: 11px;
+                                font-size: 10.5px;
                                 font-weight: is-active ? 800 : 600;
                                 color: is-active
                                     ? #ffffff
@@ -1360,8 +1397,8 @@ export component BindsTestWindow inherits Window {
                             }
 
                             if !is-searching && tab.selected-count > 0 : Rectangle {
-                                height: 16px;
-                                min-width: 16px;
+                                height: 15px;
+                                min-width: 15px;
                                 y: (parent.height - self.height) / 2;
                                 border-radius: CS2Theme.radius-xs;
                                 background: CS2Theme.accent-ct-soft;
@@ -1369,11 +1406,11 @@ export component BindsTestWindow inherits Window {
                                 border-color: CS2Theme.accent-ct-blue;
 
                                 HorizontalLayout {
-                                    padding-left: 4px;
-                                    padding-right: 4px;
+                                    padding-left: 3px;
+                                    padding-right: 3px;
                                     Text {
                                         text: tab.selected-count;
-                                        font-size: 9px;
+                                        font-size: 8.5px;
                                         font-weight: 900;
                                         color: CS2Theme.text-cyan;
                                         vertical-alignment: center;
@@ -1383,8 +1420,8 @@ export component BindsTestWindow inherits Window {
                             }
 
                             if is-searching && tab.match-count > 0 : Rectangle {
-                                height: 16px;
-                                min-width: 16px;
+                                height: 15px;
+                                min-width: 15px;
                                 y: (parent.height - self.height) / 2;
                                 border-radius: CS2Theme.radius-xs;
                                 background: CS2Theme.bg-main;
@@ -1392,11 +1429,11 @@ export component BindsTestWindow inherits Window {
                                 border-color: CS2Theme.border-hover;
 
                                 HorizontalLayout {
-                                    padding-left: 4px;
-                                    padding-right: 4px;
+                                    padding-left: 3px;
+                                    padding-right: 3px;
                                     Text {
                                         text: tab.match-count;
-                                        font-size: 9px;
+                                        font-size: 8.5px;
                                         font-weight: 800;
                                         color: CS2Theme.text-primary;
                                         vertical-alignment: center;
@@ -1417,13 +1454,13 @@ export component BindsTestWindow inherits Window {
                         tab-touch := TouchArea {
                             mouse-cursor: pointer;
                             clicked => {
-                                root.is-listening-key = false;
-                                root.selector-dropdown-open = false;
+                                BindsState.is-listening-key = false;
+                                BindsState.selector-dropdown-open = false;
                                 root.hide-grid-tooltip();
-                                root.search-query = "";
-                                root.active-category-index = tab.index;
+                                BindsState.search-query = "";
+                                BindsState.active-category-index = tab.index;
                                 catalog-scroll.content-y = 0px;
-                                root.category-tab-selected(tab.index);
+                                BindsState.category-tab-selected(tab.index);
                             }
                         }
                     }
@@ -1448,14 +1485,14 @@ export component BindsTestWindow inherits Window {
 
             VerticalLayout {
                 width: catalog-scroll.visible-width;
-                padding-left: 20px;
-                padding-right: 20px;
-                padding-top: 12px;
-                padding-bottom: 24px;
-                spacing: root.is-grid-view ? 12px : 8px;
+                padding-left: 16px;
+                padding-right: 16px;
+                padding-top: 10px;
+                padding-bottom: 18px;
+                spacing: BindsState.is-grid-view ? 10px : 8px;
                 alignment: start;
 
-                if root.search-query != "" && root.catalog-rows.length > 0 : Rectangle {
+                if BindsState.search-query != "" && BindsState.catalog-rows.length > 0 : Rectangle {
                     background: CS2Theme.bg-surface;
                     border-radius: CS2Theme.radius-sm;
                     border-width: 1px;
@@ -1470,7 +1507,7 @@ export component BindsTestWindow inherits Window {
                         alignment: space-between;
 
                         Text {
-                            text: "Exibindo " + root.filtered-commands-count + (root.filtered-commands-count == 1 ? " comando" : " comandos") + " encontrados para \"" + root.search-query + "\" em todas as categorias";
+                            text: "Exibindo " + BindsState.filtered-commands-count + (BindsState.filtered-commands-count == 1 ? " comando" : " comandos") + " encontrados para \"" + BindsState.search-query + "\" em todas as categorias";
                             font-size: 11px;
                             font-weight: 600;
                             color: CS2Theme.text-muted;
@@ -1502,16 +1539,16 @@ export component BindsTestWindow inherits Window {
                                 mouse-cursor: pointer;
                                 clicked => {
                                     root.hide-grid-tooltip();
-                                    root.search-query = "";
+                                    BindsState.search-query = "";
                                     catalog-scroll.content-y = 0px;
-                                    root.search-query-changed("");
+                                    BindsState.search-query-changed("");
                                 }
                             }
                         }
                     }
                 }
 
-                if root.search-query != "" && root.catalog-rows.length == 0 : Rectangle {
+                if BindsState.search-query != "" && BindsState.catalog-rows.length == 0 : Rectangle {
                     vertical-stretch: 0;
                     background: CS2Theme.bg-surface;
                     border-radius: CS2Theme.radius-sm;
@@ -1548,7 +1585,7 @@ export component BindsTestWindow inherits Window {
                         }
 
                         Text {
-                            text: "Nenhum comando encontrado para \"" + root.search-query + "\"";
+                            text: "Nenhum comando encontrado para \"" + BindsState.search-query + "\"";
                             font-size: 13px;
                             font-weight: 800;
                             color: CS2Theme.text-primary;
@@ -1588,9 +1625,9 @@ export component BindsTestWindow inherits Window {
                                     mouse-cursor: pointer;
                                     clicked => {
                                         root.hide-grid-tooltip();
-                                        root.search-query = "";
+                                        BindsState.search-query = "";
                                         catalog-scroll.content-y = 0px;
-                                        root.search-query-changed("");
+                                        BindsState.search-query-changed("");
                                     }
                                 }
                             }
@@ -1598,10 +1635,10 @@ export component BindsTestWindow inherits Window {
                     }
                 }
 
-                for row[idx] in root.catalog-rows : VerticalLayout {
+                for row[idx] in BindsState.catalog-rows : VerticalLayout {
                     // 3.1 Cabeçalho de Categoria (subtítulo abaixo do título, sem caixa)
                     if row.row-kind == 0 : VerticalLayout {
-                        padding-top: idx == 0 ? 4px : 18px;
+                        padding-top: idx == 0 ? 4px : 16px;
                         padding-bottom: 4px;
                         spacing: 6px;
 
@@ -1610,7 +1647,7 @@ export component BindsTestWindow inherits Window {
 
                             Text {
                                 text: row.title;
-                                font-size: 16px;
+                                font-size: 15px;
                                 font-weight: 800;
                                 letter-spacing: 0.3px;
                                 color: CS2Theme.text-primary;
@@ -1618,7 +1655,7 @@ export component BindsTestWindow inherits Window {
 
                             if row.subtitle != "" : Text {
                                 text: row.subtitle;
-                                font-size: 12px;
+                                font-size: 11.5px;
                                 font-weight: 400;
                                 color: CS2Theme.text-muted;
                                 wrap: word-wrap;
@@ -1633,7 +1670,7 @@ export component BindsTestWindow inherits Window {
 
                     // 3.2 Cabeçalho de Subcategoria
                     if row.row-kind == 1 : VerticalLayout {
-                        padding-top: 10px;
+                        padding-top: 8px;
                         padding-bottom: 2px;
 
                         Text {
@@ -1651,23 +1688,23 @@ export component BindsTestWindow inherits Window {
                         description: row.subtitle;
                         checked: row.checked;
                         toggled(new-val) => {
-                            root.selector-dropdown-open = false;
+                            BindsState.selector-dropdown-open = false;
                             row.checked = new-val;
-                            if !root.backend-connected {
+                            if !BindsState.backend-connected {
                                 if new-val {
-                                    root.selected-commands-count += 1;
+                                    BindsState.selected-commands-count += 1;
                                 } else {
-                                    root.selected-commands-count = max(0, root.selected-commands-count - 1);
+                                    BindsState.selected-commands-count = max(0, BindsState.selected-commands-count - 1);
                                 }
                             }
-                            root.command-toggled(row.command-index, new-val);
+                            BindsState.command-toggled(row.command-index, new-val);
                         }
                     }
 
                     // 3.4 Grade estilo Otimizações (4 colunas com popup de descrição no hover)
                     if row.row-kind == 3 : HorizontalLayout {
-                        property <length> col-width: max(180px, (catalog-scroll.visible-width - 76px) / 4);
-                        spacing: 12px;
+                        property <length> col-width: max(165px, (catalog-scroll.visible-width - 72px) / 4);
+                        spacing: 10px;
 
                         BindGridSwitchSlot {
                             cell: row.cell-0;
@@ -1723,19 +1760,22 @@ export component BindsTestWindow inherits Window {
     }
 
     // =========================================================================
-    // 4. POPUP DE DESCRIÇÃO NO HOVER DA GRADE (ACIMA DO SCROLLVIEW)
+    // 4. POPUP DE DESCRIÇÃO NO HOVER DA GRADE (COORDENADAS LOCAIS)
     // =========================================================================
-    if root.tooltip-visible && root.is-grid-view && !root.selector-dropdown-open : Rectangle {
-        property <length> above-y: root.tooltip-anchor-y - self.height - 8px;
-        property <length> below-y: root.tooltip-anchor-y + root.tooltip-anchor-h + 8px;
+    if BindsState.tooltip-visible && BindsState.is-grid-view && !BindsState.selector-dropdown-open : Rectangle {
+        property <length> local-anchor-x: BindsState.tooltip-anchor-x - root.absolute-position.x;
+        property <length> local-anchor-y: BindsState.tooltip-anchor-y - root.absolute-position.y;
+        property <length> scroll-top-y: catalog-scroll.absolute-position.y - root.absolute-position.y;
+        property <length> above-y: local-anchor-y - self.height - 8px;
+        property <length> below-y: local-anchor-y + BindsState.tooltip-anchor-h + 8px;
 
-        width: min(360px, root.width - 24px);
+        width: min(340px, root.width - 24px);
         height: tooltip-content.preferred-height;
-        x: clamp(root.tooltip-anchor-x + (root.tooltip-anchor-w - self.width) / 2, 12px, root.width - self.width - 12px);
-        y: above-y >= catalog-scroll.absolute-position.y ? above-y : clamp(below-y, 12px, max(12px, root.height - self.height - 12px));
+        x: clamp(local-anchor-x + (BindsState.tooltip-anchor-w - self.width) / 2, 12px, root.width - self.width - 12px);
+        y: above-y >= scroll-top-y ? above-y : clamp(below-y, 12px, max(12px, root.height - self.height - 12px));
         background: #0f172a;
         border-width: 1px;
-        border-color: root.tooltip-checked ? CS2Theme.accent-ct-cyan : CS2Theme.accent-ct-blue;
+        border-color: BindsState.tooltip-checked ? CS2Theme.accent-ct-cyan : CS2Theme.accent-ct-blue;
         border-radius: CS2Theme.radius-xs;
         drop-shadow-color: rgba(0, 0, 0, 0.55);
         drop-shadow-blur: 14px;
@@ -1750,7 +1790,7 @@ export component BindsTestWindow inherits Window {
             spacing: 4px;
 
             Text {
-                text: root.tooltip-title;
+                text: BindsState.tooltip-title;
                 font-size: 11px;
                 font-weight: 800;
                 color: CS2Theme.accent-ct-cyan;
@@ -1758,7 +1798,7 @@ export component BindsTestWindow inherits Window {
             }
 
             Text {
-                text: root.tooltip-description;
+                text: BindsState.tooltip-description;
                 font-size: 11px;
                 font-weight: 500;
                 color: #f8fafc;
@@ -1768,19 +1808,19 @@ export component BindsTestWindow inherits Window {
     }
 
     // =========================================================================
-    // 3. OVERLAY DO SELETOR DE ARQUIVOS EXISTENTES (.CFG)
+    // 5. OVERLAY DO SELETOR DE ARQUIVOS EXISTENTES (.CFG) (COORDENADAS LOCAIS)
     // =========================================================================
-    if root.selector-dropdown-open : TouchArea {
+    if BindsState.selector-dropdown-open : TouchArea {
         clicked => {
-            root.selector-dropdown-open = false;
+            BindsState.selector-dropdown-open = false;
         }
     }
 
-    if root.selector-dropdown-open : Rectangle {
-        x: clamp(selector-anchor.absolute-position.x + selector-anchor.width - self.width, 12px, root.width - self.width - 12px);
-        y: selector-anchor.absolute-position.y + selector-anchor.height + 6px;
-        width: 268px;
-        height: min(260px, 46px + max(1, root.existing-cfg-files.length) * 32px);
+    if BindsState.selector-dropdown-open : Rectangle {
+        x: clamp(selector-anchor.absolute-position.x - root.absolute-position.x + selector-anchor.width - self.width, 12px, root.width - self.width - 12px);
+        y: selector-anchor.absolute-position.y - root.absolute-position.y + selector-anchor.height + 6px;
+        width: 264px;
+        height: min(260px, 46px + max(1, BindsState.existing-cfg-files.length) * 32px);
         background: CS2Theme.bg-surface-elevated;
         border-radius: CS2Theme.radius-sm;
         border-width: 1px;
@@ -1818,10 +1858,10 @@ export component BindsTestWindow inherits Window {
                 clear-sel-touch := TouchArea {
                     mouse-cursor: pointer;
                     clicked => {
-                        root.selected-existing-file = "";
-                        root.selector-dropdown-open = false;
+                        BindsState.selected-existing-file = "";
+                        BindsState.selector-dropdown-open = false;
                         root.sync-local-save-mode();
-                        root.existing-file-selected("");
+                        BindsState.existing-file-selected("");
                     }
                 }
             }
@@ -1831,7 +1871,7 @@ export component BindsTestWindow inherits Window {
                 background: CS2Theme.border;
             }
 
-            if root.existing-cfg-files.length == 0 : Rectangle {
+            if BindsState.existing-cfg-files.length == 0 : Rectangle {
                 height: 32px;
                 Text {
                     text: "Nenhum arquivo .cfg encontrado";
@@ -1842,14 +1882,14 @@ export component BindsTestWindow inherits Window {
                 }
             }
 
-            if root.existing-cfg-files.length > 0 : ScrollView {
+            if BindsState.existing-cfg-files.length > 0 : ScrollView {
                 vertical-stretch: 1;
 
                 VerticalLayout {
                     spacing: 2px;
 
-                    for cfg-name in root.existing-cfg-files : Rectangle {
-                        property <bool> is-current: cfg-name == root.selected-existing-file;
+                    for cfg-name in BindsState.existing-cfg-files : Rectangle {
+                        property <bool> is-current: cfg-name == BindsState.selected-existing-file;
                         height: 30px;
                         border-radius: CS2Theme.radius-xs;
                         background: is-current
@@ -1883,12 +1923,12 @@ export component BindsTestWindow inherits Window {
                         cfg-item-touch := TouchArea {
                             mouse-cursor: pointer;
                             clicked => {
-                                root.selected-existing-file = cfg-name;
-                                root.file-name-input = cfg-name;
-                                root.selector-dropdown-open = false;
-                                root.show-conflict-prompt = false;
+                                BindsState.selected-existing-file = cfg-name;
+                                BindsState.file-name-input = cfg-name;
+                                BindsState.selector-dropdown-open = false;
+                                BindsState.show-conflict-prompt = false;
                                 root.sync-local-save-mode();
-                                root.existing-file-selected(cfg-name);
+                                BindsState.existing-file-selected(cfg-name);
                             }
                         }
                     }

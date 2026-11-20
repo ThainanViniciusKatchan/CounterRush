@@ -10,16 +10,16 @@ use counterrush_core::{
 };
 use slint::{ComponentHandle, Model, ModelRc, SharedString, VecModel};
 
-slint::include_modules!();
+use crate::{BindCatalogRow, BindCategoryTab, BindGridCell, BindsState, MainWindow};
 
-struct BindsWindowState {
+struct BindsViewState {
     selected_flags: Vec<bool>,
     active_category: usize,
     is_grid_view: bool,
     search_query: String,
 }
 
-impl BindsWindowState {
+impl BindsViewState {
     fn new() -> Self {
         Self {
             selected_flags: vec![false; cs2_bind_catalog().len()],
@@ -127,7 +127,7 @@ fn flush_subcategory_rows(
     pending.clear();
 }
 
-fn build_category_tabs(state: &BindsWindowState) -> Vec<BindCategoryTab> {
+fn build_category_tabs(state: &BindsViewState) -> Vec<BindCategoryTab> {
     let catalog = cs2_bind_catalog();
     let categories = cs2_bind_categories();
     let query = state.search_query.trim();
@@ -162,7 +162,7 @@ fn build_category_tabs(state: &BindsWindowState) -> Vec<BindCategoryTab> {
         .collect()
 }
 
-fn build_visible_catalog_rows(state: &BindsWindowState) -> (Vec<BindCatalogRow>, usize) {
+fn build_visible_catalog_rows(state: &BindsViewState) -> (Vec<BindCatalogRow>, usize) {
     let catalog = cs2_bind_catalog();
     let categories = cs2_bind_categories();
     let query = state.search_query.trim();
@@ -212,7 +212,7 @@ fn build_visible_catalog_rows(state: &BindsWindowState) -> (Vec<BindCatalogRow>,
     (rows, total_matched)
 }
 
-/// Função dedicada de captura e conversão de eventos de teclado Slint para códigos CS2 (Source 2).
+/// Captura e converte eventos de teclado Slint para códigos CS2 (Source 2).
 fn capture_key_from_slint_text(raw_text: &str) -> Option<String> {
     if raw_text.is_empty() {
         return None;
@@ -354,47 +354,47 @@ fn load_cfg_names_for_dir(dir: &Path) -> Vec<SharedString> {
         .collect()
 }
 
-fn sync_window_summary(ui: &BindsTestWindow, selected_flags: &[bool]) {
-    let selected_existing = ui.get_selected_existing_file();
-    let file_input = ui.get_file_name_input();
+fn sync_binds_summary(binds: &BindsState<'_>, selected_flags: &[bool]) {
+    let selected_existing = binds.get_selected_existing_file();
+    let file_input = binds.get_file_name_input();
 
     if selected_existing.trim().is_empty() {
-        ui.set_is_creating_new_file(true);
-        ui.set_save_mode_badge("NOVO ARQUIVO".into());
+        binds.set_is_creating_new_file(true);
+        binds.set_save_mode_badge("NOVO ARQUIVO".into());
     } else if file_input.trim().is_empty() {
-        ui.set_is_creating_new_file(true);
-        ui.set_save_mode_badge("DIGITE O NOME".into());
+        binds.set_is_creating_new_file(true);
+        binds.set_save_mode_badge("DIGITE O NOME".into());
     } else {
         match determine_bind_save_mode(selected_existing.as_str(), file_input.as_str()) {
             Ok((_, BindFlag::Default)) => {
-                ui.set_is_creating_new_file(false);
-                ui.set_save_mode_badge("ATUALIZAR ATUAL".into());
+                binds.set_is_creating_new_file(false);
+                binds.set_save_mode_badge("ATUALIZAR ATUAL".into());
             }
             Ok((_, BindFlag::NewConfig)) => {
-                ui.set_is_creating_new_file(true);
-                ui.set_save_mode_badge("CRIAR NOVO".into());
+                binds.set_is_creating_new_file(true);
+                binds.set_save_mode_badge("CRIAR NOVO".into());
             }
             Err(_) | Ok((_, BindFlag::Restore)) => {
-                ui.set_is_creating_new_file(true);
-                ui.set_save_mode_badge("NOME INVÁLIDO".into());
+                binds.set_is_creating_new_file(true);
+                binds.set_save_mode_badge("NOME INVÁLIDO".into());
             }
         }
     }
 
     let selected_cmds = collect_checked_commands(selected_flags);
-    ui.set_selected_commands_count(selected_cmds.len() as i32);
+    binds.set_selected_commands_count(selected_cmds.len() as i32);
 
-    let key = ui.get_bound_key();
+    let key = binds.get_bound_key();
     if !key.trim().is_empty() && !selected_cmds.is_empty() {
         if let (Ok(clean_key), Ok(unified)) = (
             validate_bind_key(key.as_str()),
             format_bind_commands(&selected_cmds),
         ) {
-            ui.set_bind_preview_line(format_bind_line(&clean_key, &unified).into());
+            binds.set_bind_preview_line(format_bind_line(&clean_key, &unified).into());
             return;
         }
     }
-    ui.set_bind_preview_line("".into());
+    binds.set_bind_preview_line("".into());
 }
 
 fn sync_command_check_in_visible_rows(
@@ -425,17 +425,17 @@ fn sync_command_check_in_visible_rows(
 }
 
 fn refresh_catalog_view(
-    ui: &BindsTestWindow,
-    state: &BindsWindowState,
+    binds: &BindsState<'_>,
+    state: &BindsViewState,
     rows_model: &Rc<VecModel<BindCatalogRow>>,
 ) {
     let (visible_rows, matched_count) = build_visible_catalog_rows(state);
     rows_model.set_vec(visible_rows);
-    ui.set_category_tabs(ModelRc::new(VecModel::from(build_category_tabs(state))));
-    ui.set_filtered_commands_count(matched_count as i32);
-    ui.set_active_category_index(state.active_category as i32);
-    ui.set_is_grid_view(state.is_grid_view);
-    sync_window_summary(ui, &state.selected_flags);
+    binds.set_category_tabs(ModelRc::new(VecModel::from(build_category_tabs(state))));
+    binds.set_filtered_commands_count(matched_count as i32);
+    binds.set_active_category_index(state.active_category as i32);
+    binds.set_is_grid_view(state.is_grid_view);
+    sync_binds_summary(binds, &state.selected_flags);
 }
 
 fn check_existing_key_conflict(
@@ -457,19 +457,20 @@ fn check_existing_key_conflict(
 }
 
 fn execute_save_bind(
-    ui: &BindsTestWindow,
-    state: &BindsWindowState,
+    ui: &MainWindow,
+    state: &BindsViewState,
     dirs: &BindDirectories,
     allow_conflict_overwrite: bool,
 ) {
-    let file_input = ui.get_file_name_input().to_string();
-    let selected_existing = ui.get_selected_existing_file().to_string();
-    let raw_key = ui.get_bound_key().to_string();
+    let binds = ui.global::<BindsState>();
+    let file_input = binds.get_file_name_input().to_string();
+    let selected_existing = binds.get_selected_existing_file().to_string();
+    let raw_key = binds.get_bound_key().to_string();
     let selected_cmds = collect_checked_commands(&state.selected_flags);
 
     if file_input.trim().is_empty() {
-        ui.set_status_kind("warning".into());
-        ui.set_status_message(
+        binds.set_status_kind("warning".into());
+        binds.set_status_message(
             "Informe um nome para o arquivo .cfg ou selecione um arquivo existente.".into(),
         );
         return;
@@ -478,8 +479,8 @@ fn execute_save_bind(
     let clean_key = match validate_bind_key(&raw_key) {
         Ok(k) => k,
         Err(_) => {
-            ui.set_status_kind("warning".into());
-            ui.set_status_message(
+            binds.set_status_kind("warning".into());
+            binds.set_status_message(
                 "Clique no campo de tecla e pressione a tecla desejada antes de salvar.".into(),
             );
             return;
@@ -487,16 +488,18 @@ fn execute_save_bind(
     };
 
     if selected_cmds.is_empty() {
-        ui.set_status_kind("warning".into());
-        ui.set_status_message("Marque ao menos um comando na listagem abaixo para salvar.".into());
+        binds.set_status_kind("warning".into());
+        binds.set_status_message(
+            "Marque ao menos um comando na listagem abaixo para salvar.".into(),
+        );
         return;
     }
 
     let (target_file_name, flag) = match determine_bind_save_mode(&selected_existing, &file_input) {
         Ok(res) => res,
         Err(err) => {
-            ui.set_status_kind("error".into());
-            ui.set_status_message(format!("Nome de arquivo inválido: {err}").into());
+            binds.set_status_kind("error".into());
+            binds.set_status_message(format!("Nome de arquivo inválido: {err}").into());
             return;
         }
     };
@@ -504,8 +507,8 @@ fn execute_save_bind(
     let unified_cmd = match format_bind_commands(&selected_cmds) {
         Ok(c) => c,
         Err(err) => {
-            ui.set_status_kind("error".into());
-            ui.set_status_message(format!("Erro nos comandos marcados: {err}").into());
+            binds.set_status_kind("error".into());
+            binds.set_status_message(format!("Erro nos comandos marcados: {err}").into());
             return;
         }
     };
@@ -514,16 +517,16 @@ fn execute_save_bind(
         if let Some((_, existing_cmd)) =
             check_existing_key_conflict(dirs, &target_file_name, &clean_key)
         {
-            ui.set_conflict_message(
+            binds.set_conflict_message(
                 format!(
                     "A tecla '{}' já possui a bind \"{}\" em '{}'. Substituir por \"{}\"?",
                     clean_key, existing_cmd, target_file_name, unified_cmd
                 )
                 .into(),
             );
-            ui.set_show_conflict_prompt(true);
-            ui.set_status_kind("warning".into());
-            ui.set_status_message("Confirme a substituição da tecla conflitante acima.".into());
+            binds.set_show_conflict_prompt(true);
+            binds.set_status_kind("warning".into());
+            binds.set_status_message("Confirme a substituição da tecla conflitante acima.".into());
             return;
         }
     }
@@ -538,7 +541,7 @@ fn execute_save_bind(
     ) {
         Ok(report) => {
             let refreshed = load_cfg_names_for_dir(&dirs.local_cfg_dir);
-            ui.set_existing_cfg_files(ModelRc::new(VecModel::from(refreshed)));
+            binds.set_existing_cfg_files(ModelRc::new(VecModel::from(refreshed)));
 
             let saved_file = match &report.outcome {
                 BindOperationOutcome::Created { file_name, .. }
@@ -546,10 +549,10 @@ fn execute_save_bind(
                 _ => target_file_name.clone(),
             };
 
-            ui.set_selected_existing_file(saved_file.clone().into());
-            ui.set_file_name_input(saved_file.into());
-            ui.set_show_conflict_prompt(false);
-            sync_window_summary(ui, &state.selected_flags);
+            binds.set_selected_existing_file(saved_file.clone().into());
+            binds.set_file_name_input(saved_file.into());
+            binds.set_show_conflict_prompt(false);
+            sync_binds_summary(&binds, &state.selected_flags);
 
             let msg = match (&report.outcome, &report.cs2_sync_warning) {
                 (
@@ -618,31 +621,39 @@ fn execute_save_bind(
                 }
             };
 
-            ui.set_status_kind(if report.synced_to_cs2_global {
+            binds.set_status_kind(if report.synced_to_cs2_global {
                 "success".into()
             } else {
                 "warning".into()
             });
-            ui.set_status_message(msg.into());
+            binds.set_status_message(msg.into());
         }
         Err(err) => {
-            ui.set_status_kind("error".into());
-            ui.set_status_message(format!("Erro ao salvar bind: {err}").into());
+            binds.set_status_kind("error".into());
+            binds.set_status_message(format!("Erro ao salvar bind: {err}").into());
         }
     }
 }
 
-fn wire_binds_window(ui: &BindsTestWindow, dirs: BindDirectories) {
-    let state = Rc::new(RefCell::new(BindsWindowState::new()));
+pub fn refresh_existing_cfg_files(ui: &MainWindow, dirs: &BindDirectories) {
+    let binds = ui.global::<BindsState>();
+    let cfg_names = load_cfg_names_for_dir(&dirs.local_cfg_dir);
+    binds.set_existing_cfg_files(ModelRc::new(VecModel::from(cfg_names)));
+}
+
+pub fn wire_binds_view(ui: &MainWindow, dirs: BindDirectories) {
+    let state = Rc::new(RefCell::new(BindsViewState::new()));
     let rows_model = Rc::new(VecModel::default());
-    ui.set_backend_connected(true);
-    ui.set_catalog_rows(ModelRc::from(rows_model.clone()));
+    let binds = ui.global::<BindsState>();
+
+    binds.set_backend_connected(true);
+    binds.set_catalog_rows(ModelRc::from(rows_model.clone()));
 
     let cfg_names = load_cfg_names_for_dir(&dirs.local_cfg_dir);
-    ui.set_existing_cfg_files(ModelRc::new(VecModel::from(cfg_names)));
-    refresh_catalog_view(ui, &state.borrow(), &rows_model);
+    binds.set_existing_cfg_files(ModelRc::new(VecModel::from(cfg_names)));
+    refresh_catalog_view(&binds, &state.borrow(), &rows_model);
 
-    ui.on_resolve_cs2_key(|raw_text| {
+    binds.on_resolve_cs2_key(|raw_text| {
         capture_key_from_slint_text(raw_text.as_str())
             .map(SharedString::from)
             .unwrap_or_default()
@@ -650,18 +661,19 @@ fn wire_binds_window(ui: &BindsTestWindow, dirs: BindDirectories) {
 
     let ui_weak = ui.as_weak();
     let state_sel = state.clone();
-    ui.on_existing_file_selected(move |selected| {
+    binds.on_existing_file_selected(move |selected| {
         if let Some(ui) = ui_weak.upgrade() {
-            ui.set_show_conflict_prompt(false);
-            sync_window_summary(&ui, &state_sel.borrow().selected_flags);
-            ui.set_status_kind("info".into());
+            let binds = ui.global::<BindsState>();
+            binds.set_show_conflict_prompt(false);
+            sync_binds_summary(&binds, &state_sel.borrow().selected_flags);
+            binds.set_status_kind("info".into());
             if selected.trim().is_empty() {
-                ui.set_status_message(
+                binds.set_status_message(
                     "Seleção limpa. Digite um nome no campo de arquivo para criar um novo .cfg."
                         .into(),
                 );
             } else {
-                ui.set_status_message(
+                binds.set_status_message(
                     format!(
                         "Arquivo '{}' carregado. Mantenha o nome para atualizar ou altere para criar um novo arquivo.",
                         selected
@@ -674,25 +686,32 @@ fn wire_binds_window(ui: &BindsTestWindow, dirs: BindDirectories) {
 
     let ui_weak = ui.as_weak();
     let state_edit = state.clone();
-    ui.on_file_name_edited(move |_| {
+    binds.on_file_name_edited(move |_| {
         if let Some(ui) = ui_weak.upgrade() {
-            sync_window_summary(&ui, &state_edit.borrow().selected_flags);
+            let binds = ui.global::<BindsState>();
+            sync_binds_summary(&binds, &state_edit.borrow().selected_flags);
         }
     });
 
     let ui_weak = ui.as_weak();
     let state_key = state.clone();
-    ui.on_key_captured(move |captured| {
+    binds.on_key_captured(move |captured| {
         if let Some(ui) = ui_weak.upgrade() {
-            ui.set_show_conflict_prompt(false);
-            sync_window_summary(&ui, &state_key.borrow().selected_flags);
-            ui.set_status_kind("info".into());
+            let binds = ui.global::<BindsState>();
+            binds.set_show_conflict_prompt(false);
+            sync_binds_summary(&binds, &state_key.borrow().selected_flags);
+            binds.set_status_kind("info".into());
             if captured.trim().is_empty() {
-                ui.set_status_message("Tecla removida. Clique no campo para capturar outra.".into());
+                binds.set_status_message(
+                    "Tecla removida. Clique no campo para capturar outra.".into(),
+                );
             } else {
-                ui.set_status_message(
-                    format!("Tecla '{}' associada. Marque os comandos e clique em Salvar Bind.", captured)
-                        .into(),
+                binds.set_status_message(
+                    format!(
+                        "Tecla '{}' associada. Marque os comandos e clique em Salvar Bind.",
+                        captured
+                    )
+                    .into(),
                 );
             }
         }
@@ -701,7 +720,7 @@ fn wire_binds_window(ui: &BindsTestWindow, dirs: BindDirectories) {
     let ui_weak = ui.as_weak();
     let state_tab = state.clone();
     let model_tab = rows_model.clone();
-    ui.on_category_tab_selected(move |tab_idx| {
+    binds.on_category_tab_selected(move |tab_idx| {
         let cat_count = cs2_bind_categories().len();
         {
             let mut st = state_tab.borrow_mut();
@@ -709,47 +728,50 @@ fn wire_binds_window(ui: &BindsTestWindow, dirs: BindDirectories) {
             st.search_query.clear();
         }
         if let Some(ui) = ui_weak.upgrade() {
-            if !ui.get_search_query().is_empty() {
-                ui.set_search_query("".into());
+            let binds = ui.global::<BindsState>();
+            if !binds.get_search_query().is_empty() {
+                binds.set_search_query("".into());
             }
-            refresh_catalog_view(&ui, &state_tab.borrow(), &model_tab);
+            refresh_catalog_view(&binds, &state_tab.borrow(), &model_tab);
         }
     });
 
     let ui_weak = ui.as_weak();
     let state_view = state.clone();
     let model_view = rows_model.clone();
-    ui.on_view_mode_changed(move |grid_mode| {
+    binds.on_view_mode_changed(move |grid_mode| {
         {
             let mut st = state_view.borrow_mut();
             st.is_grid_view = grid_mode;
         }
         if let Some(ui) = ui_weak.upgrade() {
-            refresh_catalog_view(&ui, &state_view.borrow(), &model_view);
+            let binds = ui.global::<BindsState>();
+            refresh_catalog_view(&binds, &state_view.borrow(), &model_view);
         }
     });
 
     let ui_weak = ui.as_weak();
     let state_search = state.clone();
     let model_search = rows_model.clone();
-    ui.on_search_query_changed(move |query| {
+    binds.on_search_query_changed(move |query| {
         {
             let mut st = state_search.borrow_mut();
             st.search_query = query.to_string();
         }
         if let Some(ui) = ui_weak.upgrade() {
+            let binds = ui.global::<BindsState>();
             let st = state_search.borrow();
-            if ui.get_search_query().as_str() != st.search_query.as_str() {
-                ui.set_search_query(st.search_query.clone().into());
+            if binds.get_search_query().as_str() != st.search_query.as_str() {
+                binds.set_search_query(st.search_query.clone().into());
             }
-            refresh_catalog_view(&ui, &st, &model_search);
+            refresh_catalog_view(&binds, &st, &model_search);
         }
     });
 
     let ui_weak = ui.as_weak();
     let state_toggle = state.clone();
     let model_for_toggle = rows_model.clone();
-    ui.on_command_toggled(move |cmd_idx, checked| {
+    binds.on_command_toggled(move |cmd_idx, checked| {
         if cmd_idx >= 0 {
             let idx_usize = cmd_idx as usize;
             let mut st = state_toggle.borrow_mut();
@@ -759,17 +781,18 @@ fn wire_binds_window(ui: &BindsTestWindow, dirs: BindDirectories) {
         }
         sync_command_check_in_visible_rows(&model_for_toggle, cmd_idx, checked);
         if let Some(ui) = ui_weak.upgrade() {
+            let binds = ui.global::<BindsState>();
             let st = state_toggle.borrow();
-            ui.set_category_tabs(ModelRc::new(VecModel::from(build_category_tabs(&st))));
-            sync_window_summary(&ui, &st.selected_flags);
-            ui.set_status_kind("info".into());
+            binds.set_category_tabs(ModelRc::new(VecModel::from(build_category_tabs(&st))));
+            sync_binds_summary(&binds, &st.selected_flags);
+            binds.set_status_kind("info".into());
         }
     });
 
     let ui_weak = ui.as_weak();
     let state_clear = state.clone();
     let model_for_clear = rows_model.clone();
-    ui.on_clear_selected_commands(move || {
+    binds.on_clear_selected_commands(move || {
         {
             let mut st = state_clear.borrow_mut();
             st.selected_flags.fill(false);
@@ -793,11 +816,12 @@ fn wire_binds_window(ui: &BindsTestWindow, dirs: BindDirectories) {
             }
         }
         if let Some(ui) = ui_weak.upgrade() {
+            let binds = ui.global::<BindsState>();
             let st = state_clear.borrow();
-            ui.set_category_tabs(ModelRc::new(VecModel::from(build_category_tabs(&st))));
-            sync_window_summary(&ui, &st.selected_flags);
-            ui.set_status_kind("info".into());
-            ui.set_status_message("Seleção de comandos limpa.".into());
+            binds.set_category_tabs(ModelRc::new(VecModel::from(build_category_tabs(&st))));
+            sync_binds_summary(&binds, &st.selected_flags);
+            binds.set_status_kind("info".into());
+            binds.set_status_message("Seleção de comandos limpa.".into());
         }
     });
 
@@ -806,7 +830,7 @@ fn wire_binds_window(ui: &BindsTestWindow, dirs: BindDirectories) {
     let ui_weak = ui.as_weak();
     let dirs_save = dirs_rc.clone();
     let state_save = state.clone();
-    ui.on_save_bind_clicked(move || {
+    binds.on_save_bind_clicked(move || {
         if let Some(ui) = ui_weak.upgrade() {
             execute_save_bind(&ui, &state_save.borrow(), &dirs_save.borrow(), false);
         }
@@ -815,261 +839,252 @@ fn wire_binds_window(ui: &BindsTestWindow, dirs: BindDirectories) {
     let ui_weak = ui.as_weak();
     let dirs_confirm = dirs_rc.clone();
     let state_confirm = state.clone();
-    ui.on_confirm_conflict_overwrite(move || {
+    binds.on_confirm_conflict_overwrite(move || {
         if let Some(ui) = ui_weak.upgrade() {
             execute_save_bind(&ui, &state_confirm.borrow(), &dirs_confirm.borrow(), true);
         }
     });
 
     let ui_weak = ui.as_weak();
-    ui.on_cancel_conflict_overwrite(move || {
+    binds.on_cancel_conflict_overwrite(move || {
         if let Some(ui) = ui_weak.upgrade() {
-            ui.set_status_kind("info".into());
-            ui.set_status_message(
+            let binds = ui.global::<BindsState>();
+            binds.set_status_kind("info".into());
+            binds.set_status_message(
                 "Substituição cancelada. Nenhuma alteração foi gravada no arquivo.".into(),
             );
         }
     });
 }
 
-fn find_catalog_command_index(cfg_command: &str) -> i32 {
-    cs2_bind_catalog()
-        .iter()
-        .position(|e| e.cfg_command == cfg_command)
-        .expect("Comando esperado deve existir no catálogo") as i32
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{AppTray, MainWindow};
 
-fn count_visible_commands_in_model(rows: &ModelRc<BindCatalogRow>) -> usize {
-    let mut count = 0usize;
-    for i in 0..rows.row_count() {
-        let row = rows.row_data(i).unwrap();
-        match row.row_kind {
-            2 => count += 1,
-            3 => {
+    fn find_catalog_command_index(cfg_command: &str) -> i32 {
+        cs2_bind_catalog()
+            .iter()
+            .position(|e| e.cfg_command == cfg_command)
+            .expect("Comando esperado deve existir no catálogo") as i32
+    }
+
+    fn count_visible_commands_in_model(rows: &ModelRc<BindCatalogRow>) -> usize {
+        let mut count = 0usize;
+        for i in 0..rows.row_count() {
+            let row = rows.row_data(i).unwrap();
+            match row.row_kind {
+                2 => count += 1,
+                3 => {
+                    for cell in [&row.cell_0, &row.cell_1, &row.cell_2, &row.cell_3] {
+                        if cell.present {
+                            count += 1;
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+        count
+    }
+
+    #[test]
+    fn test_binds_view_integrated_contracts_and_navigation() {
+        let temp = tempfile::tempdir().expect("Falha ao criar tempdir");
+        let local_cfg = temp.path().join("local_cfg");
+        let bkp_cfg = local_cfg.join("bkp");
+        let cs2_cfg = temp.path().join("cs2_cfg");
+        std::fs::create_dir_all(&local_cfg).unwrap();
+        std::fs::create_dir_all(&cs2_cfg).unwrap();
+
+        let original_autoexec = "bind \"f4\" \"buy ak47;buy vesthelm\"\n";
+        std::fs::write(local_cfg.join("autoexec.cfg"), original_autoexec).unwrap();
+
+        let dirs = BindDirectories::with_paths(&local_cfg, &bkp_cfg, &cs2_cfg);
+        let ui = MainWindow::new().expect("Falha ao instanciar MainWindow");
+        let app_tray = AppTray::new().expect("Falha ao instanciar AppTray");
+        let settings_path = temp.path().join("settings.json");
+
+        assert!(!ui.get_show_binds_view(), "Painel deve iniciar sem view de binds aberta");
+
+        crate::tray::setup_tray(&ui, &app_tray, settings_path, false);
+        wire_binds_view(&ui, dirs.clone());
+
+        let binds = ui.global::<BindsState>();
+
+        // Simula ação de entrada na tela de Binds a partir do card no Painel
+        let ui_weak = ui.as_weak();
+        let dirs_card = dirs.clone();
+        ui.on_card_action_clicked(move |module_id| {
+            if let Some(ui) = ui_weak.upgrade() {
+                if module_id.as_str() == "binds" {
+                    refresh_existing_cfg_files(&ui, &dirs_card);
+                    ui.set_show_binds_view(true);
+                }
+            }
+        });
+        ui.invoke_card_action_clicked("binds".into());
+        assert!(ui.get_show_binds_view(), "Clique em Gerenciar Binds deve abrir BindsView");
+
+        // 1. Validar 7 abas de categorias e soma total de 186 comandos
+        let tabs = binds.get_category_tabs();
+        assert_eq!(tabs.row_count(), 7);
+        assert_eq!(tabs.row_data(0).unwrap().title, "1. Movimentação");
+        assert_eq!(
+            tabs.row_data(6).unwrap().title,
+            "7. Outros (Áudio, Demos/Replays, HUD e Sistema)"
+        );
+
+        let mut total_across_tabs = 0usize;
+        for tab_idx in 0..7 {
+            binds.invoke_category_tab_selected(tab_idx);
+            let tab_cmd_count = count_visible_commands_in_model(&binds.get_catalog_rows());
+            assert_eq!(
+                tab_cmd_count as i32,
+                tabs.row_data(tab_idx as usize).unwrap().total_count
+            );
+            total_across_tabs += tab_cmd_count;
+        }
+        assert_eq!(total_across_tabs, 186);
+
+        // 2. Alternância Lista <-> Grade mantendo contagem e descrições
+        binds.invoke_category_tab_selected(1);
+        binds.invoke_view_mode_changed(true);
+        let grid_rows = binds.get_catalog_rows();
+        let mut has_grid_row = false;
+        for i in 0..grid_rows.row_count() {
+            let row = grid_rows.row_data(i).unwrap();
+            assert_ne!(row.row_kind, 2);
+            if row.row_kind == 3 {
+                has_grid_row = true;
                 for cell in [&row.cell_0, &row.cell_1, &row.cell_2, &row.cell_3] {
                     if cell.present {
-                        count += 1;
+                        assert!(!cell.description.is_empty());
                     }
                 }
             }
-            _ => {}
         }
-    }
-    count
-}
+        assert!(has_grid_row);
+        assert_eq!(count_visible_commands_in_model(&grid_rows), 23);
 
-fn run_self_test() {
-    println!("=== CounterRush — Self-Test Isolado da Janela de Binds ===");
-    let temp = tempfile::tempdir().expect("Falha ao criar tempdir");
-    let local_cfg = temp.path().join("local_cfg");
-    let bkp_cfg = local_cfg.join("bkp");
-    let cs2_cfg = temp.path().join("cs2_cfg");
-    std::fs::create_dir_all(&local_cfg).unwrap();
-    std::fs::create_dir_all(&cs2_cfg).unwrap();
+        binds.invoke_view_mode_changed(false);
+        assert_eq!(count_visible_commands_in_model(&binds.get_catalog_rows()), 23);
 
-    let original_autoexec = "bind \"f4\" \"buy ak47;buy vesthelm\"\n";
-    std::fs::write(local_cfg.join("autoexec.cfg"), original_autoexec).unwrap();
+        // 3. Pesquisa global por comando e descrição (sem acento)
+        binds.invoke_search_query_changed("noclip".into());
+        assert_eq!(binds.get_filtered_commands_count(), 1);
+        binds.invoke_search_query_changed("fumaca".into());
+        assert!(binds.get_filtered_commands_count() >= 1);
+        binds.invoke_search_query_changed("termo_inexistente_xyz".into());
+        assert_eq!(binds.get_filtered_commands_count(), 0);
+        assert_eq!(binds.get_catalog_rows().row_count(), 0);
 
-    let dirs = BindDirectories::with_paths(&local_cfg, &bkp_cfg, &cs2_cfg);
-    let ui = BindsTestWindow::new().expect("Falha ao instanciar BindsTestWindow");
-    wire_binds_window(&ui, dirs);
+        binds.invoke_category_tab_selected(0);
+        assert_eq!(binds.get_search_query(), "");
 
-    // 1. Validar 7 abas de categorias, separação por abas e soma total de 186 comandos
-    let tabs = ui.get_category_tabs();
-    assert_eq!(tabs.row_count(), 7, "Deve exibir exatamente 7 abas de categoria");
-    assert_eq!(tabs.row_data(0).unwrap().title, "1. Movimentação");
-    assert_eq!(
-        tabs.row_data(6).unwrap().title,
-        "7. Outros (Áudio, Demos/Replays, HUD e Sistema)"
-    );
-
-    let mut total_across_tabs = 0usize;
-    for tab_idx in 0..7 {
-        ui.invoke_category_tab_selected(tab_idx);
-        let tab_rows = ui.get_catalog_rows();
-        let tab_cmd_count = count_visible_commands_in_model(&tab_rows);
+        // 4. Conversão de teclas
+        assert_eq!(binds.invoke_resolve_cs2_key(" ".into()), "space");
         assert_eq!(
-            tab_cmd_count as i32,
-            tabs.row_data(tab_idx as usize).unwrap().total_count,
-            "Aba {} deve exibir somente os comandos da sua categoria",
-            tab_idx
+            binds.invoke_resolve_cs2_key(char::from(slint::platform::Key::UpArrow).to_string().into()),
+            "uparrow"
         );
-        total_across_tabs += tab_cmd_count;
+        assert_eq!(
+            binds.invoke_resolve_cs2_key(char::from(slint::platform::Key::F4).to_string().into()),
+            "f4"
+        );
+        assert_eq!(binds.invoke_resolve_cs2_key(";".into()), "semicolon");
+        assert_eq!(binds.invoke_resolve_cs2_key("\"".into()), "");
+
+        // 5. Preservação de estado entre abas + retorno para Painel + salvamento de novo arquivo
+        let noclip_idx = find_catalog_command_index("noclip");
+        let rethrow_idx = find_catalog_command_index("sv_rethrow_last_grenade");
+        let jump_idx = find_catalog_command_index("+jump");
+        let smoke_idx = find_catalog_command_index("slot8");
+
+        binds.set_file_name_input("treino_smokes".into());
+        binds.invoke_file_name_edited("treino_smokes".into());
+        assert!(binds.get_is_creating_new_file());
+
+        binds.set_bound_key("v".into());
+        binds.invoke_key_captured("v".into());
+        binds.invoke_category_tab_selected(1);
+        binds.invoke_command_toggled(noclip_idx, true);
+        binds.invoke_view_mode_changed(true);
+        binds.invoke_command_toggled(rethrow_idx, true);
+
+        // Voltar ao Painel ou trocar de aba no tray deve preservar estado no BindsState
+        app_tray.invoke_open_tab(1);
+        assert!(!ui.get_show_binds_view());
+        app_tray.invoke_open_tab(0);
+        ui.invoke_card_action_clicked("binds".into());
+        assert!(ui.get_show_binds_view());
+        assert_eq!(binds.get_selected_commands_count(), 2);
+        assert_eq!(
+            binds.get_bind_preview_line(),
+            "bind \"v\" \"noclip;sv_rethrow_last_grenade\""
+        );
+
+        binds.invoke_save_bind_clicked();
+        assert_eq!(
+            std::fs::read_to_string(local_cfg.join("treino_smokes.cfg")).unwrap(),
+            "bind \"v\" \"noclip;sv_rethrow_last_grenade\"\n"
+        );
+
+        // 6. Atualizar existente mantendo o nome
+        binds.invoke_clear_selected_commands();
+        binds.set_selected_existing_file("treino_smokes.cfg".into());
+        binds.set_file_name_input("treino_smokes.cfg".into());
+        binds.invoke_existing_file_selected("treino_smokes.cfg".into());
+        assert!(!binds.get_is_creating_new_file());
+
+        binds.set_bound_key("mwheeldown".into());
+        binds.invoke_key_captured("mwheeldown".into());
+        binds.invoke_command_toggled(jump_idx, true);
+        binds.invoke_save_bind_clicked();
+
+        let treino_updated = std::fs::read_to_string(local_cfg.join("treino_smokes.cfg")).unwrap();
+        assert!(treino_updated.contains("bind \"v\" \"noclip;sv_rethrow_last_grenade\""));
+        assert!(treino_updated.contains("bind \"mwheeldown\" \"+jump\""));
+
+        // 7. Renomear arquivo selecionado cria NOVO arquivo preservando o original
+        binds.invoke_clear_selected_commands();
+        binds.set_selected_existing_file("autoexec.cfg".into());
+        binds.set_file_name_input("autoexec.cfg".into());
+        binds.invoke_existing_file_selected("autoexec.cfg".into());
+        binds.set_file_name_input("autoexec_smokes.cfg".into());
+        binds.invoke_file_name_edited("autoexec_smokes.cfg".into());
+        assert!(binds.get_is_creating_new_file());
+
+        binds.set_bound_key("c".into());
+        binds.invoke_key_captured("c".into());
+        binds.invoke_command_toggled(smoke_idx, true);
+        binds.invoke_save_bind_clicked();
+
+        assert_eq!(
+            std::fs::read_to_string(local_cfg.join("autoexec.cfg")).unwrap(),
+            original_autoexec
+        );
+        assert_eq!(
+            std::fs::read_to_string(local_cfg.join("autoexec_smokes.cfg")).unwrap(),
+            "bind \"c\" \"slot8\"\n"
+        );
+
+        // 8. Detecção e confirmação de conflito
+        binds.invoke_clear_selected_commands();
+        binds.set_selected_existing_file("autoexec.cfg".into());
+        binds.set_file_name_input("autoexec.cfg".into());
+        binds.invoke_existing_file_selected("autoexec.cfg".into());
+        binds.set_bound_key("f4".into());
+        binds.invoke_key_captured("f4".into());
+        binds.invoke_command_toggled(smoke_idx, true);
+        binds.invoke_save_bind_clicked();
+
+        assert!(binds.get_show_conflict_prompt());
+        binds.invoke_confirm_conflict_overwrite();
+        assert!(!binds.get_show_conflict_prompt());
+        assert_eq!(
+            std::fs::read_to_string(local_cfg.join("autoexec.cfg")).unwrap(),
+            "bind \"f4\" \"slot8\"\n"
+        );
     }
-    assert_eq!(total_across_tabs, 186, "Soma das 7 abas deve totalizar 186 comandos");
-
-    // 2. Validar alternância Lista <-> Grade (4 colunas estilo Otimizações) mantendo contagem e descrições
-    ui.invoke_category_tab_selected(1); // 2. Treinamento (23 comandos)
-    ui.invoke_view_mode_changed(true);
-    let grid_rows = ui.get_catalog_rows();
-    let mut has_grid_row = false;
-    for i in 0..grid_rows.row_count() {
-        let row = grid_rows.row_data(i).unwrap();
-        assert_ne!(row.row_kind, 2, "Modo grade não deve emitir row_kind == 2");
-        if row.row_kind == 3 {
-            has_grid_row = true;
-            for cell in [&row.cell_0, &row.cell_1, &row.cell_2, &row.cell_3] {
-                if cell.present {
-                    assert!(
-                        !cell.description.is_empty(),
-                        "Célula da grade deve trazer descrição completa para o popup"
-                    );
-                }
-            }
-        }
-    }
-    assert!(has_grid_row, "Modo grade deve emitir linhas row_kind == 3");
-    assert_eq!(count_visible_commands_in_model(&grid_rows), 23);
-
-    ui.invoke_view_mode_changed(false);
-    assert_eq!(count_visible_commands_in_model(&ui.get_catalog_rows()), 23);
-
-    // 3. Validar pesquisa global por comando e descrição (inclusive sem acento)
-    ui.invoke_search_query_changed("noclip".into());
-    assert_eq!(ui.get_filtered_commands_count(), 1);
-    assert_eq!(count_visible_commands_in_model(&ui.get_catalog_rows()), 1);
-
-    ui.invoke_search_query_changed("fumaca".into());
-    assert!(
-        ui.get_filtered_commands_count() >= 1,
-        "Pesquisa por descrição sem acento deve encontrar comandos relacionados a fumaça"
-    );
-
-    ui.invoke_search_query_changed("invencibilidade".into());
-    assert_eq!(ui.get_filtered_commands_count(), 1);
-
-    ui.invoke_search_query_changed("termo_inexistente_xyz".into());
-    assert_eq!(ui.get_filtered_commands_count(), 0);
-    assert_eq!(ui.get_catalog_rows().row_count(), 0);
-
-    ui.invoke_category_tab_selected(0);
-    assert_eq!(ui.get_search_query(), "");
-
-    let noclip_idx = find_catalog_command_index("noclip");
-    let rethrow_idx = find_catalog_command_index("sv_rethrow_last_grenade");
-    let jump_idx = find_catalog_command_index("+jump");
-    let smoke_idx = find_catalog_command_index("slot8");
-
-    // 4. Validar função dedicada de captura de tecla
-    assert_eq!(ui.invoke_resolve_cs2_key(" ".into()), "space");
-    assert_eq!(
-        ui.invoke_resolve_cs2_key(char::from(slint::platform::Key::UpArrow).to_string().into()),
-        "uparrow"
-    );
-    assert_eq!(
-        ui.invoke_resolve_cs2_key(char::from(slint::platform::Key::F4).to_string().into()),
-        "f4"
-    );
-    assert_eq!(ui.invoke_resolve_cs2_key(";".into()), "semicolon");
-    assert_eq!(ui.invoke_resolve_cs2_key("\"".into()), "");
-
-    // 5. Validar preservação de seleção entre abas e criação de NOVO arquivo sem selecionar existente
-    ui.set_file_name_input("treino_smokes".into());
-    ui.invoke_file_name_edited("treino_smokes".into());
-    assert!(ui.get_is_creating_new_file());
-
-    ui.set_bound_key("v".into());
-    ui.invoke_key_captured("v".into());
-    ui.invoke_category_tab_selected(1);
-    ui.invoke_command_toggled(noclip_idx, true);
-    ui.invoke_view_mode_changed(true);
-    ui.invoke_command_toggled(rethrow_idx, true);
-    ui.invoke_category_tab_selected(0); // Trocar de aba deve preservar seleções
-    assert_eq!(ui.get_selected_commands_count(), 2);
-    assert_eq!(
-        ui.get_category_tabs().row_data(1).unwrap().selected_count,
-        2
-    );
-    assert_eq!(
-        ui.get_bind_preview_line(),
-        "bind \"v\" \"noclip;sv_rethrow_last_grenade\""
-    );
-    ui.invoke_save_bind_clicked();
-
-    let treino_content = std::fs::read_to_string(local_cfg.join("treino_smokes.cfg")).unwrap();
-    assert_eq!(
-        treino_content,
-        "bind \"v\" \"noclip;sv_rethrow_last_grenade\"\n"
-    );
-
-    // 6. Validar atualização do arquivo selecionado mantendo o nome
-    ui.invoke_clear_selected_commands();
-    ui.set_selected_existing_file("treino_smokes.cfg".into());
-    ui.set_file_name_input("treino_smokes.cfg".into());
-    ui.invoke_existing_file_selected("treino_smokes.cfg".into());
-    assert!(!ui.get_is_creating_new_file());
-
-    ui.set_bound_key("mwheeldown".into());
-    ui.invoke_key_captured("mwheeldown".into());
-    ui.invoke_command_toggled(jump_idx, true);
-    ui.invoke_save_bind_clicked();
-
-    let treino_updated = std::fs::read_to_string(local_cfg.join("treino_smokes.cfg")).unwrap();
-    assert!(treino_updated.contains("bind \"v\" \"noclip;sv_rethrow_last_grenade\""));
-    assert!(treino_updated.contains("bind \"mwheeldown\" \"+jump\""));
-
-    // 7. Validar regra: selecionar arquivo existente e ALTERAR nome -> cria NOVO arquivo preservando o original!
-    ui.invoke_clear_selected_commands();
-    ui.set_selected_existing_file("autoexec.cfg".into());
-    ui.set_file_name_input("autoexec.cfg".into());
-    ui.invoke_existing_file_selected("autoexec.cfg".into());
-
-    ui.set_file_name_input("autoexec_smokes.cfg".into());
-    ui.invoke_file_name_edited("autoexec_smokes.cfg".into());
-    assert!(ui.get_is_creating_new_file());
-
-    ui.set_bound_key("c".into());
-    ui.invoke_key_captured("c".into());
-    ui.invoke_command_toggled(smoke_idx, true);
-    ui.invoke_save_bind_clicked();
-
-    assert_eq!(
-        std::fs::read_to_string(local_cfg.join("autoexec.cfg")).unwrap(),
-        original_autoexec,
-        "Arquivo original autoexec.cfg deve permanecer 100% preservado"
-    );
-    assert_eq!(
-        std::fs::read_to_string(local_cfg.join("autoexec_smokes.cfg")).unwrap(),
-        "bind \"c\" \"slot8\"\n"
-    );
-
-    // 8. Validar detecção e confirmação de conflito ao editar arquivo selecionado
-    ui.invoke_clear_selected_commands();
-    ui.set_selected_existing_file("autoexec.cfg".into());
-    ui.set_file_name_input("autoexec.cfg".into());
-    ui.invoke_existing_file_selected("autoexec.cfg".into());
-    ui.set_bound_key("f4".into());
-    ui.invoke_key_captured("f4".into());
-    ui.invoke_command_toggled(smoke_idx, true);
-    ui.invoke_save_bind_clicked();
-
-    assert!(
-        ui.get_show_conflict_prompt(),
-        "Conflito na tecla f4 em autoexec.cfg deve abrir confirmação"
-    );
-    assert_eq!(
-        std::fs::read_to_string(local_cfg.join("autoexec.cfg")).unwrap(),
-        original_autoexec
-    );
-    ui.invoke_confirm_conflict_overwrite();
-    assert!(!ui.get_show_conflict_prompt());
-    assert_eq!(
-        std::fs::read_to_string(local_cfg.join("autoexec.cfg")).unwrap(),
-        "bind \"f4\" \"slot8\"\n"
-    );
-
-    println!("[PASS] Todos os contratos da BindsTestWindow validados com sucesso!");
-}
-
-fn main() -> Result<(), slint::PlatformError> {
-    if std::env::args().any(|a| a == "--self-test") {
-        run_self_test();
-        return Ok(());
-    }
-
-    let window = BindsTestWindow::new()?;
-    wire_binds_window(&window, BindDirectories::default());
-    window.show()?;
-    slint::run_event_loop_until_quit()?;
-    Ok(())
 }
