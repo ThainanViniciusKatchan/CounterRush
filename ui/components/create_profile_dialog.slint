@@ -1,4 +1,7 @@
+import { ScrollView } from "std-widgets.slint";
 import { CS2Theme } from "../theme.slint";
+import { BindCommandCard } from "bind_command_card.slint";
+import { TweakSwitch } from "tweak_switch.slint";
 
 export struct NewProfileData {
     name: string,
@@ -18,58 +21,45 @@ export struct NewProfileData {
     apply-render-queue: bool,
 }
 
-component ProfileTweakCheck inherits Rectangle {
-    in property <string> text;
-    in-out property <bool> checked: false;
+component ProfileGridSwitchSlot inherits Rectangle {
+    in property <int> module-id;
+    in property <string> label;
+    in property <string> info;
+    in property <string> full-title;
+    in property <string> description;
+    in property <bool> checked: false;
+    in property <length> slot-width;
+    callback toggled(bool);
+    callback hover-changed(bool, int, string, string, bool, length, length, length, length);
 
-    height: 27px;
-    background: touch.has-hover ? CS2Theme.bg-card-hover : CS2Theme.bg-surface;
-    border-radius: CS2Theme.radius-xs;
-    border-width: 1px;
-    border-color: root.checked ? CS2Theme.accent-orange : (touch.has-hover ? CS2Theme.border-hover : CS2Theme.border);
+    width: root.slot-width;
+    height: 50px;
 
-    animate background { duration: 100ms; }
-    animate border-color { duration: 100ms; }
-
-    HorizontalLayout {
-        padding-left: 8px;
-        padding-right: 8px;
-        spacing: 8px;
-        alignment: start;
-
-        Rectangle {
-            width: 14px;
-            height: 14px;
-            border-radius: 2px;
-            border-width: 1px;
-            border-color: root.checked ? CS2Theme.accent-orange : CS2Theme.border;
-            background: root.checked ? CS2Theme.accent-orange : transparent;
-            y: (parent.height - self.height) / 2;
-
-            if root.checked : Text {
-                text: "✓";
-                font-size: 9px;
-                font-weight: 900;
-                color: #ffffff;
-                horizontal-alignment: center;
-                vertical-alignment: center;
-            }
+    TweakSwitch {
+        width: parent.width;
+        button-width: parent.width;
+        label: root.label;
+        info: root.info;
+        checked: root.checked;
+        accent-color: CS2Theme.accent-ct-blue;
+        hover-color: #0284c7;
+        show-inline-tooltip: false;
+        auto-toggle: false;
+        toggled(new-val) => {
+            root.toggled(new-val);
         }
-
-        Text {
-            text: root.text;
-            font-size: 10px;
-            font-weight: 600;
-            color: root.checked ? CS2Theme.text-primary : CS2Theme.text-muted;
-            vertical-alignment: center;
-            overflow: elide;
-        }
-    }
-
-    touch := TouchArea {
-        mouse-cursor: pointer;
-        clicked => {
-            root.checked = !root.checked;
+        hover-changed(hovered, ax, ay, aw, ah) => {
+            root.hover-changed(
+                hovered,
+                root.module-id,
+                root.full-title,
+                root.description,
+                root.checked,
+                ax,
+                ay,
+                aw,
+                ah
+            );
         }
     }
 }
@@ -96,6 +86,110 @@ export component CreateProfileDialog inherits Rectangle {
     property <bool> disable-power-saving: false;
     property <bool> apply-render-queue: false;
 
+    // Estado de visualização (Lista por padrão, igual à página de Binds)
+    property <bool> is-grid-view: false;
+    property <int> selected-count:
+        (root.cs2-affinity ? 1 : 0)
+        + (root.apply-timer-resolution ? 1 : 0)
+        + (root.cs2-priority ? 1 : 0)
+        + (root.empty-standby-list ? 1 : 0)
+        + (root.disable-gpu-acceleration ? 1 : 0)
+        + (root.apply-dpi-optimization ? 1 : 0)
+        + (root.disable-memory-compression ? 1 : 0)
+        + (root.apply-mmcss ? 1 : 0)
+        + (root.disable-hpet ? 1 : 0)
+        + (root.disable-game-bar ? 1 : 0)
+        + (root.enable-msi ? 1 : 0)
+        + (root.disable-power-saving ? 1 : 0)
+        + (root.apply-render-queue ? 1 : 0);
+
+    // Estado do popup flutuante de descrição no hover da grade
+    property <bool> tooltip-visible: false;
+    property <int> tooltip-id: -1;
+    property <string> tooltip-title: "";
+    property <string> tooltip-description: "";
+    property <bool> tooltip-checked: false;
+    property <length> tooltip-anchor-x: 0px;
+    property <length> tooltip-anchor-y: 0px;
+    property <length> tooltip-anchor-w: 0px;
+    property <length> tooltip-anchor-h: 0px;
+
+    function hide-grid-tooltip() {
+        root.tooltip-visible = false;
+    }
+
+    function handle-grid-hover(
+        hovered: bool,
+        id: int,
+        title: string,
+        desc: string,
+        checked: bool,
+        ax: length,
+        ay: length,
+        aw: length,
+        ah: length
+    ) {
+        if hovered {
+            root.tooltip-id = id;
+            root.tooltip-title = title;
+            root.tooltip-description = desc;
+            root.tooltip-checked = checked;
+            root.tooltip-anchor-x = ax;
+            root.tooltip-anchor-y = ay;
+            root.tooltip-anchor-w = aw;
+            root.tooltip-anchor-h = ah;
+            root.tooltip-visible = true;
+        } else if !hovered && root.tooltip-id == id {
+            root.tooltip-visible = false;
+        }
+    }
+
+    function sync-tooltip-checked(id: int, new-val: bool) {
+        if root.tooltip-id == id {
+            root.tooltip-checked = new-val;
+        }
+    }
+
+    function set-all-tweaks(enabled: bool) {
+        root.empty-standby-list = enabled;
+        root.cs2-priority = enabled;
+        root.cs2-affinity = enabled;
+        root.disable-gpu-acceleration = enabled;
+        root.apply-dpi-optimization = enabled;
+        root.disable-memory-compression = enabled;
+        root.apply-timer-resolution = enabled;
+        root.apply-mmcss = enabled;
+        root.disable-hpet = enabled;
+        root.disable-game-bar = enabled;
+        root.enable-msi = enabled;
+        root.disable-power-saving = enabled;
+        root.apply-render-queue = enabled;
+        if root.tooltip-visible {
+            root.tooltip-checked = enabled;
+        }
+    }
+
+    function submit-profile() {
+        root.hide-grid-tooltip();
+        root.confirmed({
+            name: root.profile-name,
+            launch-args: root.launch-args,
+            empty-standby-list: root.empty-standby-list,
+            cs2-priority: root.cs2-priority,
+            cs2-affinity: root.cs2-affinity,
+            disable-gpu-acceleration: root.disable-gpu-acceleration,
+            apply-dpi-optimization: root.apply-dpi-optimization,
+            disable-memory-compression: root.disable-memory-compression,
+            apply-timer-resolution: root.apply-timer-resolution,
+            apply-mmcss: root.apply-mmcss,
+            disable-hpet: root.disable-hpet,
+            disable-game-bar: root.disable-game-bar,
+            enable-msi: root.enable-msi,
+            disable-power-saving: root.disable-power-saving,
+            apply-render-queue: root.apply-render-queue,
+        });
+    }
+
     width: 980px;
     height: 620px;
     background: rgba(11, 15, 23, 0.88);
@@ -105,67 +199,361 @@ export component CreateProfileDialog inherits Rectangle {
         mouse-cursor: default;
     }
 
-    // Card Centralizado do Diálogo
-    Rectangle {
+    // Card Centralizado do Diálogo (alinhado ao padrão visual da página de Binds)
+    dialog-card := Rectangle {
         x: (parent.width - self.width) / 2;
         y: (parent.height - self.height) / 2;
-        width: 720px;
-        height: 540px;
-        background: CS2Theme.bg-card;
+        width: 840px;
+        height: 564px;
+        background: CS2Theme.bg-main;
         border-radius: CS2Theme.radius-md;
         border-width: 1px;
-        border-color: CS2Theme.accent-orange;
+        border-color: CS2Theme.accent-ct-cyan;
+        drop-shadow-color: rgba(0, 0, 0, 0.55);
+        drop-shadow-blur: 18px;
+        drop-shadow-offset-y: 8px;
         clip: true;
 
         VerticalLayout {
-            padding-left: 24px;
-            padding-right: 24px;
-            padding-top: 18px;
-            padding-bottom: 18px;
-            spacing: 12px;
+            width: parent.width;
+            height: parent.height;
 
-            // 1. Cabeçalho com Título Tático e Botão Fechar
-            HorizontalLayout {
-                alignment: space-between;
+            // =================================================================
+            // 1. CABEÇALHO E INPUTS DE IDENTIFICAÇÃO DO PERFIL (.JSON)
+            // =================================================================
+            Rectangle {
+                background: CS2Theme.bg-surface;
 
                 VerticalLayout {
-                    spacing: 2px;
-                    Text {
-                        text: @tr("NOVO PERFIL DE OTIMIZAÇÃO");
-                        font-size: 15px;
-                        font-weight: 900;
-                        letter-spacing: 0.8px;
-                        color: CS2Theme.accent-orange;
-                    }
-                    Text {
-                        text: @tr("Grave um perfil .json customizado e ative-o imediatamente no CounterRush");
-                        font-size: 10px;
-                        color: CS2Theme.text-muted;
-                    }
-                }
+                    padding-left: 16px;
+                    padding-right: 16px;
+                    padding-top: 12px;
+                    padding-bottom: 12px;
+                    spacing: 10px;
 
-                // Botão Fechar (✕)
-                Rectangle {
-                    width: 26px;
-                    height: 26px;
-                    border-radius: CS2Theme.radius-xs;
-                    background: close-touch.has-hover ? CS2Theme.status-danger : CS2Theme.bg-surface;
-                    border-width: 1px;
-                    border-color: close-touch.has-hover ? CS2Theme.status-danger : CS2Theme.border;
+                    // Título Tático e Botão Fechar vetorial (Path)
+                    HorizontalLayout {
+                        alignment: space-between;
+                        spacing: 12px;
 
-                    Text {
-                        text: "✕";
-                        font-size: 12px;
-                        font-weight: 800;
-                        color: close-touch.has-hover ? #ffffff : CS2Theme.text-dim;
-                        horizontal-alignment: center;
-                        vertical-alignment: center;
+                        HorizontalLayout {
+                            spacing: 10px;
+                            horizontal-stretch: 1;
+
+                            VerticalLayout {
+                                alignment: center;
+                                horizontal-stretch: 0;
+                                Image {
+                                    source: @image-url("../assets/icons/cfg.svg");
+                                    width: 16px;
+                                    height: 16px;
+                                    colorize: CS2Theme.accent-ct-cyan;
+                                }
+                            }
+
+                            VerticalLayout {
+                                spacing: 2px;
+                                horizontal-stretch: 1;
+
+                                Text {
+                                    text: @tr("NOVO PERFIL DE OTIMIZAÇÃO");
+                                    font-size: 13px;
+                                    font-weight: 900;
+                                    letter-spacing: 0.7px;
+                                    color: CS2Theme.text-primary;
+                                }
+
+                                Text {
+                                    text: @tr("Grave um perfil .json customizado e ative-o imediatamente no CounterRush");
+                                    font-size: 10.5px;
+                                    color: CS2Theme.text-muted;
+                                    overflow: elide;
+                                }
+                            }
+                        }
+
+                        // Botão Fechar (X vetorial sem glifo Unicode)
+                        Rectangle {
+                            width: 28px;
+                            height: 28px;
+                            y: (parent.height - self.height) / 2;
+                            border-radius: CS2Theme.radius-sm;
+                            background: close-touch.has-hover ? CS2Theme.status-danger : CS2Theme.bg-card;
+                            animate background { duration: 100ms; }
+
+                            Path {
+                                width: 10px;
+                                height: 10px;
+                                x: (parent.width - self.width) / 2;
+                                y: (parent.height - self.height) / 2;
+                                viewbox-width: 10;
+                                viewbox-height: 10;
+                                stroke: close-touch.has-hover ? #ffffff : CS2Theme.text-muted;
+                                stroke-width: 1.8px;
+                                commands: "M 1.5 1.5 L 8.5 8.5 M 8.5 1.5 L 1.5 8.5";
+                            }
+
+                            close-touch := TouchArea {
+                                mouse-cursor: pointer;
+                                clicked => {
+                                    root.hide-grid-tooltip();
+                                    root.cancel();
+                                }
+                            }
+                        }
                     }
 
-                    close-touch := TouchArea {
-                        mouse-cursor: pointer;
-                        clicked => {
-                            root.cancel();
+                    // Inputs lado a lado (sem borda em repouso, destaque ciano no foco)
+                    HorizontalLayout {
+                        spacing: 10px;
+
+                        // Campo 1: Nome do Perfil (.json)
+                        VerticalLayout {
+                            spacing: 4px;
+                            horizontal-stretch: 1;
+
+                            HorizontalLayout {
+                                height: 16px;
+                                alignment: space-between;
+
+                                Text {
+                                    text: @tr("NOME DO PERFIL (.JSON)");
+                                    font-size: 10px;
+                                    font-weight: 800;
+                                    letter-spacing: 0.6px;
+                                    color: name-input.has-focus ? CS2Theme.text-cyan : CS2Theme.text-muted;
+                                    vertical-alignment: center;
+                                }
+
+                                Rectangle {
+                                    height: 16px;
+                                    border-radius: CS2Theme.radius-xs;
+                                    background: CS2Theme.accent-t-soft;
+
+                                    HorizontalLayout {
+                                        padding-left: 6px;
+                                        padding-right: 6px;
+                                        Text {
+                                            text: "NOVO ARQUIVO";
+                                            font-size: 8px;
+                                            font-weight: 900;
+                                            letter-spacing: 0.5px;
+                                            color: CS2Theme.text-gold;
+                                            vertical-alignment: center;
+                                        }
+                                    }
+                                }
+                            }
+
+                            Rectangle {
+                                height: 36px;
+                                background: name-input.has-focus
+                                    ? CS2Theme.bg-main
+                                    : (name-area-touch.has-hover ? CS2Theme.bg-card-hover : CS2Theme.bg-card);
+                                border-radius: CS2Theme.radius-sm;
+                                border-width: 1.5px;
+                                border-color: name-input.has-focus ? CS2Theme.accent-ct-cyan : transparent;
+                                animate background { duration: 120ms; }
+                                animate border-color { duration: 120ms; }
+
+                                HorizontalLayout {
+                                    padding-left: 10px;
+                                    padding-right: 6px;
+                                    spacing: 8px;
+
+                                    VerticalLayout {
+                                        alignment: center;
+                                        horizontal-stretch: 0;
+                                        Image {
+                                            source: @image-url("../assets/icons/cfg.svg");
+                                            width: 14px;
+                                            height: 14px;
+                                            colorize: name-input.has-focus ? CS2Theme.accent-ct-cyan : CS2Theme.text-dim;
+                                        }
+                                    }
+
+                                    Rectangle {
+                                        horizontal-stretch: 1;
+                                        clip: true;
+
+                                        name-area-touch := TouchArea {
+                                            mouse-cursor: text;
+                                            clicked => {
+                                                root.hide-grid-tooltip();
+                                                name-input.focus();
+                                            }
+                                        }
+
+                                        name-input := TextInput {
+                                            width: parent.width;
+                                            height: parent.height;
+                                            text <=> root.profile-name;
+                                            color: CS2Theme.text-primary;
+                                            font-size: 12px;
+                                            font-weight: 700;
+                                            single-line: true;
+                                            vertical-alignment: center;
+                                            accepted => {
+                                                root.submit-profile();
+                                            }
+                                        }
+
+                                        if root.profile-name == "" : Text {
+                                            width: parent.width;
+                                            height: parent.height;
+                                            text: @tr("Ex: competitivo_ultra");
+                                            color: CS2Theme.text-muted;
+                                            font-size: 11px;
+                                            vertical-alignment: center;
+                                            overflow: elide;
+                                            opacity: 0.78;
+                                        }
+                                    }
+
+                                    if root.profile-name != "" : Rectangle {
+                                        width: 22px;
+                                        height: 22px;
+                                        y: (parent.height - self.height) / 2;
+                                        border-radius: CS2Theme.radius-xs;
+                                        background: clear-name-touch.has-hover ? CS2Theme.bg-card-selected : transparent;
+
+                                        Path {
+                                            width: 8px;
+                                            height: 8px;
+                                            x: (parent.width - self.width) / 2;
+                                            y: (parent.height - self.height) / 2;
+                                            viewbox-width: 10;
+                                            viewbox-height: 10;
+                                            stroke: clear-name-touch.has-hover ? CS2Theme.text-primary : CS2Theme.text-muted;
+                                            stroke-width: 1.8px;
+                                            commands: "M 1.5 1.5 L 8.5 8.5 M 8.5 1.5 L 1.5 8.5";
+                                        }
+
+                                        clear-name-touch := TouchArea {
+                                            mouse-cursor: pointer;
+                                            clicked => {
+                                                root.profile-name = "";
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Campo 2: Argumentos Steam (Launch Args)
+                        VerticalLayout {
+                            spacing: 4px;
+                            horizontal-stretch: 1;
+
+                            HorizontalLayout {
+                                height: 16px;
+
+                                Text {
+                                    text: @tr("ARGUMENTOS STEAM (LAUNCH ARGS)");
+                                    font-size: 10px;
+                                    font-weight: 800;
+                                    letter-spacing: 0.6px;
+                                    color: args-input.has-focus ? CS2Theme.text-cyan : CS2Theme.text-muted;
+                                    vertical-alignment: center;
+                                }
+                            }
+
+                            Rectangle {
+                                height: 36px;
+                                background: args-input.has-focus
+                                    ? CS2Theme.bg-main
+                                    : (args-area-touch.has-hover ? CS2Theme.bg-card-hover : CS2Theme.bg-card);
+                                border-radius: CS2Theme.radius-sm;
+                                border-width: 1.5px;
+                                border-color: args-input.has-focus ? CS2Theme.accent-ct-cyan : transparent;
+                                animate background { duration: 120ms; }
+                                animate border-color { duration: 120ms; }
+
+                                HorizontalLayout {
+                                    padding-left: 10px;
+                                    padding-right: 6px;
+                                    spacing: 8px;
+
+                                    VerticalLayout {
+                                        alignment: center;
+                                        horizontal-stretch: 0;
+                                        Path {
+                                            width: 13px;
+                                            height: 11px;
+                                            viewbox-width: 14;
+                                            viewbox-height: 12;
+                                            stroke: args-input.has-focus ? CS2Theme.accent-ct-cyan : CS2Theme.text-dim;
+                                            stroke-width: 1.7px;
+                                            commands: "M 1.5 2 L 6 6 L 1.5 10 M 7.5 10 L 12.5 10";
+                                        }
+                                    }
+
+                                    Rectangle {
+                                        horizontal-stretch: 1;
+                                        clip: true;
+
+                                        args-area-touch := TouchArea {
+                                            mouse-cursor: text;
+                                            clicked => {
+                                                root.hide-grid-tooltip();
+                                                args-input.focus();
+                                            }
+                                        }
+
+                                        args-input := TextInput {
+                                            width: parent.width;
+                                            height: parent.height;
+                                            text <=> root.launch-args;
+                                            color: CS2Theme.text-primary;
+                                            font-size: 12px;
+                                            font-weight: 600;
+                                            single-line: true;
+                                            vertical-alignment: center;
+                                            accepted => {
+                                                root.submit-profile();
+                                            }
+                                        }
+
+                                        if root.launch-args == "" : Text {
+                                            width: parent.width;
+                                            height: parent.height;
+                                            text: @tr("Ex: -novid -high +fps_max 0");
+                                            color: CS2Theme.text-muted;
+                                            font-size: 11px;
+                                            vertical-alignment: center;
+                                            overflow: elide;
+                                            opacity: 0.78;
+                                        }
+                                    }
+
+                                    if root.launch-args != "" : Rectangle {
+                                        width: 22px;
+                                        height: 22px;
+                                        y: (parent.height - self.height) / 2;
+                                        border-radius: CS2Theme.radius-xs;
+                                        background: clear-args-touch.has-hover ? CS2Theme.bg-card-selected : transparent;
+
+                                        Path {
+                                            width: 8px;
+                                            height: 8px;
+                                            x: (parent.width - self.width) / 2;
+                                            y: (parent.height - self.height) / 2;
+                                            viewbox-width: 10;
+                                            viewbox-height: 10;
+                                            stroke: clear-args-touch.has-hover ? CS2Theme.text-primary : CS2Theme.text-muted;
+                                            stroke-width: 1.8px;
+                                            commands: "M 1.5 1.5 L 8.5 8.5 M 8.5 1.5 L 1.5 8.5";
+                                        }
+
+                                        clear-args-touch := TouchArea {
+                                            mouse-cursor: pointer;
+                                            clicked => {
+                                                root.launch-args = "";
+                                            }
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -176,358 +564,797 @@ export component CreateProfileDialog inherits Rectangle {
                 background: CS2Theme.border;
             }
 
-            // 2. Formulário: Nome e Argumentos Steam
-            HorizontalLayout {
-                spacing: 16px;
-
-                // Campo 1: Nome do Perfil
-                VerticalLayout {
-                    spacing: 4px;
-                    horizontal-stretch: 1;
-
-                    Text {
-                        text: @tr("NOME DO PERFIL (.JSON)");
-                        font-size: 10px;
-                        font-weight: 800;
-                        letter-spacing: 0.5px;
-                        color: CS2Theme.text-muted;
-                    }
-
-                    Rectangle {
-                        height: 32px;
-                        background: CS2Theme.bg-surface;
-                        border-radius: CS2Theme.radius-sm;
-                        border-width: 1px;
-                        border-color: name-input.has-focus ? CS2Theme.accent-orange : CS2Theme.border;
-
-                        HorizontalLayout {
-                            padding-left: 10px;
-                            padding-right: 10px;
-
-                            name-input := TextInput {
-                                text <=> root.profile-name;
-                                color: CS2Theme.text-primary;
-                                font-size: 11px;
-                                font-weight: 700;
-                                vertical-alignment: center;
-                            }
-                        }
-
-                        if root.profile-name == "" : Text {
-                            x: 10px;
-                            text: @tr("Ex: competitivo_ultra");
-                            color: CS2Theme.text-dim;
-                            font-size: 11px;
-                            vertical-alignment: center;
-                        }
-                    }
-                }
-
-                // Campo 2: Argumentos de Inicialização Steam
-                VerticalLayout {
-                    spacing: 4px;
-                    horizontal-stretch: 1;
-
-                    Text {
-                        text: @tr("ARGUMENTOS STEAM (LAUNCH ARGS)");
-                        font-size: 10px;
-                        font-weight: 800;
-                        letter-spacing: 0.5px;
-                        color: CS2Theme.text-muted;
-                    }
-
-                    Rectangle {
-                        height: 32px;
-                        background: CS2Theme.bg-surface;
-                        border-radius: CS2Theme.radius-sm;
-                        border-width: 1px;
-                        border-color: args-input.has-focus ? CS2Theme.accent-orange : CS2Theme.border;
-
-                        HorizontalLayout {
-                            padding-left: 10px;
-                            padding-right: 10px;
-
-                            args-input := TextInput {
-                                text <=> root.launch-args;
-                                color: CS2Theme.text-primary;
-                                font-size: 11px;
-                                font-weight: 600;
-                                vertical-alignment: center;
-                            }
-                        }
-
-                        if root.launch-args == "" : Text {
-                            x: 10px;
-                            text: @tr("Ex: -novid -high +fps_max 0");
-                            color: CS2Theme.text-dim;
-                            font-size: 11px;
-                            vertical-alignment: center;
-                        }
-                    }
-                }
-            }
-
-            // 3. Seção Módulos de Otimização (13) com Botões de Conveniência
-            VerticalLayout {
-                spacing: 8px;
+            // =================================================================
+            // 2. BARRA DE FERRAMENTAS: CONTAGEM, AÇÕES EM MASSA E LISTA/GRADE
+            // =================================================================
+            Rectangle {
+                background: CS2Theme.bg-surface;
 
                 HorizontalLayout {
+                    padding-left: 16px;
+                    padding-right: 16px;
+                    padding-top: 8px;
+                    padding-bottom: 8px;
+                    spacing: 10px;
                     alignment: space-between;
 
-                    Text {
-                        text: @tr("SELEÇÃO DOS 13 MÓDULOS DE OTIMIZAÇÃO");
-                        font-size: 10px;
-                        font-weight: 800;
-                        letter-spacing: 0.6px;
-                        color: CS2Theme.text-muted;
-                        vertical-alignment: center;
-                    }
-
-                    // Ações Rápidas: Marcar / Desmarcar Todos
+                    // Título + contador de selecionados
                     HorizontalLayout {
                         spacing: 8px;
 
-                        Rectangle {
-                            height: 22px;
-                            width: 100px;
-                            background: check-all-touch.has-hover ? CS2Theme.bg-card-hover : CS2Theme.bg-surface;
-                            border-radius: CS2Theme.radius-xs;
-                            border-width: 1px;
-                            border-color: check-all-touch.has-hover ? CS2Theme.accent-orange : CS2Theme.border;
+                        Text {
+                            text: @tr("SELEÇÃO DOS 13 MÓDULOS DE OTIMIZAÇÃO");
+                            font-size: 10px;
+                            font-weight: 800;
+                            letter-spacing: 0.6px;
+                            color: CS2Theme.text-muted;
+                            vertical-alignment: center;
+                        }
 
-                            Text {
-                                text: @tr("MARCAR TODOS");
-                                font-size: 9px;
-                                font-weight: 800;
-                                color: check-all-touch.has-hover ? CS2Theme.accent-orange : CS2Theme.text-dim;
-                                horizontal-alignment: center;
-                                vertical-alignment: center;
+                        Rectangle {
+                            height: 18px;
+                            y: (parent.height - self.height) / 2;
+                            border-radius: CS2Theme.radius-xs;
+                            background: CS2Theme.accent-ct-soft;
+                            border-width: 1px;
+                            border-color: CS2Theme.accent-ct-blue;
+
+                            HorizontalLayout {
+                                padding-left: 6px;
+                                padding-right: 6px;
+                                Text {
+                                    text: root.selected-count + "/13";
+                                    font-size: 9px;
+                                    font-weight: 900;
+                                    color: CS2Theme.text-cyan;
+                                    vertical-alignment: center;
+                                }
+                            }
+                        }
+                    }
+
+                    // Ações Rápidas + Alternador Lista/Grade
+                    HorizontalLayout {
+                        spacing: 8px;
+                        alignment: end;
+
+                        Rectangle {
+                            height: 32px;
+                            border-radius: CS2Theme.radius-sm;
+                            background: check-all-touch.has-hover ? CS2Theme.bg-card-hover : CS2Theme.bg-card;
+                            animate background { duration: 100ms; }
+
+                            HorizontalLayout {
+                                padding-left: 10px;
+                                padding-right: 10px;
+                                Text {
+                                    text: @tr("MARCAR TODOS");
+                                    font-size: 10px;
+                                    font-weight: 800;
+                                    letter-spacing: 0.4px;
+                                    color: check-all-touch.has-hover ? CS2Theme.text-cyan : CS2Theme.text-muted;
+                                    vertical-alignment: center;
+                                }
                             }
 
                             check-all-touch := TouchArea {
                                 mouse-cursor: pointer;
                                 clicked => {
-                                    root.empty-standby-list = true;
-                                    root.cs2-priority = true;
-                                    root.cs2-affinity = true;
-                                    root.disable-gpu-acceleration = true;
-                                    root.apply-dpi-optimization = true;
-                                    root.disable-memory-compression = true;
-                                    root.apply-timer-resolution = true;
-                                    root.apply-mmcss = true;
-                                    root.disable-hpet = true;
-                                    root.disable-game-bar = true;
-                                    root.enable-msi = true;
-                                    root.disable-power-saving = true;
-                                    root.apply-render-queue = true;
+                                    root.set-all-tweaks(true);
                                 }
                             }
                         }
 
                         Rectangle {
-                            height: 22px;
-                            width: 110px;
-                            background: uncheck-all-touch.has-hover ? CS2Theme.bg-card-hover : CS2Theme.bg-surface;
-                            border-radius: CS2Theme.radius-xs;
-                            border-width: 1px;
-                            border-color: uncheck-all-touch.has-hover ? CS2Theme.accent-orange : CS2Theme.border;
+                            height: 32px;
+                            border-radius: CS2Theme.radius-sm;
+                            background: uncheck-all-touch.has-hover ? CS2Theme.bg-card-hover : CS2Theme.bg-card;
+                            animate background { duration: 100ms; }
 
-                            Text {
-                                text: @tr("DESMARCAR TODOS");
-                                font-size: 9px;
-                                font-weight: 800;
-                                color: uncheck-all-touch.has-hover ? CS2Theme.accent-orange : CS2Theme.text-dim;
-                                horizontal-alignment: center;
-                                vertical-alignment: center;
+                            HorizontalLayout {
+                                padding-left: 10px;
+                                padding-right: 10px;
+                                Text {
+                                    text: @tr("DESMARCAR TODOS");
+                                    font-size: 10px;
+                                    font-weight: 800;
+                                    letter-spacing: 0.4px;
+                                    color: uncheck-all-touch.has-hover ? CS2Theme.text-cyan : CS2Theme.text-muted;
+                                    vertical-alignment: center;
+                                }
                             }
 
                             uncheck-all-touch := TouchArea {
                                 mouse-cursor: pointer;
                                 clicked => {
-                                    root.empty-standby-list = false;
-                                    root.cs2-priority = false;
-                                    root.cs2-affinity = false;
-                                    root.disable-gpu-acceleration = false;
-                                    root.apply-dpi-optimization = false;
-                                    root.disable-memory-compression = false;
-                                    root.apply-timer-resolution = false;
-                                    root.apply-mmcss = false;
-                                    root.disable-hpet = false;
-                                    root.disable-game-bar = false;
-                                    root.enable-msi = false;
-                                    root.disable-power-saving = false;
-                                    root.apply-render-queue = false;
+                                    root.set-all-tweaks(false);
+                                }
+                            }
+                        }
+
+                        // Alternador Lista / Grade (mesmo componente visual da página de Binds)
+                        Rectangle {
+                            horizontal-stretch: 0;
+                            height: 32px;
+                            background: CS2Theme.bg-main;
+                            border-radius: CS2Theme.radius-sm;
+
+                            HorizontalLayout {
+                                padding: 3px;
+                                spacing: 3px;
+
+                                Rectangle {
+                                    height: 26px;
+                                    border-radius: CS2Theme.radius-xs;
+                                    background: !root.is-grid-view
+                                        ? CS2Theme.accent-ct-soft
+                                        : (list-mode-touch.has-hover ? CS2Theme.bg-card : transparent);
+                                    animate background { duration: 100ms; }
+
+                                    HorizontalLayout {
+                                        padding-left: 10px;
+                                        padding-right: 10px;
+                                        spacing: 6px;
+
+                                        VerticalLayout {
+                                            alignment: center;
+                                            Path {
+                                                width: 12px;
+                                                height: 10px;
+                                                viewbox-width: 14;
+                                                viewbox-height: 12;
+                                                stroke: !root.is-grid-view ? CS2Theme.accent-ct-cyan : CS2Theme.text-muted;
+                                                stroke-width: 1.7px;
+                                                commands: "M 1 2 L 13 2 M 1 6 L 13 6 M 1 10 L 13 10";
+                                            }
+                                        }
+
+                                        Text {
+                                            text: "Lista";
+                                            font-size: 11px;
+                                            font-weight: !root.is-grid-view ? 800 : 600;
+                                            color: !root.is-grid-view ? #ffffff : CS2Theme.text-muted;
+                                            vertical-alignment: center;
+                                        }
+                                    }
+
+                                    list-mode-touch := TouchArea {
+                                        mouse-cursor: pointer;
+                                        clicked => {
+                                            root.hide-grid-tooltip();
+                                            if root.is-grid-view {
+                                                root.is-grid-view = false;
+                                                modules-scroll.content-y = 0px;
+                                            }
+                                        }
+                                    }
+                                }
+
+                                Rectangle {
+                                    height: 26px;
+                                    border-radius: CS2Theme.radius-xs;
+                                    background: root.is-grid-view
+                                        ? CS2Theme.accent-ct-soft
+                                        : (grid-mode-touch.has-hover ? CS2Theme.bg-card : transparent);
+                                    animate background { duration: 100ms; }
+
+                                    HorizontalLayout {
+                                        padding-left: 10px;
+                                        padding-right: 10px;
+                                        spacing: 6px;
+
+                                        VerticalLayout {
+                                            alignment: center;
+                                            Path {
+                                                width: 11px;
+                                                height: 11px;
+                                                viewbox-width: 12;
+                                                viewbox-height: 12;
+                                                stroke: root.is-grid-view ? CS2Theme.accent-ct-cyan : CS2Theme.text-muted;
+                                                stroke-width: 1.4px;
+                                                fill: root.is-grid-view ? CS2Theme.accent-ct-cyan : transparent;
+                                                commands: "M 1 1 L 4.5 1 L 4.5 4.5 L 1 4.5 Z M 7.5 1 L 11 1 L 11 4.5 L 7.5 4.5 Z M 1 7.5 L 4.5 7.5 L 4.5 11 L 1 11 Z M 7.5 7.5 L 11 7.5 L 11 11 L 7.5 11 Z";
+                                            }
+                                        }
+
+                                        Text {
+                                            text: "Grade";
+                                            font-size: 11px;
+                                            font-weight: root.is-grid-view ? 800 : 600;
+                                            color: root.is-grid-view ? #ffffff : CS2Theme.text-muted;
+                                            vertical-alignment: center;
+                                        }
+                                    }
+
+                                    grid-mode-touch := TouchArea {
+                                        mouse-cursor: pointer;
+                                        clicked => {
+                                            root.hide-grid-tooltip();
+                                            if !root.is-grid-view {
+                                                root.is-grid-view = true;
+                                                modules-scroll.content-y = 0px;
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
                     }
                 }
+            }
 
-                // Grade em 2 Colunas com os 13 Checkboxes
-                HorizontalLayout {
-                    spacing: 12px;
+            Rectangle {
+                height: 1px;
+                background: CS2Theme.border;
+            }
 
-                    // Coluna 1 (7 itens)
-                    VerticalLayout {
-                        spacing: 4px;
-                        horizontal-stretch: 1;
+            // =================================================================
+            // 3. ÁREA ROLÁVEL DOS 13 MÓDULOS (MODO LISTA OU MODO GRADE 4 COLS)
+            // =================================================================
+            modules-scroll := ScrollView {
+                vertical-stretch: 1;
+                content-width: self.visible-width;
+                changed content-y => {
+                    root.hide-grid-tooltip();
+                }
 
-                        ProfileTweakCheck {
-                            text: @tr("Afinidade de CPU (Isolar Core 0)");
-                            checked <=> root.cs2-affinity;
+                VerticalLayout {
+                    width: modules-scroll.visible-width;
+                    padding-left: 16px;
+                    padding-right: 16px;
+                    padding-top: 10px;
+                    padding-bottom: 12px;
+                    spacing: root.is-grid-view ? 10px : 8px;
+                    alignment: start;
+
+                    // 3.1 Modo Lista (cards expandidos com descrição completa)
+                    if !root.is-grid-view : VerticalLayout {
+                        spacing: 8px;
+
+                        BindCommandCard {
+                            command-title: @tr("Afinidade de CPU (Isolar Core 0)");
+                            description: @tr("Afinidade de CPU: Desativa o Núcleo 0 para o CS2 mitigando interrupções do SO.");
+                            checked: root.cs2-affinity;
+                            toggled(val) => { root.cs2-affinity = val; }
                         }
-                        ProfileTweakCheck {
-                            text: @tr("Resolução de Timer (0.5ms)");
-                            checked <=> root.apply-timer-resolution;
+                        BindCommandCard {
+                            command-title: @tr("Resolução de Timer (0.5ms)");
+                            description: @tr("Temporizador do Sistema: Define resolução de alta precisão de 0.5ms.");
+                            checked: root.apply-timer-resolution;
+                            toggled(val) => { root.apply-timer-resolution = val; }
                         }
-                        ProfileTweakCheck {
-                            text: @tr("Prioridade Alta CS2");
-                            checked <=> root.cs2-priority;
+                        BindCommandCard {
+                            command-title: @tr("Prioridade Alta CS2");
+                            description: @tr("Prioridade de Processo: Eleva a prioridade do executável cs2.exe para Tempo Real.");
+                            checked: root.cs2-priority;
+                            toggled(val) => { root.cs2-priority = val; }
                         }
-                        ProfileTweakCheck {
-                            text: @tr("Limpeza de RAM Standby");
-                            checked <=> root.empty-standby-list;
+                        BindCommandCard {
+                            command-title: @tr("Limpeza de RAM Standby");
+                            description: @tr("Empty Standby List: Libera páginas de cache em standby na memória RAM.");
+                            checked: root.empty-standby-list;
+                            toggled(val) => { root.empty-standby-list = val; }
                         }
-                        ProfileTweakCheck {
-                            text: @tr("Desativar GPU Hardware Accel");
-                            checked <=> root.disable-gpu-acceleration;
+                        BindCommandCard {
+                            command-title: @tr("Desativar GPU Hardware Accel");
+                            description: @tr("Aceleração GPU: Desativa aceleração de hardware em Discord, Steam e navegadores.");
+                            checked: root.disable-gpu-acceleration;
+                            toggled(val) => { root.disable-gpu-acceleration = val; }
                         }
-                        ProfileTweakCheck {
-                            text: @tr("Otimização de DPI / Escala");
-                            checked <=> root.apply-dpi-optimization;
+                        BindCommandCard {
+                            command-title: @tr("Otimização de DPI / Escala");
+                            description: @tr("Otimização DPI: Aplica flags de tela cheia exclusiva e reduz input lag no CS2.");
+                            checked: root.apply-dpi-optimization;
+                            toggled(val) => { root.apply-dpi-optimization = val; }
                         }
-                        ProfileTweakCheck {
-                            text: @tr("Desativar Compactação Memória");
-                            checked <=> root.disable-memory-compression;
+                        BindCommandCard {
+                            command-title: @tr("Desativar Compactação Memória");
+                            description: @tr("Compactação de Memória: Desativa compressão de páginas do Windows (>16GB RAM).");
+                            checked: root.disable-memory-compression;
+                            toggled(val) => { root.disable-memory-compression = val; }
+                        }
+                        BindCommandCard {
+                            command-title: @tr("Perfil MMCSS Games");
+                            description: @tr("MMCSS Games: Otimiza prioridade de rede, áudio e GPU para perfis de jogos.");
+                            checked: root.apply-mmcss;
+                            toggled(val) => { root.apply-mmcss = val; }
+                        }
+                        BindCommandCard {
+                            command-title: @tr("Desativar HPET (High Precision Timer)");
+                            description: @tr("Desativar HPET: Desativa o relógio de plataforma no BCD priorizando o TSC da CPU.");
+                            checked: root.disable-hpet;
+                            toggled(val) => { root.disable-hpet = val; }
+                        }
+                        BindCommandCard {
+                            command-title: @tr("Desativar Windows Game Bar");
+                            description: @tr("Xbox Game Bar: Desativa sobreposições, modo Xbox e gravações de fundo GameDVR.");
+                            checked: root.disable-game-bar;
+                            toggled(val) => { root.disable-game-bar = val; }
+                        }
+                        BindCommandCard {
+                            command-title: @tr("Modo MSI para GPU / Áudio");
+                            description: @tr("Modo MSI: Ativa interrupções baseadas em mensagens para GPU, Rede e portas USB.");
+                            checked: root.enable-msi;
+                            toggled(val) => { root.enable-msi = val; }
+                        }
+                        BindCommandCard {
+                            command-title: @tr("Desativar Economia de Energia");
+                            description: @tr("Economia de Energia: Desativa PCIe ASPM e suspensão seletiva de portas USB.");
+                            checked: root.disable-power-saving;
+                            toggled(val) => { root.disable-power-saving = val; }
+                        }
+                        BindCommandCard {
+                            command-title: @tr("Render Queue CS2 Ultra-Low");
+                            description: @tr("Fila de Renderização: FlipQueue AMD = 1 e Persistence Mode em placas NVIDIA.");
+                            checked: root.apply-render-queue;
+                            toggled(val) => { root.apply-render-queue = val; }
                         }
                     }
 
-                    // Coluna 2 (6 itens)
-                    VerticalLayout {
-                        spacing: 4px;
-                        horizontal-stretch: 1;
+                    // 3.2 Modo Grade (4 colunas estilo Binds com tooltip no hover)
+                    if root.is-grid-view : grid-container := VerticalLayout {
+                        property <length> col-width: max(165px, (modules-scroll.visible-width - 62px) / 4);
+                        spacing: 10px;
 
-                        ProfileTweakCheck {
-                            text: @tr("Perfil MMCSS Games");
-                            checked <=> root.apply-mmcss;
+                        // Linha 1 (módulos 0..3)
+                        HorizontalLayout {
+                            spacing: 10px;
+
+                            ProfileGridSwitchSlot {
+                                module-id: 0;
+                                label: @tr("Núcleo 0 Off");
+                                info: @tr("Afinidade CPU");
+                                full-title: @tr("Afinidade de CPU (Isolar Core 0)");
+                                description: @tr("Afinidade de CPU: Desativa o Núcleo 0 para o CS2 mitigando interrupções do SO.");
+                                checked: root.cs2-affinity;
+                                slot-width: grid-container.col-width;
+                                toggled(new-val) => {
+                                    root.cs2-affinity = new-val;
+                                    root.sync-tooltip-checked(0, new-val);
+                                }
+                                hover-changed(hovered, id, title, desc, checked, ax, ay, aw, ah) => {
+                                    root.handle-grid-hover(hovered, id, title, desc, checked, ax, ay, aw, ah);
+                                }
+                            }
+                            ProfileGridSwitchSlot {
+                                module-id: 1;
+                                label: @tr("Timer 0.5ms");
+                                info: @tr("Temporizador");
+                                full-title: @tr("Resolução de Timer (0.5ms)");
+                                description: @tr("Temporizador do Sistema: Define resolução de alta precisão de 0.5ms.");
+                                checked: root.apply-timer-resolution;
+                                slot-width: grid-container.col-width;
+                                toggled(new-val) => {
+                                    root.apply-timer-resolution = new-val;
+                                    root.sync-tooltip-checked(1, new-val);
+                                }
+                                hover-changed(hovered, id, title, desc, checked, ax, ay, aw, ah) => {
+                                    root.handle-grid-hover(hovered, id, title, desc, checked, ax, ay, aw, ah);
+                                }
+                            }
+                            ProfileGridSwitchSlot {
+                                module-id: 2;
+                                label: @tr("Prioridade Alta");
+                                info: @tr("Processo CS2");
+                                full-title: @tr("Prioridade Alta CS2");
+                                description: @tr("Prioridade de Processo: Eleva a prioridade do executável cs2.exe para Tempo Real.");
+                                checked: root.cs2-priority;
+                                slot-width: grid-container.col-width;
+                                toggled(new-val) => {
+                                    root.cs2-priority = new-val;
+                                    root.sync-tooltip-checked(2, new-val);
+                                }
+                                hover-changed(hovered, id, title, desc, checked, ax, ay, aw, ah) => {
+                                    root.handle-grid-hover(hovered, id, title, desc, checked, ax, ay, aw, ah);
+                                }
+                            }
+                            ProfileGridSwitchSlot {
+                                module-id: 3;
+                                label: @tr("Limpar RAM");
+                                info: @tr("Empty Standby");
+                                full-title: @tr("Limpeza de RAM Standby");
+                                description: @tr("Empty Standby List: Libera páginas de cache em standby na memória RAM.");
+                                checked: root.empty-standby-list;
+                                slot-width: grid-container.col-width;
+                                toggled(new-val) => {
+                                    root.empty-standby-list = new-val;
+                                    root.sync-tooltip-checked(3, new-val);
+                                }
+                                hover-changed(hovered, id, title, desc, checked, ax, ay, aw, ah) => {
+                                    root.handle-grid-hover(hovered, id, title, desc, checked, ax, ay, aw, ah);
+                                }
+                            }
                         }
-                        ProfileTweakCheck {
-                            text: @tr("Desativar HPET (High Precision Timer)");
-                            checked <=> root.disable-hpet;
+
+                        // Linha 2 (módulos 4..7)
+                        HorizontalLayout {
+                            spacing: 10px;
+
+                            ProfileGridSwitchSlot {
+                                module-id: 4;
+                                label: @tr("GPU Apps Off");
+                                info: @tr("VRAM & Apps");
+                                full-title: @tr("Desativar GPU Hardware Accel");
+                                description: @tr("Aceleração GPU: Desativa aceleração de hardware em Discord, Steam e navegadores.");
+                                checked: root.disable-gpu-acceleration;
+                                slot-width: grid-container.col-width;
+                                toggled(new-val) => {
+                                    root.disable-gpu-acceleration = new-val;
+                                    root.sync-tooltip-checked(4, new-val);
+                                }
+                                hover-changed(hovered, id, title, desc, checked, ax, ay, aw, ah) => {
+                                    root.handle-grid-hover(hovered, id, title, desc, checked, ax, ay, aw, ah);
+                                }
+                            }
+                            ProfileGridSwitchSlot {
+                                module-id: 5;
+                                label: @tr("Otimização DPI");
+                                info: @tr("Tela Cheia CS2");
+                                full-title: @tr("Otimização de DPI / Escala");
+                                description: @tr("Otimização DPI: Aplica flags de tela cheia exclusiva e reduz input lag no CS2.");
+                                checked: root.apply-dpi-optimization;
+                                slot-width: grid-container.col-width;
+                                toggled(new-val) => {
+                                    root.apply-dpi-optimization = new-val;
+                                    root.sync-tooltip-checked(5, new-val);
+                                }
+                                hover-changed(hovered, id, title, desc, checked, ax, ay, aw, ah) => {
+                                    root.handle-grid-hover(hovered, id, title, desc, checked, ax, ay, aw, ah);
+                                }
+                            }
+                            ProfileGridSwitchSlot {
+                                module-id: 6;
+                                label: @tr("Compactar RAM");
+                                info: @tr("MMAgent Off");
+                                full-title: @tr("Desativar Compactação Memória");
+                                description: @tr("Compactação de Memória: Desativa compressão de páginas do Windows (>16GB RAM).");
+                                checked: root.disable-memory-compression;
+                                slot-width: grid-container.col-width;
+                                toggled(new-val) => {
+                                    root.disable-memory-compression = new-val;
+                                    root.sync-tooltip-checked(6, new-val);
+                                }
+                                hover-changed(hovered, id, title, desc, checked, ax, ay, aw, ah) => {
+                                    root.handle-grid-hover(hovered, id, title, desc, checked, ax, ay, aw, ah);
+                                }
+                            }
+                            ProfileGridSwitchSlot {
+                                module-id: 7;
+                                label: @tr("Agendador MMCSS");
+                                info: @tr("Agendador Win");
+                                full-title: @tr("Perfil MMCSS Games");
+                                description: @tr("MMCSS Games: Otimiza prioridade de rede, áudio e GPU para perfis de jogos.");
+                                checked: root.apply-mmcss;
+                                slot-width: grid-container.col-width;
+                                toggled(new-val) => {
+                                    root.apply-mmcss = new-val;
+                                    root.sync-tooltip-checked(7, new-val);
+                                }
+                                hover-changed(hovered, id, title, desc, checked, ax, ay, aw, ah) => {
+                                    root.handle-grid-hover(hovered, id, title, desc, checked, ax, ay, aw, ah);
+                                }
+                            }
                         }
-                        ProfileTweakCheck {
-                            text: @tr("Desativar Windows Game Bar");
-                            checked <=> root.disable-game-bar;
+
+                        // Linha 3 (módulos 8..11)
+                        HorizontalLayout {
+                            spacing: 10px;
+
+                            ProfileGridSwitchSlot {
+                                module-id: 8;
+                                label: @tr("HPET Off");
+                                info: @tr("Timer BCD");
+                                full-title: @tr("Desativar HPET (High Precision Timer)");
+                                description: @tr("Desativar HPET: Desativa o relógio de plataforma no BCD priorizando o TSC da CPU.");
+                                checked: root.disable-hpet;
+                                slot-width: grid-container.col-width;
+                                toggled(new-val) => {
+                                    root.disable-hpet = new-val;
+                                    root.sync-tooltip-checked(8, new-val);
+                                }
+                                hover-changed(hovered, id, title, desc, checked, ax, ay, aw, ah) => {
+                                    root.handle-grid-hover(hovered, id, title, desc, checked, ax, ay, aw, ah);
+                                }
+                            }
+                            ProfileGridSwitchSlot {
+                                module-id: 9;
+                                label: @tr("Game Bar Off");
+                                info: @tr("DVR & Overlay");
+                                full-title: @tr("Desativar Windows Game Bar");
+                                description: @tr("Xbox Game Bar: Desativa sobreposições, modo Xbox e gravações de fundo GameDVR.");
+                                checked: root.disable-game-bar;
+                                slot-width: grid-container.col-width;
+                                toggled(new-val) => {
+                                    root.disable-game-bar = new-val;
+                                    root.sync-tooltip-checked(9, new-val);
+                                }
+                                hover-changed(hovered, id, title, desc, checked, ax, ay, aw, ah) => {
+                                    root.handle-grid-hover(hovered, id, title, desc, checked, ax, ay, aw, ah);
+                                }
+                            }
+                            ProfileGridSwitchSlot {
+                                module-id: 10;
+                                label: @tr("Modo MSI");
+                                info: @tr("PCIe IRQ Mode");
+                                full-title: @tr("Modo MSI para GPU / Áudio");
+                                description: @tr("Modo MSI: Ativa interrupções baseadas em mensagens para GPU, Rede e portas USB.");
+                                checked: root.enable-msi;
+                                slot-width: grid-container.col-width;
+                                toggled(new-val) => {
+                                    root.enable-msi = new-val;
+                                    root.sync-tooltip-checked(10, new-val);
+                                }
+                                hover-changed(hovered, id, title, desc, checked, ax, ay, aw, ah) => {
+                                    root.handle-grid-hover(hovered, id, title, desc, checked, ax, ay, aw, ah);
+                                }
+                            }
+                            ProfileGridSwitchSlot {
+                                module-id: 11;
+                                label: @tr("Power Save Off");
+                                info: @tr("PCIe & USB");
+                                full-title: @tr("Desativar Economia de Energia");
+                                description: @tr("Economia de Energia: Desativa PCIe ASPM e suspensão seletiva de portas USB.");
+                                checked: root.disable-power-saving;
+                                slot-width: grid-container.col-width;
+                                toggled(new-val) => {
+                                    root.disable-power-saving = new-val;
+                                    root.sync-tooltip-checked(11, new-val);
+                                }
+                                hover-changed(hovered, id, title, desc, checked, ax, ay, aw, ah) => {
+                                    root.handle-grid-hover(hovered, id, title, desc, checked, ax, ay, aw, ah);
+                                }
+                            }
                         }
-                        ProfileTweakCheck {
-                            text: @tr("Modo MSI para GPU / Áudio");
-                            checked <=> root.enable-msi;
-                        }
-                        ProfileTweakCheck {
-                            text: @tr("Desativar Economia de Energia");
-                            checked <=> root.disable-power-saving;
-                        }
-                        ProfileTweakCheck {
-                            text: @tr("Render Queue CS2 Ultra-Low");
-                            checked <=> root.apply-render-queue;
+
+                        // Linha 4 (módulo 12 + 3 espaçadores para manter alinhamento da grade)
+                        HorizontalLayout {
+                            spacing: 10px;
+
+                            ProfileGridSwitchSlot {
+                                module-id: 12;
+                                label: @tr("Render Queue");
+                                info: @tr("Flip & Persist");
+                                full-title: @tr("Render Queue CS2 Ultra-Low");
+                                description: @tr("Fila de Renderização: FlipQueue AMD = 1 e Persistence Mode em placas NVIDIA.");
+                                checked: root.apply-render-queue;
+                                slot-width: grid-container.col-width;
+                                toggled(new-val) => {
+                                    root.apply-render-queue = new-val;
+                                    root.sync-tooltip-checked(12, new-val);
+                                }
+                                hover-changed(hovered, id, title, desc, checked, ax, ay, aw, ah) => {
+                                    root.handle-grid-hover(hovered, id, title, desc, checked, ax, ay, aw, ah);
+                                }
+                            }
+
+                            Rectangle { width: grid-container.col-width; height: 50px; background: transparent; }
+                            Rectangle { width: grid-container.col-width; height: 50px; background: transparent; }
+                            Rectangle { width: grid-container.col-width; height: 50px; background: transparent; }
                         }
                     }
                 }
             }
 
-            // 4. Rodapé: Mensagem de Erro + Botões de Ação
-            HorizontalLayout {
-                alignment: space-between;
+            Rectangle {
+                height: 1px;
+                background: CS2Theme.border;
+            }
 
-                // Mensagem de Erro Reativa
+            // =================================================================
+            // 4. RODAPÉ: FAIXA DE STATUS/ERRO E BOTÕES DE AÇÃO
+            // =================================================================
+            Rectangle {
+                background: CS2Theme.bg-surface;
+
                 HorizontalLayout {
-                    spacing: 6px;
-                    alignment: start;
-
-                    if root.error-message != "" : Text {
-                        text: @tr("⚠ {}", root.error-message);
-                        font-size: 11px;
-                        font-weight: 700;
-                        color: CS2Theme.status-danger;
-                        vertical-alignment: center;
-                    }
-                }
-
-                // Botões Cancelar e Confirmar
-                HorizontalLayout {
+                    padding-left: 16px;
+                    padding-right: 16px;
+                    padding-top: 12px;
+                    padding-bottom: 12px;
                     spacing: 12px;
-                    alignment: end;
+                    alignment: space-between;
 
-                    // Botão Cancelar
+                    // Faixa de status/erro estilo Binds
                     Rectangle {
-                        width: 110px;
-                        height: 38px;
-                        background: cancel-touch.has-hover ? CS2Theme.bg-card-hover : CS2Theme.bg-surface;
+                        horizontal-stretch: 1;
+                        height: 36px;
                         border-radius: CS2Theme.radius-sm;
-                        border-width: 1px;
-                        border-color: cancel-touch.has-hover ? CS2Theme.border-hover : CS2Theme.border;
+                        background: CS2Theme.bg-main;
 
-                        Text {
-                            text: @tr("CANCELAR");
-                            font-size: 11px;
-                            font-weight: 800;
-                            letter-spacing: 0.6px;
-                            color: cancel-touch.has-hover ? CS2Theme.text-primary : CS2Theme.text-muted;
-                            horizontal-alignment: center;
-                            vertical-alignment: center;
-                        }
+                        HorizontalLayout {
+                            padding-left: 10px;
+                            padding-right: 10px;
+                            spacing: 8px;
 
-                        cancel-touch := TouchArea {
-                            mouse-cursor: pointer;
-                            clicked => {
-                                root.cancel();
+                            VerticalLayout {
+                                alignment: center;
+                                horizontal-stretch: 0;
+                                Rectangle {
+                                    width: 6px;
+                                    height: 6px;
+                                    border-radius: 3px;
+                                    background: root.error-message != "" ? CS2Theme.status-danger : CS2Theme.accent-ct-cyan;
+                                }
+                            }
+
+                            if root.error-message != "" : Text {
+                                text: root.error-message;
+                                font-size: 11px;
+                                font-weight: 700;
+                                color: CS2Theme.status-danger;
+                                vertical-alignment: center;
+                                overflow: elide;
+                                horizontal-stretch: 1;
+                            }
+
+                            if root.error-message == "" : Text {
+                                text: root.selected-count + "/13";
+                                font-size: 11px;
+                                font-weight: 800;
+                                color: CS2Theme.text-cyan;
+                                vertical-alignment: center;
+                            }
+
+                            if root.error-message == "" : Text {
+                                text: @tr("SELEÇÃO DOS 13 MÓDULOS DE OTIMIZAÇÃO");
+                                font-size: 10px;
+                                font-weight: 600;
+                                color: CS2Theme.text-muted;
+                                vertical-alignment: center;
+                                overflow: elide;
+                                horizontal-stretch: 1;
                             }
                         }
                     }
 
-                    // Botão Criar e Ativar Perfil
-                    Rectangle {
-                        width: 190px;
-                        height: 38px;
-                        background: confirm-touch.has-hover ? CS2Theme.accent-orange-bright : CS2Theme.accent-orange;
-                        border-radius: CS2Theme.radius-sm;
-                        border-width: 1px;
-                        border-color: #c2410c;
+                    // Botões Cancelar e Criar/Ativar
+                    HorizontalLayout {
+                        spacing: 10px;
+                        alignment: end;
+                        horizontal-stretch: 0;
 
-                        Text {
-                            text: @tr("CRIAR E ATIVAR PERFIL");
-                            font-size: 11px;
-                            font-weight: 900;
-                            letter-spacing: 0.8px;
-                            color: #ffffff;
-                            horizontal-alignment: center;
-                            vertical-alignment: center;
+                        // Botão Cancelar (sem borda em repouso, mesmo estilo de Binds)
+                        Rectangle {
+                            height: 36px;
+                            min-width: 104px;
+                            border-radius: CS2Theme.radius-sm;
+                            background: cancel-touch.has-hover ? CS2Theme.bg-card-hover : CS2Theme.bg-card;
+                            animate background { duration: 100ms; }
+
+                            HorizontalLayout {
+                                padding-left: 14px;
+                                padding-right: 14px;
+                                alignment: center;
+                                Text {
+                                    text: @tr("CANCELAR");
+                                    font-size: 11px;
+                                    font-weight: 800;
+                                    letter-spacing: 0.6px;
+                                    color: cancel-touch.has-hover ? CS2Theme.text-primary : CS2Theme.text-muted;
+                                    vertical-alignment: center;
+                                }
+                            }
+
+                            cancel-touch := TouchArea {
+                                mouse-cursor: pointer;
+                                clicked => {
+                                    root.hide-grid-tooltip();
+                                    root.cancel();
+                                }
+                            }
                         }
 
-                        confirm-touch := TouchArea {
-                            mouse-cursor: pointer;
-                            clicked => {
-                                root.confirmed({
-                                    name: root.profile-name,
-                                    launch-args: root.launch-args,
-                                    empty-standby-list: root.empty-standby-list,
-                                    cs2-priority: root.cs2-priority,
-                                    cs2-affinity: root.cs2-affinity,
-                                    disable-gpu-acceleration: root.disable-gpu-acceleration,
-                                    apply-dpi-optimization: root.apply-dpi-optimization,
-                                    disable-memory-compression: root.disable-memory-compression,
-                                    apply-timer-resolution: root.apply-timer-resolution,
-                                    apply-mmcss: root.apply-mmcss,
-                                    disable-hpet: root.disable-hpet,
-                                    disable-game-bar: root.disable-game-bar,
-                                    enable-msi: root.enable-msi,
-                                    disable-power-saving: root.disable-power-saving,
-                                    apply-render-queue: root.apply-render-queue,
-                                });
+                        // CTA Primário (mesmo design do botão SALVAR BIND)
+                        Rectangle {
+                            height: 36px;
+                            background: confirm-touch.has-hover ? CS2Theme.accent-orange-bright : CS2Theme.accent-orange;
+                            border-radius: CS2Theme.radius-sm;
+                            animate background { duration: 100ms; }
+
+                            HorizontalLayout {
+                                padding-left: 14px;
+                                padding-right: 14px;
+                                spacing: 7px;
+                                alignment: center;
+
+                                Image {
+                                    source: @image-url("../assets/icons/save.svg");
+                                    width: 14px;
+                                    height: 14px;
+                                    colorize: #ffffff;
+                                    y: (parent.height - self.height) / 2;
+                                }
+
+                                Text {
+                                    text: @tr("CRIAR E ATIVAR PERFIL");
+                                    font-size: 11px;
+                                    font-weight: 900;
+                                    letter-spacing: 0.6px;
+                                    color: #ffffff;
+                                    vertical-alignment: center;
+                                }
+
+                                if root.selected-count > 0 : Rectangle {
+                                    height: 18px;
+                                    min-width: 18px;
+                                    y: (parent.height - self.height) / 2;
+                                    border-radius: CS2Theme.radius-xs;
+                                    background: rgba(0, 0, 0, 0.28);
+
+                                    HorizontalLayout {
+                                        padding-left: 5px;
+                                        padding-right: 5px;
+                                        Text {
+                                            text: root.selected-count;
+                                            font-size: 10px;
+                                            font-weight: 900;
+                                            color: #ffffff;
+                                            vertical-alignment: center;
+                                            horizontal-alignment: center;
+                                        }
+                                    }
+                                }
+                            }
+
+                            confirm-touch := TouchArea {
+                                mouse-cursor: pointer;
+                                clicked => {
+                                    root.submit-profile();
+                                }
                             }
                         }
                     }
                 }
+            }
+        }
+    }
+
+    // =========================================================================
+    // 5. POPUP FLUTUANTE DE DESCRIÇÃO NO HOVER DA GRADE (COORDENADAS LOCAIS)
+    // =========================================================================
+    if root.tooltip-visible && root.is-grid-view : Rectangle {
+        property <length> card-left-x: dialog-card.x + 12px;
+        property <length> card-right-x: dialog-card.x + dialog-card.width - self.width - 12px;
+        property <length> local-anchor-x: root.tooltip-anchor-x - root.absolute-position.x;
+        property <length> local-anchor-y: root.tooltip-anchor-y - root.absolute-position.y;
+        property <length> scroll-top-y: modules-scroll.absolute-position.y - root.absolute-position.y;
+        property <length> above-y: local-anchor-y - self.height - 8px;
+        property <length> below-y: local-anchor-y + root.tooltip-anchor-h + 8px;
+
+        width: min(340px, dialog-card.width - 24px);
+        height: tooltip-content.preferred-height;
+        x: clamp(local-anchor-x + (root.tooltip-anchor-w - self.width) / 2, card-left-x, card-right-x);
+        y: above-y >= scroll-top-y ? above-y : clamp(below-y, dialog-card.y + 12px, max(dialog-card.y + 12px, dialog-card.y + dialog-card.height - self.height - 12px));
+        background: #0f172a;
+        border-width: 1px;
+        border-color: root.tooltip-checked ? CS2Theme.accent-ct-cyan : CS2Theme.accent-ct-blue;
+        border-radius: CS2Theme.radius-xs;
+        drop-shadow-color: rgba(0, 0, 0, 0.55);
+        drop-shadow-blur: 14px;
+        drop-shadow-offset-y: 6px;
+
+        tooltip-content := VerticalLayout {
+            width: parent.width;
+            padding-left: 12px;
+            padding-right: 12px;
+            padding-top: 8px;
+            padding-bottom: 8px;
+            spacing: 4px;
+
+            Text {
+                text: root.tooltip-title;
+                font-size: 11px;
+                font-weight: 800;
+                color: CS2Theme.accent-ct-cyan;
+                wrap: word-wrap;
+            }
+
+            Text {
+                text: root.tooltip-description;
+                font-size: 11px;
+                font-weight: 500;
+                color: #f8fafc;
+                wrap: word-wrap;
             }
         }
     }
