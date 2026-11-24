@@ -1,0 +1,164 @@
+import { CS2Theme } from "../theme.slint";
+
+export component CfgSelectorCard inherits Rectangle {
+    in property <string> selected-cfg: "";
+    in property <bool> dropdown-open: false;
+    in property <bool> enabled: true;
+    in property <length> card-width: 526px;
+    in property <length> card-height: 46px;
+    callback toggle-dropdown(length, length, length, length);
+    callback blocked-click();
+    callback hover-changed(bool, length, length, length, length);
+
+    property <bool> is-active: root.selected-cfg != "";
+
+    height: root.card-height;
+    min-width: root.card-width;
+    max-width: root.card-width;
+    horizontal-stretch: 0;
+    background: !root.enabled
+        ? CS2Theme.bg-surface
+        : (root.is-active
+            ? (touch.has-hover ? #2b3f5e : CS2Theme.bg-card-selected)
+            : (root.dropdown-open || touch.has-hover ? CS2Theme.bg-card-hover : CS2Theme.bg-card));
+    border-radius: CS2Theme.radius-sm;
+    border-width: (root.enabled && (root.is-active || root.dropdown-open)) ? 1.5px : 1px;
+    border-color: !root.enabled
+        ? transparent
+        : (root.dropdown-open || root.is-active
+            ? CS2Theme.accent-ct-cyan
+            : (touch.has-hover ? CS2Theme.border-hover : transparent));
+    animate background { duration: 120ms; }
+    animate border-color { duration: 120ms; }
+
+    HorizontalLayout {
+        opacity: root.enabled ? 1.0 : 0.65;
+        animate opacity { duration: 150ms; }
+        padding-left: 12px;
+        padding-right: 12px;
+        spacing: 10px;
+        alignment: space-between;
+
+        HorizontalLayout {
+            spacing: 10px;
+            horizontal-stretch: 1;
+
+            VerticalLayout {
+                alignment: center;
+                horizontal-stretch: 0;
+                Image {
+                    source: @image-url("../assets/icons/cfg.svg");
+                    width: 15px;
+                    height: 15px;
+                    colorize: (root.is-active || root.dropdown-open) ? CS2Theme.accent-ct-cyan : CS2Theme.text-muted;
+                    animate colorize { duration: 120ms; }
+                }
+            }
+
+            VerticalLayout {
+                alignment: center;
+                spacing: 2px;
+                horizontal-stretch: 1;
+
+                Text {
+                    text: root.is-active ? root.selected-cfg : @tr("CFG preferida");
+                    font-size: 11px;
+                    font-weight: 800;
+                    overflow: elide;
+                    color: root.is-active ? #ffffff : CS2Theme.text-muted;
+                }
+
+                Text {
+                    text: root.is-active
+                        ? @tr("CFG preferida • +exec {}", root.selected-cfg)
+                        : @tr("Selecionar arquivo .cfg");
+                    font-size: 9px;
+                    font-weight: root.is-active ? 700 : 500;
+                    overflow: elide;
+                    color: root.is-active ? CS2Theme.text-cyan : #8ea2bc;
+                }
+            }
+        }
+
+        HorizontalLayout {
+            spacing: 8px;
+            horizontal-stretch: 0;
+
+            // Selo de estado padronizado com os switches da aba Otimizações
+            Rectangle {
+                min-width: 78px;
+                height: 22px;
+                background: root.is-active ? #065f46 : CS2Theme.bg-surface;
+                border-radius: CS2Theme.radius-xs;
+                border-width: root.is-active ? 1px : 0px;
+                border-color: root.is-active ? #34d399 : transparent;
+                y: (parent.height - self.height) / 2;
+                animate background { duration: 120ms; }
+                animate border-color { duration: 120ms; }
+
+                HorizontalLayout {
+                    padding-left: 8px;
+                    padding-right: 8px;
+                    spacing: 5px;
+                    alignment: center;
+
+                    Rectangle {
+                        width: 5.5px;
+                        height: 5.5px;
+                        border-radius: 2.75px;
+                        background: root.is-active ? #6ee7b7 : CS2Theme.text-dim;
+                        y: (parent.height - self.height) / 2;
+                        animate background { duration: 120ms; }
+                    }
+
+                    Text {
+                        text: root.is-active ? @tr("Ativado") : @tr("Desativado");
+                        font-size: 8.5px;
+                        font-weight: root.is-active ? 900 : 800;
+                        letter-spacing: 0.4px;
+                        color: root.is-active ? #ffffff : CS2Theme.text-muted;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+
+            VerticalLayout {
+                alignment: center;
+                Path {
+                    width: 9px;
+                    height: 5px;
+                    viewbox-width: 10;
+                    viewbox-height: 6;
+                    stroke: (root.dropdown-open || root.is-active) ? CS2Theme.accent-ct-cyan : CS2Theme.text-muted;
+                    stroke-width: 1.8px;
+                    commands: root.dropdown-open ? "M 1 5 L 5 1 L 9 5" : "M 1 1 L 5 5 L 9 1";
+                }
+            }
+        }
+    }
+
+    touch := TouchArea {
+        mouse-cursor: root.enabled ? pointer : default;
+        changed has-hover => {
+            root.hover-changed(
+                self.has-hover,
+                root.absolute-position.x,
+                root.absolute-position.y,
+                root.width,
+                root.height
+            );
+        }
+        clicked => {
+            if root.enabled {
+                root.toggle-dropdown(
+                    root.absolute-position.x,
+                    root.absolute-position.y,
+                    root.width,
+                    root.height
+                );
+            } else {
+                root.blocked-click();
+            }
+        }
+    }
+}

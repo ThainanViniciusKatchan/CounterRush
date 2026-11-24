@@ -872,3 +872,24 @@ msgstr "Все оптимизации возвращены к стандартн
 
 msgid "CONCLUÍDO"
 msgstr "ГОТОВО"
+
+msgid "CFG preferida"
+msgstr "Предпочитаемый CFG"
+
+msgid "Selecionar arquivo .cfg"
+msgstr "Выберите файл .cfg"
+
+msgid "CFG preferida • +exec {}"
+msgstr "Предпочитаемый CFG • +exec {}"
+
+msgid "Ativado"
+msgstr "Включено"
+
+msgid "Selecione um arquivo .cfg de binds para executá-lo automaticamente sempre que o CS2 iniciar."
+msgstr "Выберите файл .cfg с биндами, чтобы CS2 автоматически загружал его при каждом запуске."
+
+msgid "Nenhuma (desativar)"
+msgstr "Нет (отключить)"
+
+msgid "Crie arquivos em Painel → Binds Táticas."
+msgstr "Создайте файлы в разделе Панель → Тактические бинды."

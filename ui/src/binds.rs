@@ -623,6 +623,7 @@ fn execute_save_bind(
     ) {
         Ok(report) => {
             let refreshed = load_cfg_names_for_dir(&dirs.local_cfg_dir);
+            ui.set_available_cfg_files(ModelRc::new(VecModel::from(refreshed.clone())));
             binds.set_existing_cfg_files(ModelRc::new(VecModel::from(refreshed)));
 
             let saved_file = match &report.outcome {
@@ -688,6 +689,7 @@ fn execute_save_bind(
 pub fn refresh_existing_cfg_files(ui: &MainWindow, dirs: &BindDirectories) {
     let binds = ui.global::<BindsState>();
     let cfg_names = load_cfg_names_for_dir(&dirs.local_cfg_dir);
+    ui.set_available_cfg_files(ModelRc::new(VecModel::from(cfg_names.clone())));
     binds.set_existing_cfg_files(ModelRc::new(VecModel::from(cfg_names)));
 }
 

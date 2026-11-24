@@ -726,6 +726,124 @@ pub fn list_cfg_files() -> Vec<PathBuf> {
     list_cfg_files_in_dir(resolve_local_cfg_dir())
 }
 
+fn is_exec_prefix_with_space(s: &str) -> bool {
+    let bytes = s.as_bytes();
+    bytes.len() > 5
+        && s.get(..5)
+            .map(|p| p.eq_ignore_ascii_case("+exec"))
+            .unwrap_or(false)
+        && s[5..]
+            .chars()
+            .next()
+            .map(char::is_whitespace)
+            .unwrap_or(false)
+}
+
+fn consume_quoted_exec_value(launch_args: &[String], start_idx: usize) -> (String, usize) {
+    let first = launch_args[start_idx].trim();
+    if first.starts_with('"') && !(first.len() > 1 && first.ends_with('"')) {
+        let mut combined = first.to_string();
+        let mut idx = start_idx + 1;
+        while idx < launch_args.len() {
+            combined.push(' ');
+            combined.push_str(launch_args[idx].trim());
+            if launch_args[idx].trim().ends_with('"') {
+                idx += 1;
+                break;
+            }
+            idx += 1;
+        }
+        let cleaned = combined.trim().trim_matches('"').trim().to_string();
+        (cleaned, idx)
+    } else {
+        let cleaned = first.trim_matches('"').trim().to_string();
+        (cleaned, start_idx + 1)
+    }
+}
+
+/// Extrai o arquivo `.cfg` configurado via `+exec` nos argumentos de inicialização.
+pub fn extract_exec_cfg_from_launch_args(launch_args: &[String]) -> Option<String> {
+    let mut found = None;
+    let mut i = 0;
+
+    while i < launch_args.len() {
+        let trimmed = launch_args[i].trim();
+        if trimmed.eq_ignore_ascii_case("+exec") {
+            if let Some(next) = launch_args.get(i + 1) {
+                let next_trimmed = next.trim();
+                if !next_trimmed.is_empty()
+                    && !next_trimmed.starts_with('-')
+                    && !next_trimmed.starts_with('+')
+                {
+                    let (raw_val, next_i) = consume_quoted_exec_value(launch_args, i + 1);
+                    if !raw_val.is_empty() {
+                        if let Ok(normalized) = validate_cfg_file_name(&raw_val) {
+                            found = Some(normalized);
+                        }
+                    }
+                    i = next_i;
+                    continue;
+                }
+            }
+            i += 1;
+        } else if is_exec_prefix_with_space(trimmed) {
+            let rest = trimmed[5..].trim().trim_matches('"').trim();
+            if !rest.is_empty() {
+                if let Ok(normalized) = validate_cfg_file_name(rest) {
+                    found = Some(normalized);
+                }
+            }
+            i += 1;
+        } else {
+            i += 1;
+        }
+    }
+
+    found
+}
+
+/// Atualiza ou remove `+exec <nomedoarquivo.cfg>` nos parâmetros de inicialização sem duplicar entradas.
+pub fn set_exec_cfg_in_launch_args(
+    launch_args: &[String],
+    cfg_file: Option<&str>,
+) -> Result<Vec<String>, CoreError> {
+    let mut result = Vec::with_capacity(launch_args.len() + 2);
+    let mut i = 0;
+
+    while i < launch_args.len() {
+        let trimmed = launch_args[i].trim();
+        if trimmed.eq_ignore_ascii_case("+exec") {
+            i += 1;
+            if let Some(next) = launch_args.get(i) {
+                let next_trimmed = next.trim();
+                if !next_trimmed.starts_with('-') && !next_trimmed.starts_with('+') {
+                    let (_, next_i) = consume_quoted_exec_value(launch_args, i);
+                    i = next_i;
+                }
+            }
+        } else if is_exec_prefix_with_space(trimmed) {
+            i += 1;
+        } else {
+            result.push(launch_args[i].clone());
+            i += 1;
+        }
+    }
+
+    if let Some(raw) = cfg_file {
+        if !raw.trim().is_empty() {
+            let normalized = validate_cfg_file_name(raw)?;
+            result.push("+exec".to_string());
+            if normalized.chars().any(char::is_whitespace) {
+                result.push(format!("\"{normalized}\""));
+            } else {
+                result.push(normalized);
+            }
+        }
+    }
+
+    Ok(result)
+}
+
 /// Lê um arquivo `.cfg` e extrai todas as linhas de bind ativas no formato `(tecla, comando)`.
 pub fn read_binds_from_cfg_file(path: &Path) -> Result<Vec<(String, String)>, CoreError> {
     let content = std::fs::read_to_string(path)?;
@@ -1101,5 +1219,85 @@ mod tests {
             std::fs::read_to_string(local_dir.join("autoexec.cfg")).unwrap(),
             "bind \"f4\" \"slot8\"\nbind \"v\" \"noclip\"\n"
         );
+    }
+
+    #[test]
+    fn test_set_and_extract_exec_cfg_basic() {
+        let initial = vec!["-fullscreen".to_string(), "-nojoy".to_string()];
+        let updated = set_exec_cfg_in_launch_args(&initial, Some("autoexec.cfg"))
+            .expect("deve adicionar +exec");
+        assert_eq!(
+            updated,
+            vec!["-fullscreen", "-nojoy", "+exec", "autoexec.cfg"]
+        );
+        assert_eq!(
+            extract_exec_cfg_from_launch_args(&updated).as_deref(),
+            Some("autoexec.cfg")
+        );
+    }
+
+    #[test]
+    fn test_set_exec_cfg_replaces_without_duplicating() {
+        let initial = vec![
+            "-console".to_string(),
+            "+exec old.cfg".to_string(),
+            "+fps_max".to_string(),
+            "240".to_string(),
+            "+EXEC".to_string(),
+            "autoexec.cfg".to_string(),
+        ];
+        let updated = set_exec_cfg_in_launch_args(&initial, Some("meuexec"))
+            .expect("deve substituir sem duplicar");
+        assert_eq!(
+            updated,
+            vec!["-console", "+fps_max", "240", "+exec", "meuexec.cfg"]
+        );
+        assert_eq!(
+            extract_exec_cfg_from_launch_args(&updated).as_deref(),
+            Some("meuexec.cfg")
+        );
+    }
+
+    #[test]
+    fn test_set_exec_cfg_none_removes_and_preserves_other_args() {
+        let initial = vec![
+            "-fullscreen".to_string(),
+            "+exec".to_string(),
+            "-nojoy".to_string(),
+            "+exec".to_string(),
+            "autoexec.cfg".to_string(),
+            "+fps_max".to_string(),
+            "240".to_string(),
+        ];
+        let cleared = set_exec_cfg_in_launch_args(&initial, None).expect("deve remover +exec");
+        assert_eq!(cleared, vec!["-fullscreen", "-nojoy", "+fps_max", "240"]);
+        assert_eq!(extract_exec_cfg_from_launch_args(&cleared), None);
+
+        let cleared_empty =
+            set_exec_cfg_in_launch_args(&cleared, Some("   ")).expect("string vazia limpa");
+        assert_eq!(cleared_empty, cleared);
+    }
+
+    #[test]
+    fn test_set_exec_cfg_handles_spaces_and_rejects_invalid_names() {
+        let updated = set_exec_cfg_in_launch_args(&[], Some("minha bind.cfg"))
+            .expect("nome com espaço deve ser aceito entre aspas");
+        assert_eq!(updated, vec!["+exec", "\"minha bind.cfg\""]);
+
+        let joined_tokens: Vec<String> = updated
+            .join(" ")
+            .split_whitespace()
+            .map(str::to_string)
+            .collect();
+        assert_eq!(
+            extract_exec_cfg_from_launch_args(&joined_tokens).as_deref(),
+            Some("minha bind.cfg")
+        );
+
+        let replaced = set_exec_cfg_in_launch_args(&joined_tokens, Some("limpo.cfg"))
+            .expect("deve substituir token com aspas dividido");
+        assert_eq!(replaced, vec!["+exec", "limpo.cfg"]);
+
+        assert!(set_exec_cfg_in_launch_args(&[], Some("../evil.cfg")).is_err());
     }
 }

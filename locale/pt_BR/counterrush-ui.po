@@ -872,3 +872,24 @@ msgstr "Todas as otimizações foram revertidas para o padrão do Windows."
 
 msgid "CONCLUÍDO"
 msgstr "CONCLUÍDO"
+
+msgid "CFG preferida"
+msgstr "CFG preferida"
+
+msgid "Selecionar arquivo .cfg"
+msgstr "Selecionar arquivo .cfg"
+
+msgid "CFG preferida • +exec {}"
+msgstr "CFG preferida • +exec {}"
+
+msgid "Ativado"
+msgstr "Ativado"
+
+msgid "Selecione um arquivo .cfg de binds para executá-lo automaticamente sempre que o CS2 iniciar."
+msgstr "Selecione um arquivo .cfg de binds para executá-lo automaticamente sempre que o CS2 iniciar."
+
+msgid "Nenhuma (desativar)"
+msgstr "Nenhuma (desativar)"
+
+msgid "Crie arquivos em Painel → Binds Táticas."
+msgstr "Crie arquivos em Painel → Binds Táticas."

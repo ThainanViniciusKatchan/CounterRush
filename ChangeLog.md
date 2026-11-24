@@ -1,7 +1,5 @@
 ### ChangeLog Versão <versão>
 
-
-
 ##### Mudanças:
 
 - Redesign completo do modal de criação de arquivos personalizado, agora o layout segue o padrão do projeto.
@@ -12,7 +10,7 @@
 
   - Agora as otimizações estão separadas por:
 
-    -  "Otimizações em game": Toda otimização que depende do processo do game em execução para ser aplicada.
+    - "Otimizações em game": Toda otimização que depende do processo do game em execução para ser aplicada.
 
     - "Otimização do sistema": Otimizações permanentes, após aplicadas uma vez, permanencem ativas até o usuário restaurar para o padrão do sistema.
 
@@ -20,11 +18,11 @@
 
 - Adicionado botão para restaurar as otimizações para o padrão, ele pode ser utilizado caso as mudanças realizadas não sejam do agrado do jogador.
 
+- Novo seletor adicionado para que seja possível selecionar um arquivo de configuração .cfg favorito que irá iniciar junto ao game, removendo a necessidade de executar o comando ``exec <NomeDoArquivo>``
+
 - Adicionada mensagem de aviso para aplicativos que podem ser reiniciados ao aplicar as otimizações.
 
 - Novos textos foram traduzidos para Russo e Inglês.
-
-
 
 ##### Correção:
 

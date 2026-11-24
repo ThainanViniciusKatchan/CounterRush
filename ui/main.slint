@@ -1,6 +1,8 @@
+import { ScrollView } from "std-widgets.slint";
 import { CS2Theme } from "theme.slint";
 import { Sidebar } from "components/sidebar.slint";
 import { TweakSwitch } from "components/tweak_switch.slint";
+import { CfgSelectorCard } from "components/cfg_selector_card.slint";
 import { TacticalButton } from "components/tactical_button.slint";
 import { PresetButton } from "components/preset_button.slint";
 import { AddPresetButton } from "components/add_preset_button.slint";
@@ -60,6 +62,13 @@ export component MainWindow inherits Window {
     in-out property <string> create-modal-error: "";
     in-out property <string> launch-args-text: "";
     in-out property <bool> is-editing-launch-args: false;
+    in-out property <[string]> available-cfg-files: [];
+    in-out property <string> selected-preferred-cfg: "";
+    in-out property <bool> cfg-dropdown-open: false;
+    property <length> cfg-dropdown-anchor-x: 0px;
+    property <length> cfg-dropdown-anchor-y: 0px;
+    property <length> cfg-dropdown-anchor-w: 526px;
+    property <length> cfg-dropdown-anchor-h: 46px;
     in-out property <bool> show-delete-modal: false;
     in-out property <string> target-delete-profile: "";
     in-out property <bool> show-no-profile-modal: false;
@@ -120,6 +129,10 @@ export component MainWindow inherits Window {
 
     changed active-tab => {
         root.hide-opt-tooltip();
+        root.cfg-dropdown-open = false;
+        if root.active-tab == 1 {
+            root.refresh-cfg-files-requested();
+        }
     }
 
     // Estado reativo geral para o botão mestre
@@ -149,6 +162,8 @@ export component MainWindow inherits Window {
     callback preset-selected(string);
     callback create-profile-confirmed(NewProfileData);
     callback save-launch-args-clicked(string);
+    callback preferred-cfg-selected(string);
+    callback refresh-cfg-files-requested();
     callback delete-profile-confirmed(string);
     callback language-selected(string);
     callback share-project-clicked();
@@ -188,7 +203,7 @@ export component MainWindow inherits Window {
         aw: length,
         ah: length
     ) {
-        if hovered {
+        if hovered && !root.cfg-dropdown-open {
             root.opt-tooltip-id = id;
             root.opt-tooltip-title = title;
             root.opt-tooltip-description = desc;
@@ -212,6 +227,7 @@ export component MainWindow inherits Window {
             tab-selected(idx) => {
                 root.close-binds-view();
                 root.hide-opt-tooltip();
+                root.cfg-dropdown-open = false;
                 if idx == 0 {
                     root.status-message = @tr("Visualizando Painel Geral");
                 } else if idx == 1 {
@@ -657,6 +673,7 @@ export component MainWindow inherits Window {
                             activate-all-touch := TouchArea {
                                 mouse-cursor: can-activate-all ? pointer : default;
                                 clicked => {
+                                    root.cfg-dropdown-open = false;
                                     if can-activate-all {
                                         root.cpu-tweak-active = true;
                                         root.timer-tweak-active = true;
@@ -724,6 +741,7 @@ export component MainWindow inherits Window {
                                     );
                                 }
                                 clicked => {
+                                    root.cfg-dropdown-open = false;
                                     if can-restore {
                                         root.hide-opt-tooltip();
                                         root.is-restoring-defaults = true;
@@ -780,15 +798,15 @@ export component MainWindow inherits Window {
                         }
                     }
 
-                    // Grade 2x2 (391px x 46px)
+                    // Grade 3 colunas alinhada com a seção Sistema (258px x 46px + CFG preferida 526px)
                     VerticalLayout {
                         spacing: 8px;
 
                         HorizontalLayout {
-                            spacing: 12px;
+                            spacing: 10px;
 
                             TweakSwitch {
-                                button-width: 391px;
+                                button-width: 258px;
                                 card-height: 46px;
                                 status-badge-mode: true;
                                 show-inline-tooltip: false;
@@ -812,7 +830,7 @@ export component MainWindow inherits Window {
                             }
 
                             TweakSwitch {
-                                button-width: 391px;
+                                button-width: 258px;
                                 card-height: 46px;
                                 status-badge-mode: true;
                                 show-inline-tooltip: false;
@@ -834,13 +852,9 @@ export component MainWindow inherits Window {
                                     root.handle-opt-tooltip-hover(hovered, "process_priority", self.label, self.tooltip-text, self.accent-color, false, ax, ay, aw, ah);
                                 }
                             }
-                        }
-
-                        HorizontalLayout {
-                            spacing: 12px;
 
                             TweakSwitch {
-                                button-width: 391px;
+                                button-width: 258px;
                                 card-height: 46px;
                                 status-badge-mode: true;
                                 show-inline-tooltip: false;
@@ -862,9 +876,13 @@ export component MainWindow inherits Window {
                                     root.handle-opt-tooltip-hover(hovered, "timer_resolution", self.label, self.tooltip-text, self.accent-color, false, ax, ay, aw, ah);
                                 }
                             }
+                        }
+
+                        HorizontalLayout {
+                            spacing: 10px;
 
                             TweakSwitch {
-                                button-width: 391px;
+                                button-width: 258px;
                                 card-height: 46px;
                                 status-badge-mode: true;
                                 show-inline-tooltip: false;
@@ -884,6 +902,42 @@ export component MainWindow inherits Window {
                                 }
                                 hover-changed(hovered, ax, ay, aw, ah) => {
                                     root.handle-opt-tooltip-hover(hovered, "empty_standby", self.label, self.tooltip-text, self.accent-color, false, ax, ay, aw, ah);
+                                }
+                            }
+
+                            CfgSelectorCard {
+                                card-width: 526px;
+                                card-height: 46px;
+                                selected-cfg: root.selected-preferred-cfg;
+                                dropdown-open: root.cfg-dropdown-open;
+                                enabled: root.has-active-profile && !root.is-restoring-defaults;
+                                toggle-dropdown(ax, ay, aw, ah) => {
+                                    root.hide-opt-tooltip();
+                                    root.cfg-dropdown-anchor-x = ax;
+                                    root.cfg-dropdown-anchor-y = ay;
+                                    root.cfg-dropdown-anchor-w = aw;
+                                    root.cfg-dropdown-anchor-h = ah;
+                                    if !root.cfg-dropdown-open {
+                                        root.refresh-cfg-files-requested();
+                                    }
+                                    root.cfg-dropdown-open = !root.cfg-dropdown-open;
+                                }
+                                blocked-click => {
+                                    root.handle-tweak-without-profile();
+                                }
+                                hover-changed(hovered, ax, ay, aw, ah) => {
+                                    root.handle-opt-tooltip-hover(
+                                        hovered,
+                                        "preferred_cfg",
+                                        @tr("CFG preferida"),
+                                        @tr("Selecione um arquivo .cfg de binds para executá-lo automaticamente sempre que o CS2 iniciar."),
+                                        CS2Theme.accent-ct-cyan,
+                                        false,
+                                        ax,
+                                        ay,
+                                        aw,
+                                        ah
+                                    );
                                 }
                             }
                         }
@@ -1367,6 +1421,7 @@ export component MainWindow inherits Window {
                     icon-src: @image-url("assets/icons/rocket.svg");
                     clicked => {
                         root.hide-opt-tooltip();
+                        root.cfg-dropdown-open = false;
                         root.auto-optimize-is-launch = false;
                         root.auto-optimize-is-restore = false;
                         root.auto-optimize-progress = 0.0;
@@ -1383,6 +1438,7 @@ export component MainWindow inherits Window {
                     is-empty: true;
                     clicked => {
                         root.hide-opt-tooltip();
+                        root.cfg-dropdown-open = false;
                         root.create-modal-error = "";
                         root.show-create-modal = true;
                     }
@@ -1436,6 +1492,7 @@ export component MainWindow inherits Window {
                         active-bg: preset.name == "AutoDetect" ? CS2Theme.accent-ct-soft : CS2Theme.accent-orange-soft;
                         button-width: root.presets.length > 2 ? 250px : 350px;
                         selected => {
+                            root.cfg-dropdown-open = false;
                             root.active-preset = preset.name;
                             root.is-editing-launch-args = false;
                             root.status-message = @tr("Perfil ativo: {}", preset.name);
@@ -1443,6 +1500,7 @@ export component MainWindow inherits Window {
                         }
                         delete => {
                             root.hide-opt-tooltip();
+                            root.cfg-dropdown-open = false;
                             root.target-delete-profile = preset.name;
                             root.show-delete-modal = true;
                         }
@@ -1452,6 +1510,7 @@ export component MainWindow inherits Window {
                         is-empty: false;
                         clicked => {
                             root.hide-opt-tooltip();
+                            root.cfg-dropdown-open = false;
                             root.create-modal-error = "";
                             root.show-create-modal = true;
                         }
@@ -2061,7 +2120,7 @@ export component MainWindow inherits Window {
     }
 
     // Popup flutuante sólido e adaptativo para descrições da aba Otimizações
-    if root.opt-tooltip-visible && root.active-tab == 1 && !root.show-binds-view && !root.show-create-modal && !root.show-delete-modal && !root.show-no-profile-modal && !root.show-in-development-modal && !root.show-auto-optimize-modal : Rectangle {
+    if root.opt-tooltip-visible && !root.cfg-dropdown-open && root.active-tab == 1 && !root.show-binds-view && !root.show-create-modal && !root.show-delete-modal && !root.show-no-profile-modal && !root.show-in-development-modal && !root.show-auto-optimize-modal : Rectangle {
         property <length> content-left-x: 160px;
         property <length> content-right-x: max(content-left-x, root.width - self.width - 12px);
         property <length> local-anchor-x: root.opt-tooltip-anchor-x - root.absolute-position.x;
@@ -2104,6 +2163,164 @@ export component MainWindow inherits Window {
                 font-weight: 600;
                 color: #f8fafc;
                 wrap: word-wrap;
+            }
+        }
+    }
+
+    // Overlay do Dropdown de seleção da CFG preferida na aba Otimizações
+    if root.cfg-dropdown-open && root.active-tab == 1 && !root.show-binds-view && !root.show-create-modal && !root.show-delete-modal && !root.show-no-profile-modal && !root.show-in-development-modal && !root.show-auto-optimize-modal : TouchArea {
+        clicked => {
+            root.cfg-dropdown-open = false;
+        }
+    }
+
+    if root.cfg-dropdown-open && root.active-tab == 1 && !root.show-binds-view && !root.show-create-modal && !root.show-delete-modal && !root.show-no-profile-modal && !root.show-in-development-modal && !root.show-auto-optimize-modal : Rectangle {
+        x: clamp(root.cfg-dropdown-anchor-x - root.absolute-position.x, 160px, root.width - self.width - 12px);
+        y: root.cfg-dropdown-anchor-y - root.absolute-position.y + root.cfg-dropdown-anchor-h + 6px;
+        width: root.cfg-dropdown-anchor-w;
+        height: root.available-cfg-files.length == 0
+            ? 104px
+            : min(226px, 46px + root.available-cfg-files.length * 32px);
+        background: CS2Theme.bg-surface-elevated;
+        border-radius: CS2Theme.radius-sm;
+        border-width: 1px;
+        border-color: CS2Theme.accent-ct-cyan;
+        drop-shadow-color: rgba(0, 0, 0, 0.58);
+        drop-shadow-blur: 14px;
+        drop-shadow-offset-y: 6px;
+        clip: true;
+
+        TouchArea { }
+
+        VerticalLayout {
+            padding: 4px;
+            spacing: 2px;
+
+            Rectangle {
+                property <bool> is-none: root.selected-preferred-cfg == "";
+                height: 30px;
+                border-radius: CS2Theme.radius-xs;
+                background: is-none
+                    ? CS2Theme.bg-card-selected
+                    : (none-cfg-touch.has-hover ? CS2Theme.bg-card-hover : transparent);
+
+                HorizontalLayout {
+                    padding-left: 10px;
+                    padding-right: 10px;
+                    alignment: space-between;
+
+                    Text {
+                        text: @tr("Nenhuma (desativar)");
+                        font-size: 11px;
+                        font-weight: is-none ? 800 : 600;
+                        color: is-none ? CS2Theme.text-primary : CS2Theme.text-muted;
+                        vertical-alignment: center;
+                    }
+                }
+
+                none-cfg-touch := TouchArea {
+                    mouse-cursor: pointer;
+                    clicked => {
+                        root.selected-preferred-cfg = "";
+                        root.cfg-dropdown-open = false;
+                        root.is-editing-launch-args = false;
+                        root.preferred-cfg-selected("");
+                    }
+                }
+            }
+
+            Rectangle {
+                height: 1px;
+                background: CS2Theme.border;
+            }
+
+            if root.available-cfg-files.length == 0 : VerticalLayout {
+                vertical-stretch: 1;
+                alignment: center;
+                spacing: 2px;
+
+                Text {
+                    text: @tr("Nenhum arquivo .cfg encontrado");
+                    font-size: 11px;
+                    font-weight: 700;
+                    color: CS2Theme.text-muted;
+                    horizontal-alignment: center;
+                }
+
+                Text {
+                    text: @tr("Crie arquivos em Painel → Binds Táticas.");
+                    font-size: 9.5px;
+                    color: #8ea2bc;
+                    horizontal-alignment: center;
+                }
+            }
+
+            if root.available-cfg-files.length > 0 : ScrollView {
+                vertical-stretch: 1;
+
+                VerticalLayout {
+                    spacing: 2px;
+
+                    for cfg-name in root.available-cfg-files : Rectangle {
+                        property <bool> is-current: cfg-name == root.selected-preferred-cfg;
+                        height: 30px;
+                        border-radius: CS2Theme.radius-xs;
+                        background: is-current
+                            ? CS2Theme.accent-ct-soft
+                            : (cfg-opt-touch.has-hover ? CS2Theme.bg-card-hover : transparent);
+
+                        HorizontalLayout {
+                            padding-left: 10px;
+                            padding-right: 10px;
+                            spacing: 8px;
+                            alignment: space-between;
+
+                            HorizontalLayout {
+                                spacing: 8px;
+                                horizontal-stretch: 1;
+
+                                VerticalLayout {
+                                    alignment: center;
+                                    horizontal-stretch: 0;
+                                    Image {
+                                        source: @image-url("assets/icons/cfg.svg");
+                                        width: 13px;
+                                        height: 13px;
+                                        colorize: is-current ? CS2Theme.accent-ct-cyan : CS2Theme.text-muted;
+                                    }
+                                }
+
+                                Text {
+                                    text: cfg-name;
+                                    font-size: 11px;
+                                    font-weight: is-current ? 800 : 600;
+                                    color: is-current ? CS2Theme.text-cyan : CS2Theme.text-primary;
+                                    vertical-alignment: center;
+                                    overflow: elide;
+                                    horizontal-stretch: 1;
+                                }
+                            }
+
+                            if is-current : Text {
+                                text: @tr("ATIVO");
+                                font-size: 8px;
+                                font-weight: 900;
+                                color: CS2Theme.text-cyan;
+                                vertical-alignment: center;
+                            }
+                        }
+
+                        cfg-opt-touch := TouchArea {
+                            mouse-cursor: pointer;
+                            clicked => {
+                                root.selected-preferred-cfg = cfg-name;
+                                root.cfg-dropdown-open = false;
+                                root.is-editing-launch-args = false;
+                                root.preferred-cfg-selected(cfg-name);
+                            }
+                        }
+                    }
+                }
             }
         }
     }

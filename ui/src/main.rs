@@ -7,6 +7,21 @@ mod binds_i18n;
 mod i18n;
 mod tray;
 
+fn scan_cfg_files() -> Vec<slint::SharedString> {
+    counterrush_core::list_cfg_files()
+        .into_iter()
+        .filter_map(|p| {
+            p.file_name()
+                .and_then(|n| n.to_str())
+                .map(slint::SharedString::from)
+        })
+        .collect()
+}
+
+fn preferred_cfg_from_config(cfg: &counterrush_core::config::CustomOptimizationConfig) -> String {
+    counterrush_core::extract_exec_cfg_from_launch_args(&cfg.launch_args).unwrap_or_default()
+}
+
 fn scan_presets() -> Vec<PresetModel> {
     let files = counterrush_core::list_optimization_configs();
     let mut list = Vec::new();
@@ -101,6 +116,8 @@ impl Tweaks {
 
 fn enforce_neutral_no_profile_state(ui: &MainWindow, status_msg: &str) {
     Tweaks::default().apply_to_ui(ui);
+    ui.set_selected_preferred_cfg("".into());
+    ui.set_cfg_dropdown_open(false);
     ui.set_status_message(status_msg.into());
 }
 
@@ -118,6 +135,7 @@ enum Command {
     PresetSelected { name: String },
     CreateProfile { name: String, launch_args: String, tweaks: Tweaks },
     SaveLaunchArgs { args: String },
+    SelectPreferredCfg { cfg_file: String },
     DeleteProfile { name: String, active: String },
 }
 
@@ -220,6 +238,9 @@ fn execute_command(
             tweaks,
         } => create_profile(ui, config_path, name, launch_args, tweaks, lang),
         Command::SaveLaunchArgs { args } => save_launch_args(ui, config_path, args, lang),
+        Command::SelectPreferredCfg { cfg_file } => {
+            select_preferred_cfg(ui, config_path, cfg_file, lang)
+        }
         Command::DeleteProfile { name, active } => {
             delete_profile(ui, config_path, name, active, lang)
         }
@@ -741,6 +762,7 @@ fn run_auto_optimize_flow(
 
     let updated_presets = scan_presets();
     let args_text = config.launch_args.join(" ");
+    let preferred_cfg = preferred_cfg_from_config(&config);
     let tweaks = Tweaks::from_config(&config);
     let msg = i18n::auto_optimize_completed_status(
         lang,
@@ -756,6 +778,7 @@ fn run_auto_optimize_flow(
         ui.set_presets(slint::ModelRc::new(slint::VecModel::from(updated_presets)));
         ui.set_active_preset("AutoDetect".into());
         ui.set_launch_args_text(args_text.into());
+        ui.set_selected_preferred_cfg(preferred_cfg.into());
         ui.set_is_editing_launch_args(false);
         tweaks.apply_to_ui(ui);
         ui.set_status_message(msg.into());
@@ -1331,12 +1354,15 @@ fn select_preset(
         Ok(mut cfg) => {
             save_active_preset_setting(Some(preset_name.clone()));
             let args_text = cfg.launch_args.join(" ");
+            let preferred_cfg = preferred_cfg_from_config(&cfg);
             let _ = merge_cache_into_config(&mut cfg, applied_cache);
             let tweaks = Tweaks::from_config(&cfg);
             let msg = i18n::preset_selected_ok(lang, &preset_name);
 
             post_ui(ui, move |ui| {
                 ui.set_launch_args_text(args_text.into());
+                ui.set_selected_preferred_cfg(preferred_cfg.into());
+                ui.set_cfg_dropdown_open(false);
                 ui.set_is_editing_launch_args(false);
                 tweaks.apply_to_ui(ui);
                 ui.set_status_message(msg.into());
@@ -1382,11 +1408,14 @@ fn create_profile(
 
             let updated_presets = scan_presets();
             let args_text = new_config.launch_args.join(" ");
+            let preferred_cfg = preferred_cfg_from_config(&new_config);
             let ok_msg = i18n::profile_created_ok(lang, &clean_name);
             post_ui(ui, move |ui| {
                 ui.set_presets(slint::ModelRc::new(slint::VecModel::from(updated_presets)));
                 ui.set_active_preset(clean_name.as_str().into());
                 ui.set_launch_args_text(args_text.into());
+                ui.set_selected_preferred_cfg(preferred_cfg.into());
+                ui.set_cfg_dropdown_open(false);
                 ui.set_is_editing_launch_args(false);
                 tweaks.apply_to_ui(ui);
                 ui.set_create_modal_error("".into());
@@ -1425,15 +1454,87 @@ fn save_launch_args(
                 .unwrap_or("profile")
                 .to_string();
             let args_text = config.launch_args.join(" ");
+            let preferred_cfg = preferred_cfg_from_config(&config);
             let msg = i18n::launch_args_saved(lang, &file_stem);
             post_ui(ui, move |ui| {
                 ui.set_status_message(msg.into());
                 ui.set_launch_args_text(args_text.into());
+                ui.set_selected_preferred_cfg(preferred_cfg.into());
             });
         }
         Err(err) => {
             let msg = i18n::launch_args_save_err(lang, &err);
             post_ui(ui, move |ui| ui.set_status_message(msg.into()));
+        }
+    }
+}
+
+fn select_preferred_cfg(
+    ui: &slint::Weak<MainWindow>,
+    config_path: &std::sync::Arc<std::sync::RwLock<std::path::PathBuf>>,
+    cfg_file: String,
+    lang: i18n::UiLanguage,
+) {
+    let target_path = config_path.read().map(|p| p.clone()).unwrap_or_default();
+    if target_path.as_os_str().is_empty() {
+        reject_tweak_without_profile(ui);
+        return;
+    }
+
+    let mut config = counterrush_core::config::CustomOptimizationConfig::load_from_file(&target_path)
+        .unwrap_or_default();
+    let trimmed = cfg_file.trim();
+    let desired = if trimmed.is_empty() {
+        None
+    } else {
+        Some(trimmed)
+    };
+
+    let updated_args = match counterrush_core::set_exec_cfg_in_launch_args(&config.launch_args, desired) {
+        Ok(args) => args,
+        Err(err) => {
+            let actual_cfg = preferred_cfg_from_config(&config);
+            let msg = i18n::preferred_cfg_save_err(lang, &err);
+            post_ui(ui, move |ui| {
+                ui.set_selected_preferred_cfg(actual_cfg.into());
+                ui.set_status_message(msg.into());
+            });
+            return;
+        }
+    };
+    config.launch_args = updated_args;
+
+    let file_stem = target_path
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("profile")
+        .to_string();
+
+    match config.save_to_file(&target_path) {
+        Ok(_) => {
+            let args_text = config.launch_args.join(" ");
+            let final_cfg = preferred_cfg_from_config(&config);
+            let msg = if final_cfg.is_empty() {
+                i18n::preferred_cfg_cleared(lang, &file_stem)
+            } else {
+                i18n::preferred_cfg_selected(lang, &final_cfg, &file_stem)
+            };
+            post_ui(ui, move |ui| {
+                ui.set_launch_args_text(args_text.into());
+                ui.set_selected_preferred_cfg(final_cfg.into());
+                ui.set_is_editing_launch_args(false);
+                ui.set_status_message(msg.into());
+            });
+        }
+        Err(err) => {
+            let actual_cfg = counterrush_core::config::CustomOptimizationConfig::load_from_file(&target_path)
+                .map(|c| preferred_cfg_from_config(&c))
+                .unwrap_or_default();
+            let msg = i18n::preferred_cfg_save_err(lang, &err);
+            post_ui(ui, move |ui| {
+                ui.set_selected_preferred_cfg(actual_cfg.into());
+                ui.set_status_message(msg.into());
+            });
         }
     }
 }
@@ -1459,8 +1560,7 @@ fn delete_profile(
                     ui.set_active_preset("".into());
                     ui.set_launch_args_text("".into());
                     ui.set_is_editing_launch_args(false);
-                    Tweaks::default().apply_to_ui(ui);
-                    ui.set_status_message(msg.into());
+                    enforce_neutral_no_profile_state(ui, &msg);
                 });
             } else if active == name {
                 let first_preset_name = updated_presets[0].name.to_string();
@@ -1473,11 +1573,14 @@ fn delete_profile(
                     .unwrap_or_default();
                 let tweaks = Tweaks::from_config(&cfg);
                 let args_text = cfg.launch_args.join(" ");
+                let preferred_cfg = preferred_cfg_from_config(&cfg);
                 let msg = i18n::profile_deleted_switched(lang, &name, &first_preset_name);
                 post_ui(ui, move |ui| {
                     ui.set_presets(slint::ModelRc::new(slint::VecModel::from(updated_presets)));
                     ui.set_active_preset(first_preset_name.as_str().into());
                     ui.set_launch_args_text(args_text.into());
+                    ui.set_selected_preferred_cfg(preferred_cfg.into());
+                    ui.set_cfg_dropdown_open(false);
                     ui.set_is_editing_launch_args(false);
                     tweaks.apply_to_ui(ui);
                     ui.set_status_message(msg.into());
@@ -1606,7 +1709,10 @@ fn main() -> Result<(), slint::PlatformError> {
     main_window.set_available_languages(slint::ModelRc::new(slint::VecModel::from(language_items)));
     main_window.set_active_language(target_lang.into());
 
-    // Inicializa a lista de perfis de otimização na interface a partir do disco
+    // Inicializa a lista de perfis de otimização e arquivos .cfg na interface a partir do disco
+    let initial_cfg_files = scan_cfg_files();
+    main_window.set_available_cfg_files(slint::ModelRc::new(slint::VecModel::from(initial_cfg_files.clone())));
+
     let initial_presets = scan_presets();
     main_window.set_presets(slint::ModelRc::new(slint::VecModel::from(initial_presets.clone())));
 
@@ -1641,6 +1747,7 @@ fn main() -> Result<(), slint::PlatformError> {
         }
 
         main_window.set_launch_args_text(c.launch_args.join(" ").into());
+        main_window.set_selected_preferred_cfg(preferred_cfg_from_config(&c).into());
         main_window.set_is_editing_launch_args(false);
         Tweaks::from_config(&c).apply_to_ui(&main_window);
         main_window.set_status_message(i18n::ready_status_message(initial_lang_enum).into());
@@ -1738,13 +1845,28 @@ fn main() -> Result<(), slint::PlatformError> {
         let mut tracked_path = std::path::PathBuf::new();
         let mut loop_count = 0usize;
         let mut last_preset_names: Vec<String> = initial_presets.iter().map(|p| p.name.to_string()).collect();
+        let mut last_cfg_names: Vec<String> = initial_cfg_files.iter().map(|c| c.to_string()).collect();
 
         loop {
             std::thread::sleep(std::time::Duration::from_millis(500));
 
-            // Monitora criação/remoção de arquivos na pasta config/optimzations
+            // Monitora criação/remoção de arquivos nas pastas config/optimzations e config/cfg
             loop_count += 1;
             if loop_count % 3 == 0 {
+                let current_cfgs = scan_cfg_files();
+                let current_cfg_names: Vec<String> = current_cfgs.iter().map(|c| c.to_string()).collect();
+                if current_cfg_names != last_cfg_names {
+                    last_cfg_names = current_cfg_names;
+                    let _ = slint::invoke_from_event_loop({
+                        let handle = sync_window_handle.clone();
+                        move || {
+                            if let Some(ui) = handle.upgrade() {
+                                ui.set_available_cfg_files(slint::ModelRc::new(slint::VecModel::from(current_cfgs)));
+                            }
+                        }
+                    });
+                }
+
                 let current_presets = scan_presets();
                 let current_names: Vec<String> = current_presets.iter().map(|p| p.name.to_string()).collect();
                 if current_names != last_preset_names {
@@ -1784,7 +1906,9 @@ fn main() -> Result<(), slint::PlatformError> {
                                         ui.set_active_preset(first_preset.as_str().into());
                                         if let Ok(cfg) = counterrush_core::config::CustomOptimizationConfig::load_from_file(&target) {
                                             ui.set_launch_args_text(cfg.launch_args.join(" ").into());
+                                            ui.set_selected_preferred_cfg(preferred_cfg_from_config(&cfg).into());
                                         }
+                                        ui.set_cfg_dropdown_open(false);
                                         ui.set_is_editing_launch_args(false);
                                     }
                                 }
@@ -1829,6 +1953,10 @@ fn main() -> Result<(), slint::PlatformError> {
                                             let joined_args = cfg.launch_args.join(" ");
                                             if ui.get_launch_args_text() != joined_args.as_str() {
                                                 ui.set_launch_args_text(joined_args.into());
+                                            }
+                                            let preferred_cfg = preferred_cfg_from_config(&cfg);
+                                            if ui.get_selected_preferred_cfg() != preferred_cfg.as_str() {
+                                                ui.set_selected_preferred_cfg(preferred_cfg.into());
                                             }
                                         }
                                         if ui.get_cpu_tweak_active() != cfg.cs2_affinity {
@@ -2233,6 +2361,21 @@ fn main() -> Result<(), slint::PlatformError> {
         let _ = save_args_sender.send(Command::SaveLaunchArgs {
             args: args_str.to_string(),
         });
+    });
+
+    // Callback para seleção de CFG preferida (+exec <arquivo.cfg>) na aba Otimizações
+    let preferred_cfg_sender = command_sender.clone();
+    main_window.on_preferred_cfg_selected(move |cfg_file| {
+        let _ = preferred_cfg_sender.send(Command::SelectPreferredCfg {
+            cfg_file: cfg_file.to_string(),
+        });
+    });
+
+    let refresh_cfg_ui = main_window.as_weak();
+    main_window.on_refresh_cfg_files_requested(move || {
+        if let Some(ui) = refresh_cfg_ui.upgrade() {
+            ui.set_available_cfg_files(slint::ModelRc::new(slint::VecModel::from(scan_cfg_files())));
+        }
     });
 
     // Callback para exclusão de perfil de otimização (.json)

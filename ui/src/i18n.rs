@@ -1209,6 +1209,42 @@ pub fn launch_args_save_err(lang: UiLanguage, err: &dyn std::fmt::Display) -> St
     }
 }
 
+pub fn preferred_cfg_selected(lang: UiLanguage, cfg_file: &str, profile_name: &str) -> String {
+    match lang {
+        UiLanguage::EnUs => {
+            format!("Preferred CFG '{cfg_file}' added to profile '{profile_name}' (+exec {cfg_file}).")
+        }
+        UiLanguage::RuRu => {
+            format!("Предпочитаемый CFG «{cfg_file}» добавлен в профиль «{profile_name}» (+exec {cfg_file}).")
+        }
+        UiLanguage::PtBr => {
+            format!("CFG preferida '{cfg_file}' adicionada ao perfil '{profile_name}' (+exec {cfg_file}).")
+        }
+    }
+}
+
+pub fn preferred_cfg_cleared(lang: UiLanguage, profile_name: &str) -> String {
+    match lang {
+        UiLanguage::EnUs => {
+            format!("Preferred CFG removed from profile '{profile_name}' launch parameters.")
+        }
+        UiLanguage::RuRu => {
+            format!("Предпочитаемый CFG удалён из параметров запуска профиля «{profile_name}».")
+        }
+        UiLanguage::PtBr => {
+            format!("CFG preferida removida dos parâmetros do perfil '{profile_name}'.")
+        }
+    }
+}
+
+pub fn preferred_cfg_save_err(lang: UiLanguage, err: &dyn std::fmt::Display) -> String {
+    match lang {
+        UiLanguage::EnUs => format!("Failed to save preferred CFG: {err}"),
+        UiLanguage::RuRu => format!("Не удалось сохранить предпочитаемый CFG: {err}"),
+        UiLanguage::PtBr => format!("Falha ao salvar CFG preferida: {err}"),
+    }
+}
+
 pub fn profile_deleted_empty(lang: UiLanguage, name: &str) -> String {
     match lang {
         UiLanguage::EnUs => format!("Profile '{name}' deleted successfully. No profiles remaining."),
