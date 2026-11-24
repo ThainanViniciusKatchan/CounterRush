@@ -114,8 +114,84 @@ impl Tweaks {
     }
 }
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+struct InGameRuntimeState {
+    cpu: bool,
+    priority: bool,
+    timer: bool,
+    ram: bool,
+    cs2_seen_running: bool,
+    applied_at: Option<std::time::Instant>,
+}
+
+impl InGameRuntimeState {
+    fn any_applied(&self) -> bool {
+        self.cpu || self.priority || self.timer || self.ram
+    }
+
+    fn apply_to_ui(&self, ui: &MainWindow) {
+        if ui.get_cpu_tweak_applied() != self.cpu {
+            ui.set_cpu_tweak_applied(self.cpu);
+        }
+        if ui.get_priority_tweak_applied() != self.priority {
+            ui.set_priority_tweak_applied(self.priority);
+        }
+        if ui.get_timer_tweak_applied() != self.timer {
+            ui.set_timer_tweak_applied(self.timer);
+        }
+        if ui.get_ram_tweak_applied() != self.ram {
+            ui.set_ram_tweak_applied(self.ram);
+        }
+    }
+
+    fn clear(&mut self) {
+        self.cpu = false;
+        self.priority = false;
+        self.timer = false;
+        self.ram = false;
+        self.cs2_seen_running = false;
+        self.applied_at = None;
+    }
+}
+
+type InGameAppliedCache = std::sync::Arc<std::sync::Mutex<InGameRuntimeState>>;
+
+fn clear_in_game_applied(ui: &slint::Weak<MainWindow>, cache: &InGameAppliedCache) {
+    if let Ok(mut guard) = cache.lock() {
+        guard.clear();
+    }
+    post_ui(ui, |ui| {
+        InGameRuntimeState::default().apply_to_ui(ui);
+    });
+}
+
+fn update_in_game_applied<F>(
+    ui: &slint::Weak<MainWindow>,
+    cache: &InGameAppliedCache,
+    updater: F,
+) where
+    F: FnOnce(&mut InGameRuntimeState),
+{
+    let snapshot = if let Ok(mut guard) = cache.lock() {
+        updater(&mut guard);
+        if guard.any_applied() && guard.applied_at.is_none() {
+            guard.applied_at = Some(std::time::Instant::now());
+        } else if !guard.any_applied() {
+            guard.cs2_seen_running = false;
+            guard.applied_at = None;
+        }
+        *guard
+    } else {
+        InGameRuntimeState::default()
+    };
+    post_ui(ui, move |ui| {
+        snapshot.apply_to_ui(ui);
+    });
+}
+
 fn enforce_neutral_no_profile_state(ui: &MainWindow, status_msg: &str) {
     Tweaks::default().apply_to_ui(ui);
+    InGameRuntimeState::default().apply_to_ui(ui);
     ui.set_selected_preferred_cfg("".into());
     ui.set_cfg_dropdown_open(false);
     ui.set_status_message(status_msg.into());
@@ -207,12 +283,20 @@ fn spawn_command_worker(
     ui: slint::Weak<MainWindow>,
     config_path: std::sync::Arc<std::sync::RwLock<std::path::PathBuf>>,
     applied_cache: AppliedSystemCache,
+    in_game_cache: InGameAppliedCache,
     active_lang: std::sync::Arc<std::sync::atomic::AtomicU8>,
 ) -> std::sync::mpsc::Sender<Command> {
     let (sender, receiver) = std::sync::mpsc::channel::<Command>();
     std::thread::spawn(move || {
         while let Ok(command) = receiver.recv() {
-            execute_command(command, &ui, &config_path, &applied_cache, &active_lang);
+            execute_command(
+                command,
+                &ui,
+                &config_path,
+                &applied_cache,
+                &in_game_cache,
+                &active_lang,
+            );
         }
     });
     sender
@@ -223,14 +307,17 @@ fn execute_command(
     ui: &slint::Weak<MainWindow>,
     config_path: &std::sync::Arc<std::sync::RwLock<std::path::PathBuf>>,
     applied_cache: &AppliedSystemCache,
+    in_game_cache: &InGameAppliedCache,
     active_lang: &std::sync::Arc<std::sync::atomic::AtomicU8>,
 ) {
     let lang = i18n::UiLanguage::load_atomic(active_lang);
     match command {
         Command::TweakToggled { name, active } => {
-            apply_tweak(ui, config_path, applied_cache, name, active, lang)
+            apply_tweak(ui, config_path, applied_cache, in_game_cache, name, active, lang)
         }
-        Command::BulkTweaksAction { action } => apply_bulk_action(ui, config_path, action),
+        Command::BulkTweaksAction { action } => {
+            apply_bulk_action(ui, config_path, in_game_cache, action)
+        }
         Command::PresetSelected { name } => select_preset(ui, config_path, applied_cache, name, lang),
         Command::CreateProfile {
             name,
@@ -251,6 +338,7 @@ fn apply_tweak(
     ui: &slint::Weak<MainWindow>,
     config_path: &std::sync::Arc<std::sync::RwLock<std::path::PathBuf>>,
     applied_cache: &AppliedSystemCache,
+    in_game_cache: &InGameAppliedCache,
     tweak_name: String,
     active: bool,
     lang: i18n::UiLanguage,
@@ -262,6 +350,18 @@ fn apply_tweak(
     }
 
     if !active {
+        if matches!(
+            tweak_name.as_str(),
+            "cpu_core_0" | "process_priority" | "timer_resolution" | "empty_standby"
+        ) {
+            update_in_game_applied(ui, in_game_cache, |state| match tweak_name.as_str() {
+                "cpu_core_0" => state.cpu = false,
+                "process_priority" => state.priority = false,
+                "timer_resolution" => state.timer = false,
+                "empty_standby" => state.ram = false,
+                _ => {}
+            });
+        }
         if let Some(kind) = permanent_kind_from_tweak_name(&tweak_name) {
             let core = counterrush_core::OptimizerCore::default();
             let was_applied = core.is_permanent_tweak_applied(kind).unwrap_or(false);
@@ -326,6 +426,7 @@ fn apply_tweak(
 fn apply_bulk_action(
     ui: &slint::Weak<MainWindow>,
     config_path: &std::sync::Arc<std::sync::RwLock<std::path::PathBuf>>,
+    in_game_cache: &InGameAppliedCache,
     action: String,
 ) {
     let target_path = config_path.read().map(|p| p.clone()).unwrap_or_default();
@@ -354,8 +455,14 @@ fn apply_bulk_action(
             render_queue: true,
         }
         .apply_to_config(&mut config),
-        "deactivate_all" => Tweaks::default().apply_to_config(&mut config),
-        "reset_defaults" => config = Default::default(),
+        "deactivate_all" => {
+            Tweaks::default().apply_to_config(&mut config);
+            clear_in_game_applied(ui, in_game_cache);
+        }
+        "reset_defaults" => {
+            config = Default::default();
+            clear_in_game_applied(ui, in_game_cache);
+        }
         _ => {}
     }
     let _ = config.save_to_file(&target_path);
@@ -796,6 +903,13 @@ fn save_active_preset_setting(preset_name: Option<String>) {
     }
 }
 
+struct ConfiguredExecutionResult {
+    applied_tweaks: Vec<AppliedSessionTweak>,
+    config_dirty: bool,
+    timer_applied: bool,
+    ram_applied: bool,
+}
+
 fn execute_configured_tweaks_with_modal(
     ui: &slint::Weak<MainWindow>,
     core: &counterrush_core::OptimizerCore,
@@ -805,11 +919,13 @@ fn execute_configured_tweaks_with_modal(
     step_duration: std::time::Duration,
     cancel_msg: &str,
     active_lang: &std::sync::Arc<std::sync::atomic::AtomicU8>,
-) -> Option<(Vec<AppliedSessionTweak>, bool)> {
+) -> Option<ConfiguredExecutionResult> {
     let mut applied_tweaks = Vec::new();
     let mut config_dirty = false;
+    let mut timer_applied = false;
+    let mut ram_applied = false;
     let cancel_and_rollback =
-        |applied: Vec<AppliedSessionTweak>| -> Option<(Vec<AppliedSessionTweak>, bool)> {
+        |applied: Vec<AppliedSessionTweak>| -> Option<ConfiguredExecutionResult> {
             rollback_applied_tweaks(core, applied, applied_cache);
             let msg = cancel_msg.to_string();
             post_ui(ui, move |ui| {
@@ -969,6 +1085,11 @@ fn execute_configured_tweaks_with_modal(
         } else {
             update_auto_optimize_ui(ui, step.progress, applying_label);
             if (step.apply_fn)(core) {
+                match step.tweak_id {
+                    "empty_standby_list" => ram_applied = true,
+                    "apply_timer_resolution" => timer_applied = true,
+                    _ => {}
+                }
                 if let Some(t) = step.session_tweak {
                     applied_tweaks.push(t);
                 }
@@ -980,13 +1101,19 @@ fn execute_configured_tweaks_with_modal(
         }
     }
 
-    Some((applied_tweaks, config_dirty))
+    Some(ConfiguredExecutionResult {
+        applied_tweaks,
+        config_dirty,
+        timer_applied,
+        ram_applied,
+    })
 }
 
 fn run_steam_auto_optimize_flow(
     ui: &slint::Weak<MainWindow>,
     config_path: &std::sync::Arc<std::sync::RwLock<std::path::PathBuf>>,
     applied_cache: &AppliedSystemCache,
+    in_game_cache: &InGameAppliedCache,
     pid: u32,
     token: &std::sync::Arc<std::sync::atomic::AtomicBool>,
     monitor_weak: &std::sync::Weak<counterrush_core::GameMonitorService>,
@@ -1058,7 +1185,7 @@ fn run_steam_auto_optimize_flow(
     }
 
     let cancel_msg = i18n::steam_auto_cancelled(i18n::UiLanguage::load_atomic(active_lang));
-    let steps_dirty = match execute_configured_tweaks_with_modal(
+    let exec_res = match execute_configured_tweaks_with_modal(
         ui,
         &core,
         &mut config,
@@ -1068,9 +1195,13 @@ fn run_steam_auto_optimize_flow(
         cancel_msg,
         active_lang,
     ) {
-        Some((_, dirty)) => dirty,
-        None => return,
+        Some(res) => res,
+        None => {
+            clear_in_game_applied(ui, in_game_cache);
+            return;
+        }
     };
+    let steps_dirty = exec_res.config_dirty;
 
     if hw_dirty || steps_dirty {
         let _ = config.save_to_file(&resolved_cfg_path);
@@ -1078,21 +1209,32 @@ fn run_steam_auto_optimize_flow(
         post_ui(ui, move |ui| updated_tweaks.apply_to_ui(ui));
     }
 
+    let is_running = counterrush_core::windows_api::is_pid_alive(pid)
+        || counterrush_core::windows_api::is_cs2_process_running_win32().unwrap_or(false);
+    let mut priority_applied = false;
+    let mut cpu_applied = false;
     if config.cs2_priority || config.cs2_affinity {
         let lang = i18n::UiLanguage::load_atomic(active_lang);
         update_auto_optimize_ui(ui, 0.96, i18n::steam_auto_applying_process(lang));
-        let is_running = counterrush_core::windows_api::is_pid_alive(pid)
-            || counterrush_core::windows_api::is_cs2_process_running_win32().unwrap_or(false);
         if is_running {
             use counterrush_core::tweaks::Tweak;
-            if config.cs2_priority {
-                let _ = counterrush_core::tweaks::Cs2PriorityTweak.apply();
+            if config.cs2_priority && counterrush_core::tweaks::Cs2PriorityTweak.apply().is_ok() {
+                priority_applied = true;
             }
-            if config.cs2_affinity {
-                let _ = counterrush_core::tweaks::Cs2AffinityTweak.apply();
+            if config.cs2_affinity && counterrush_core::tweaks::Cs2AffinityTweak.apply().is_ok() {
+                cpu_applied = true;
             }
         }
     }
+
+    update_in_game_applied(ui, in_game_cache, |state| {
+        state.cpu = cpu_applied;
+        state.priority = priority_applied;
+        state.timer = exec_res.timer_applied;
+        state.ram = exec_res.ram_applied;
+        state.cs2_seen_running = is_running;
+        state.applied_at = Some(std::time::Instant::now());
+    });
 
     let profile_label = resolved_cfg_path
         .file_stem()
@@ -1140,6 +1282,7 @@ fn run_launch_flow(
     ui: &slint::Weak<MainWindow>,
     config_path: &std::sync::Arc<std::sync::RwLock<std::path::PathBuf>>,
     applied_cache: &AppliedSystemCache,
+    in_game_cache: &InGameAppliedCache,
     fallback_path: std::path::PathBuf,
     token: std::sync::Arc<std::sync::atomic::AtomicBool>,
     active_lang: std::sync::Arc<std::sync::atomic::AtomicU8>,
@@ -1190,7 +1333,7 @@ fn run_launch_flow(
     }
 
     let cancel_msg = i18n::launch_cancelled_reverted(i18n::UiLanguage::load_atomic(&active_lang));
-    let (applied_tweaks, steps_dirty) = match execute_configured_tweaks_with_modal(
+    let exec_res = match execute_configured_tweaks_with_modal(
         ui,
         &core,
         &mut config,
@@ -1201,12 +1344,20 @@ fn run_launch_flow(
         &active_lang,
     ) {
         Some(res) => res,
-        None => return,
+        None => {
+            clear_in_game_applied(ui, in_game_cache);
+            return;
+        }
     };
+    let applied_tweaks = exec_res.applied_tweaks;
+    let steps_dirty = exec_res.config_dirty;
+    let timer_applied = exec_res.timer_applied;
+    let ram_applied = exec_res.ram_applied;
 
     // Etapa 13: Verificação de Download/Atualização Ativa da Steam e Inicialização
     if token.load(std::sync::atomic::Ordering::SeqCst) {
         rollback_applied_tweaks(&core, applied_tweaks, applied_cache);
+        clear_in_game_applied(ui, in_game_cache);
         let msg = i18n::launch_cancelled_reverted(i18n::UiLanguage::load_atomic(&active_lang));
         post_ui(ui, move |ui| {
             ui.set_show_auto_optimize_modal(false);
@@ -1227,6 +1378,7 @@ fn run_launch_flow(
 
         if token.load(std::sync::atomic::Ordering::SeqCst) {
             rollback_applied_tweaks(&core, applied_tweaks, applied_cache);
+            clear_in_game_applied(ui, in_game_cache);
             let msg = i18n::launch_cancelled_reverted(i18n::UiLanguage::load_atomic(&active_lang));
             post_ui(ui, move |ui| {
                 ui.set_show_auto_optimize_modal(false);
@@ -1261,6 +1413,7 @@ fn run_launch_flow(
 
         if !sleep_with_cancellation(std::time::Duration::from_millis(500), &token) {
             rollback_applied_tweaks(&core, applied_tweaks, applied_cache);
+            clear_in_game_applied(ui, in_game_cache);
             let msg = i18n::launch_cancelled_reverted(i18n::UiLanguage::load_atomic(&active_lang));
             post_ui(ui, move |ui| {
                 ui.set_show_auto_optimize_modal(false);
@@ -1289,6 +1442,7 @@ fn run_launch_flow(
     let lang = i18n::UiLanguage::load_atomic(&active_lang);
     update_auto_optimize_ui(ui, 0.96, i18n::launch_starting_steam(lang));
     if let Err(e) = counterrush_core::windows_api::launch_cs2_with_args_slice(&config.launch_args) {
+        clear_in_game_applied(ui, in_game_cache);
         let err_msg = i18n::launch_failed(lang, &e);
         post_ui(ui, move |ui| {
             ui.set_show_auto_optimize_modal(false);
@@ -1298,15 +1452,34 @@ fn run_launch_flow(
         return;
     }
 
+    update_in_game_applied(ui, in_game_cache, |state| {
+        state.cpu = false;
+        state.priority = false;
+        state.timer = timer_applied;
+        state.ram = ram_applied;
+        state.cs2_seen_running = false;
+        state.applied_at = Some(std::time::Instant::now());
+    });
+
     let _ = counterrush_core::windows_api::wait_for_process("cs2", std::time::Duration::from_millis(500));
+    let mut priority_applied = false;
+    let mut cpu_applied = false;
     {
         use counterrush_core::tweaks::Tweak;
-        if config.cs2_priority {
-            let _ = counterrush_core::tweaks::Cs2PriorityTweak.apply();
+        if config.cs2_priority && counterrush_core::tweaks::Cs2PriorityTweak.apply().is_ok() {
+            priority_applied = true;
         }
-        if config.cs2_affinity {
-            let _ = counterrush_core::tweaks::Cs2AffinityTweak.apply();
+        if config.cs2_affinity && counterrush_core::tweaks::Cs2AffinityTweak.apply().is_ok() {
+            cpu_applied = true;
         }
+    }
+    if priority_applied || cpu_applied {
+        update_in_game_applied(ui, in_game_cache, |state| {
+            state.priority = priority_applied;
+            state.cpu = cpu_applied;
+            state.cs2_seen_running = true;
+            state.applied_at = Some(std::time::Instant::now());
+        });
     }
 
     // Estado Concluído a 100%
@@ -1757,6 +1930,8 @@ fn main() -> Result<(), slint::PlatformError> {
     let active_config_path = std::sync::Arc::new(std::sync::RwLock::new(resolved_path.clone()));
     let applied_system_cache: AppliedSystemCache =
         std::sync::Arc::new(std::sync::RwLock::new(std::collections::HashSet::new()));
+    let in_game_applied_cache: InGameAppliedCache =
+        std::sync::Arc::new(std::sync::Mutex::new(InGameRuntimeState::default()));
     let auto_optimize_cancel_token =
         std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
 
@@ -1807,6 +1982,7 @@ fn main() -> Result<(), slint::PlatformError> {
     let monitor_ui = main_window.as_weak();
     let monitor_cfg_path = std::sync::Arc::clone(&active_config_path);
     let monitor_cache = std::sync::Arc::clone(&applied_system_cache);
+    let monitor_in_game_cache = std::sync::Arc::clone(&in_game_applied_cache);
     let monitor_cancel_token = std::sync::Arc::clone(&auto_optimize_cancel_token);
     let monitor_weak = std::sync::Arc::downgrade(&game_monitor);
     let monitor_lang = std::sync::Arc::clone(&active_lang);
@@ -1815,6 +1991,7 @@ fn main() -> Result<(), slint::PlatformError> {
             &monitor_ui,
             &monitor_cfg_path,
             &monitor_cache,
+            &monitor_in_game_cache,
             pid,
             &monitor_cancel_token,
             &monitor_weak,
@@ -1823,7 +2000,9 @@ fn main() -> Result<(), slint::PlatformError> {
     });
 
     let monitor_ui_exit = main_window.as_weak();
+    let monitor_exit_in_game = std::sync::Arc::clone(&in_game_applied_cache);
     game_monitor.set_on_exit(move |pid| {
+        clear_in_game_applied(&monitor_ui_exit, &monitor_exit_in_game);
         let ui_weak = monitor_ui_exit.clone();
         let _ = slint::invoke_from_event_loop(move || {
             if let Some(ui) = ui_weak.upgrade() {
@@ -1840,6 +2019,7 @@ fn main() -> Result<(), slint::PlatformError> {
     // Sincronização em tempo real (Arquivo JSON no disco -> UI)
     let sync_window_handle = main_window.as_weak();
     let sync_config_ref = active_config_path.clone();
+    let sync_in_game_ref = std::sync::Arc::clone(&in_game_applied_cache);
     std::thread::spawn(move || {
         let mut last_modified = None;
         let mut tracked_path = std::path::PathBuf::new();
@@ -1853,6 +2033,51 @@ fn main() -> Result<(), slint::PlatformError> {
             // Monitora criação/remoção de arquivos nas pastas config/optimzations e config/cfg
             loop_count += 1;
             if loop_count % 3 == 0 {
+                let runtime_snapshot = sync_in_game_ref.lock().map(|g| *g).ok();
+                if let Some(state) = runtime_snapshot {
+                    if state.any_applied() {
+                        let cs2_running =
+                            counterrush_core::windows_api::is_cs2_process_running_win32()
+                                .unwrap_or(false);
+                        if cs2_running {
+                            if !state.cs2_seen_running {
+                                if let Ok(mut guard) = sync_in_game_ref.lock() {
+                                    guard.cs2_seen_running = true;
+                                }
+                            }
+                        } else {
+                            let launch_grace_elapsed = state
+                                .applied_at
+                                .map(|t| t.elapsed() >= std::time::Duration::from_secs(45))
+                                .unwrap_or(true);
+                            if state.cs2_seen_running || launch_grace_elapsed {
+                                let expected_applied_at = state.applied_at;
+                                let handle = sync_window_handle.clone();
+                                let cache_ref = std::sync::Arc::clone(&sync_in_game_ref);
+                                let _ = slint::invoke_from_event_loop(move || {
+                                    if let Some(ui) = handle.upgrade() {
+                                        if !ui.get_is_launching() {
+                                            let cleared = if let Ok(mut guard) = cache_ref.lock() {
+                                                if guard.applied_at == expected_applied_at {
+                                                    guard.clear();
+                                                    true
+                                                } else {
+                                                    false
+                                                }
+                                            } else {
+                                                false
+                                            };
+                                            if cleared {
+                                                InGameRuntimeState::default().apply_to_ui(&ui);
+                                            }
+                                        }
+                                    }
+                                });
+                            }
+                        }
+                    }
+                }
+
                 let current_cfgs = scan_cfg_files();
                 let current_cfg_names: Vec<String> = current_cfgs.iter().map(|c| c.to_string()).collect();
                 if current_cfg_names != last_cfg_names {
@@ -2014,6 +2239,7 @@ fn main() -> Result<(), slint::PlatformError> {
         main_window.as_weak(),
         active_config_path.clone(),
         applied_system_cache.clone(),
+        in_game_applied_cache.clone(),
         active_lang.clone(),
     );
 
@@ -2021,6 +2247,7 @@ fn main() -> Result<(), slint::PlatformError> {
     let window_handle = main_window.as_weak();
     let launch_config_ref = active_config_path.clone();
     let launch_cache_ref = applied_system_cache.clone();
+    let launch_in_game_ref = in_game_applied_cache.clone();
     let fallback_path = resolved_path.clone();
     let launch_cancel_token = auto_optimize_cancel_token.clone();
     let launch_lang = active_lang.clone();
@@ -2050,6 +2277,7 @@ fn main() -> Result<(), slint::PlatformError> {
         let handle_for_thread = window_handle.clone();
         let target_cfg_path = launch_config_ref.clone();
         let cache_for_thread = launch_cache_ref.clone();
+        let in_game_for_thread = launch_in_game_ref.clone();
         let fallback_cfg = fallback_path.clone();
         let token = launch_cancel_token.clone();
         let lang_ref = launch_lang.clone();
@@ -2058,6 +2286,7 @@ fn main() -> Result<(), slint::PlatformError> {
                 &handle_for_thread,
                 &target_cfg_path,
                 &cache_for_thread,
+                &in_game_for_thread,
                 fallback_cfg,
                 token,
                 lang_ref,
@@ -2115,6 +2344,7 @@ fn main() -> Result<(), slint::PlatformError> {
     let restore_ui = main_window.as_weak();
     let restore_cfg_path = active_config_path.clone();
     let restore_cache = applied_system_cache.clone();
+    let restore_in_game_cache = in_game_applied_cache.clone();
     let restore_lang = active_lang.clone();
     let restoring_guard = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
     main_window.on_restore_defaults_clicked(move || {
@@ -2124,6 +2354,7 @@ fn main() -> Result<(), slint::PlatformError> {
         let ui_weak = restore_ui.clone();
         let cfg_path_ref = restore_cfg_path.clone();
         let cache_ref = restore_cache.clone();
+        let in_game_ref = restore_in_game_cache.clone();
         let lang_ref = restore_lang.clone();
         let guard_flag = restoring_guard.clone();
 
@@ -2274,8 +2505,13 @@ fn main() -> Result<(), slint::PlatformError> {
             let modal_sub = done_msg.clone();
             let modal_step = done_msg.clone();
 
+            if let Ok(mut guard) = in_game_ref.lock() {
+                guard.clear();
+            }
+
             post_ui(&ui_weak, move |ui| {
                 final_tweaks.apply_to_ui(ui);
+                InGameRuntimeState::default().apply_to_ui(ui);
                 ui.set_auto_optimize_progress(1.0);
                 ui.set_auto_optimize_stage_subtitle(modal_sub.into());
                 ui.set_auto_optimize_step_name(modal_step.into());
@@ -2574,4 +2810,31 @@ fn main() -> Result<(), slint::PlatformError> {
     main_window.show()?;
     slint::run_event_loop_until_quit()?;
     Ok(())
+}
+
+#[cfg(test)]
+mod in_game_state_tests {
+    use super::InGameRuntimeState;
+
+    #[test]
+    fn test_in_game_runtime_state_transitions() {
+        let mut state = InGameRuntimeState::default();
+        assert!(!state.any_applied());
+        assert!(!state.cs2_seen_running);
+        assert!(state.applied_at.is_none());
+
+        state.timer = true;
+        state.ram = true;
+        assert!(state.any_applied());
+
+        state.cpu = true;
+        state.priority = true;
+        state.cs2_seen_running = true;
+        state.applied_at = Some(std::time::Instant::now());
+        assert!(state.any_applied());
+
+        state.clear();
+        assert_eq!(state, InGameRuntimeState::default());
+        assert!(!state.any_applied());
+    }
 }

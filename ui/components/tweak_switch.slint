@@ -14,6 +14,7 @@ export component TweakSwitch inherits Rectangle {
     in property <bool> show-inline-tooltip: true;
     in property <bool> auto-toggle: true;
     in property <bool> status-badge-mode: false;
+    in property <bool> awaiting-game: false;
     callback toggled(bool);
     callback blocked-click();
     callback hover-changed(bool, length, length, length, length);
@@ -91,38 +92,41 @@ export component TweakSwitch inherits Rectangle {
             }
         }
 
-        // Selo Indicador de Estado (Modo Otimizações: Aplicado / Desativado)
+        // Selo Indicador de Estado (Modo Otimizações: Aplicado / Aguardando CS2 / Desativado)
         if root.status-badge-mode : Rectangle {
+            property <bool> is-awaiting: root.checked && root.awaiting-game;
+            property <bool> is-applied: root.checked && !root.awaiting-game;
+
             min-width: 78px;
             height: 22px;
-            background: root.checked ? #065f46 : CS2Theme.bg-surface;
+            background: is-applied ? #065f46 : (is-awaiting ? #0f172a : CS2Theme.bg-surface);
             border-radius: CS2Theme.radius-xs;
             border-width: root.checked ? 1px : 0px;
-            border-color: root.checked ? #34d399 : transparent;
+            border-color: is-applied ? #34d399 : (is-awaiting ? CS2Theme.accent-t-amber : transparent);
             y: (parent.height - self.height) / 2;
             animate background { duration: 120ms; }
             animate border-color { duration: 120ms; }
 
             HorizontalLayout {
-                padding-left: 8px;
-                padding-right: 8px;
-                spacing: 5px;
+                padding-left: is-awaiting ? 7px : 8px;
+                padding-right: is-awaiting ? 7px : 8px;
+                spacing: is-awaiting ? 4px : 5px;
                 alignment: center;
 
                 Rectangle {
                     width: 5.5px;
                     height: 5.5px;
                     border-radius: 2.75px;
-                    background: root.checked ? #6ee7b7 : CS2Theme.text-dim;
+                    background: is-applied ? #6ee7b7 : (is-awaiting ? CS2Theme.accent-t-amber : CS2Theme.text-dim);
                     y: (parent.height - self.height) / 2;
                     animate background { duration: 120ms; }
                 }
 
                 Text {
-                    text: root.checked ? @tr("Aplicado") : @tr("Desativado");
-                    font-size: 8.5px;
+                    text: is-applied ? @tr("Aplicado") : (is-awaiting ? @tr("Aguardando CS2") : @tr("Desativado"));
+                    font-size: is-awaiting ? 8px : 8.5px;
                     font-weight: root.checked ? 900 : 800;
-                    letter-spacing: 0.4px;
+                    letter-spacing: is-awaiting ? 0.3px : 0.4px;
                     color: root.checked ? #ffffff : CS2Theme.text-muted;
                     vertical-alignment: center;
                 }

@@ -893,3 +893,6 @@ msgstr "Нет (отключить)"
 
 msgid "Crie arquivos em Painel → Binds Táticas."
 msgstr "Создайте файлы в разделе Панель → Тактические бинды."
+
+msgid "Aguardando CS2"
+msgstr "Ожидание CS2"

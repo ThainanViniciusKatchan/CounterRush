@@ -47,6 +47,10 @@ export component MainWindow inherits Window {
     in-out property <bool> timer-tweak-active: false;
     in-out property <bool> priority-tweak-active: false;
     in-out property <bool> ram-tweak-active: false;
+    in-out property <bool> cpu-tweak-applied: false;
+    in-out property <bool> timer-tweak-applied: false;
+    in-out property <bool> priority-tweak-applied: false;
+    in-out property <bool> ram-tweak-applied: false;
     in-out property <bool> gpu-accel-tweak-active: false;
     in-out property <bool> dpi-tweak-active: false;
     in-out property <bool> mem-compression-tweak-active: false;
@@ -809,6 +813,7 @@ export component MainWindow inherits Window {
                                 button-width: 258px;
                                 card-height: 46px;
                                 status-badge-mode: true;
+                                awaiting-game: !root.cpu-tweak-applied;
                                 show-inline-tooltip: false;
                                 label: @tr("Núcleo 0 Off");
                                 info: @tr("Afinidade CPU");
@@ -818,6 +823,9 @@ export component MainWindow inherits Window {
                                 enabled: root.has-active-profile && !root.is-restoring-defaults;
                                 checked <=> root.cpu-tweak-active;
                                 toggled(val) => {
+                                    if !val {
+                                        root.cpu-tweak-applied = false;
+                                    }
                                     root.status-message = val ? @tr("Afinidade: Núcleo 0 desativado para o CS2.") : @tr("Afinidade: Restaurada ao padrão.");
                                     root.tweak-toggled("cpu_core_0", val);
                                 }
@@ -833,6 +841,7 @@ export component MainWindow inherits Window {
                                 button-width: 258px;
                                 card-height: 46px;
                                 status-badge-mode: true;
+                                awaiting-game: !root.priority-tweak-applied;
                                 show-inline-tooltip: false;
                                 label: @tr("Prioridade Alta");
                                 info: @tr("Processo CS2");
@@ -842,6 +851,9 @@ export component MainWindow inherits Window {
                                 enabled: root.has-active-profile && !root.is-restoring-defaults;
                                 checked <=> root.priority-tweak-active;
                                 toggled(val) => {
+                                    if !val {
+                                        root.priority-tweak-applied = false;
+                                    }
                                     root.status-message = val ? @tr("Prioridade de processo definida para Alta.") : @tr("Prioridade de processo: Normal.");
                                     root.tweak-toggled("process_priority", val);
                                 }
@@ -857,6 +869,7 @@ export component MainWindow inherits Window {
                                 button-width: 258px;
                                 card-height: 46px;
                                 status-badge-mode: true;
+                                awaiting-game: !root.timer-tweak-applied;
                                 show-inline-tooltip: false;
                                 label: @tr("Timer 0.5ms");
                                 info: @tr("Temporizador");
@@ -866,6 +879,9 @@ export component MainWindow inherits Window {
                                 enabled: root.has-active-profile && !root.is-restoring-defaults;
                                 checked <=> root.timer-tweak-active;
                                 toggled(val) => {
+                                    if !val {
+                                        root.timer-tweak-applied = false;
+                                    }
                                     root.status-message = val ? @tr("Timer: Definido para 0.5ms de alta precisão.") : @tr("Timer: Restaurado ao padrão do Windows.");
                                     root.tweak-toggled("timer_resolution", val);
                                 }
@@ -885,6 +901,7 @@ export component MainWindow inherits Window {
                                 button-width: 258px;
                                 card-height: 46px;
                                 status-badge-mode: true;
+                                awaiting-game: !root.ram-tweak-applied;
                                 show-inline-tooltip: false;
                                 label: @tr("Limpar RAM");
                                 info: @tr("Empty Standby");
@@ -894,6 +911,9 @@ export component MainWindow inherits Window {
                                 enabled: root.has-active-profile && !root.is-restoring-defaults;
                                 checked <=> root.ram-tweak-active;
                                 toggled(val) => {
+                                    if !val {
+                                        root.ram-tweak-applied = false;
+                                    }
                                     root.status-message = val ? @tr("Memória: Páginas em standby liberadas.") : @tr("Limpeza de RAM desativada.");
                                     root.tweak-toggled("empty_standby", val);
                                 }

@@ -893,3 +893,6 @@ msgstr "None (disable)"
 
 msgid "Crie arquivos em Painel → Binds Táticas."
 msgstr "Create files in Dashboard → Tactical Binds."
+
+msgid "Aguardando CS2"
+msgstr "Awaiting CS2"
