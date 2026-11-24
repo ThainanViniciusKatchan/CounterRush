@@ -22,17 +22,17 @@ export component TweakSwitch inherits Rectangle {
     min-width: root.button-width > 0px ? root.button-width : 0px;
     max-width: root.button-width > 0px ? root.button-width : 10000px;
     horizontal-stretch: root.button-width > 0px ? 0 : 1;
-    opacity: root.enabled ? 1.0 : 0.65;
     background: !root.enabled
-        ? CS2Theme.bg-card
+        ? CS2Theme.bg-surface
         : (root.checked
             ? (touch.has-hover ? root.hover-color : root.accent-color)
             : (touch.has-hover ? CS2Theme.bg-card-hover : CS2Theme.bg-card));
     border-radius: CS2Theme.radius-sm;
     animate background { duration: 120ms; }
-    animate opacity { duration: 150ms; }
 
     HorizontalLayout {
+        opacity: root.enabled ? 1.0 : 0.65;
+        animate opacity { duration: 150ms; }
         padding-left: 12px;
         padding-right: 12px;
         spacing: 8px;
@@ -130,24 +130,27 @@ export component TweakSwitch inherits Rectangle {
         }
     }
 
-    // Balão informativo flutuante (Tooltip) com quebra de linha e dimensionamento adaptativo
+    // Balão informativo flutuante (Tooltip) com fundo sólido e dimensionamento adaptativo
     if root.show-inline-tooltip && touch.has-hover : Rectangle {
         x: (parent.width - self.width) / 2;
         y: - self.height - 8px;
-        width: root.tooltip-width;
+        width: clamp(inline-tooltip-content.preferred-width + 2px, 160px, max(root.tooltip-width, 280px));
+        height: inline-tooltip-content.preferred-height;
         background: #0f172a;
         border-width: 1px;
         border-color: root.accent-color;
-        border-radius: CS2Theme.radius-xs;
+        border-radius: CS2Theme.radius-sm;
+        drop-shadow-color: rgba(0, 0, 0, 0.65);
+        drop-shadow-blur: 14px;
+        drop-shadow-offset-y: 6px;
         z: 100;
 
-        VerticalLayout {
-            padding-left: 10px;
-            padding-right: 10px;
-            padding-top: 6px;
-            padding-bottom: 6px;
-            spacing: 3px;
-            alignment: center;
+        inline-tooltip-content := VerticalLayout {
+            padding-left: 12px;
+            padding-right: 12px;
+            padding-top: 8px;
+            padding-bottom: 8px;
+            spacing: 4px;
 
             Text {
                 text: root.label;
@@ -205,7 +208,6 @@ export component MasterToggleSwitch inherits Rectangle {
     min-width: root.button-width;
     max-width: root.button-width;
     horizontal-stretch: 0;
-    opacity: root.enabled ? 1.0 : 0.65;
 
     // Alternância de cor conforme o status
     property <color> active-color: CS2Theme.status-success;
@@ -220,9 +222,10 @@ export component MasterToggleSwitch inherits Rectangle {
             : (touch.has-hover ? root.inactive-hover : root.inactive-color));
     border-radius: CS2Theme.radius-sm;
     animate background { duration: 150ms; }
-    animate opacity { duration: 150ms; }
 
     HorizontalLayout {
+        opacity: root.enabled ? 1.0 : 0.65;
+        animate opacity { duration: 150ms; }
         padding-left: 12px;
         padding-right: 12px;
         spacing: 8px;
@@ -282,24 +285,27 @@ export component MasterToggleSwitch inherits Rectangle {
         }
     }
 
-    // Balão informativo flutuante (Tooltip) com quebra de linha e dimensionamento adaptativo
+    // Balão informativo flutuante (Tooltip) com fundo sólido e dimensionamento adaptativo
     if touch.has-hover : Rectangle {
         x: (parent.width - self.width) / 2;
         y: - self.height - 8px;
-        width: root.tooltip-width;
+        width: clamp(master-tooltip-content.preferred-width + 2px, 160px, max(root.tooltip-width, 280px));
+        height: master-tooltip-content.preferred-height;
         background: #0f172a;
         border-width: 1px;
         border-color: root.all-active ? root.active-color : root.inactive-color;
-        border-radius: CS2Theme.radius-xs;
+        border-radius: CS2Theme.radius-sm;
+        drop-shadow-color: rgba(0, 0, 0, 0.65);
+        drop-shadow-blur: 14px;
+        drop-shadow-offset-y: 6px;
         z: 100;
 
-        VerticalLayout {
-            padding-left: 10px;
-            padding-right: 10px;
-            padding-top: 6px;
-            padding-bottom: 6px;
-            spacing: 3px;
-            alignment: center;
+        master-tooltip-content := VerticalLayout {
+            padding-left: 12px;
+            padding-right: 12px;
+            padding-top: 8px;
+            padding-bottom: 8px;
+            spacing: 4px;
 
             Text {
                 text: root.all-active ? @tr("Desativar Todas as Otimizações") : @tr("Ativar Todas as Otimizações");

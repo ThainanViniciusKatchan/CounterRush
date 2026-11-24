@@ -1314,14 +1314,14 @@ export component CreateProfileDialog inherits Rectangle {
     // =========================================================================
     if root.tooltip-visible && root.is-grid-view : Rectangle {
         property <length> card-left-x: dialog-card.x + 12px;
-        property <length> card-right-x: dialog-card.x + dialog-card.width - self.width - 12px;
+        property <length> card-right-x: max(card-left-x, dialog-card.x + dialog-card.width - self.width - 12px);
         property <length> local-anchor-x: root.tooltip-anchor-x - root.absolute-position.x;
         property <length> local-anchor-y: root.tooltip-anchor-y - root.absolute-position.y;
         property <length> scroll-top-y: modules-scroll.absolute-position.y - root.absolute-position.y;
         property <length> above-y: local-anchor-y - self.height - 8px;
         property <length> below-y: local-anchor-y + root.tooltip-anchor-h + 8px;
 
-        width: min(340px, dialog-card.width - 24px);
+        width: clamp(tooltip-content.preferred-width + 2px, 180px, min(340px, dialog-card.width - 24px));
         height: tooltip-content.preferred-height;
         x: clamp(local-anchor-x + (root.tooltip-anchor-w - self.width) / 2, card-left-x, card-right-x);
         y: above-y >= scroll-top-y ? above-y : clamp(below-y, dialog-card.y + 12px, max(dialog-card.y + 12px, dialog-card.y + dialog-card.height - self.height - 12px));
@@ -1334,7 +1334,6 @@ export component CreateProfileDialog inherits Rectangle {
         drop-shadow-offset-y: 6px;
 
         tooltip-content := VerticalLayout {
-            width: parent.width;
             padding-left: 12px;
             padding-right: 12px;
             padding-top: 8px;

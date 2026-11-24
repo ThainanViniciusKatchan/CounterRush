@@ -106,6 +106,22 @@ export component MainWindow inherits Window {
 
     property <bool> has-any-tweak-active: (root.game-tweaks-active-count + root.system-tweaks-active-count) > 0;
 
+    // Estado do popup flutuante de descrição na aba Otimizações
+    property <bool> opt-tooltip-visible: false;
+    property <string> opt-tooltip-id: "";
+    property <string> opt-tooltip-title: "";
+    property <string> opt-tooltip-description: "";
+    property <color> opt-tooltip-accent: CS2Theme.accent-orange;
+    property <bool> opt-tooltip-prefer-below: false;
+    property <length> opt-tooltip-anchor-x: 0px;
+    property <length> opt-tooltip-anchor-y: 0px;
+    property <length> opt-tooltip-anchor-w: 0px;
+    property <length> opt-tooltip-anchor-h: 0px;
+
+    changed active-tab => {
+        root.hide-opt-tooltip();
+    }
+
     // Estado reativo geral para o botão mestre
     property <bool> is-all-tweaks-active: 
         root.cpu-tweak-active &&
@@ -156,6 +172,38 @@ export component MainWindow inherits Window {
         BindsState.tooltip-visible = false;
     }
 
+    function hide-opt-tooltip() {
+        root.opt-tooltip-visible = false;
+    }
+
+    function handle-opt-tooltip-hover(
+        hovered: bool,
+        id: string,
+        title: string,
+        desc: string,
+        accent: color,
+        prefer-below: bool,
+        ax: length,
+        ay: length,
+        aw: length,
+        ah: length
+    ) {
+        if hovered {
+            root.opt-tooltip-id = id;
+            root.opt-tooltip-title = title;
+            root.opt-tooltip-description = desc;
+            root.opt-tooltip-accent = accent;
+            root.opt-tooltip-prefer-below = prefer-below;
+            root.opt-tooltip-anchor-x = ax;
+            root.opt-tooltip-anchor-y = ay;
+            root.opt-tooltip-anchor-w = aw;
+            root.opt-tooltip-anchor-h = ah;
+            root.opt-tooltip-visible = true;
+        } else if !hovered && root.opt-tooltip-id == id {
+            root.opt-tooltip-visible = false;
+        }
+    }
+
     HorizontalLayout {
         // 1. Barra Lateral Tática Sólida (Sem Bordas)
         Sidebar {
@@ -163,6 +211,7 @@ export component MainWindow inherits Window {
             app-version: root.app-version;
             tab-selected(idx) => {
                 root.close-binds-view();
+                root.hide-opt-tooltip();
                 if idx == 0 {
                     root.status-message = @tr("Visualizando Painel Geral");
                 } else if idx == 1 {
@@ -553,7 +602,6 @@ export component MainWindow inherits Window {
                 // Cabeçalho da Central de Otimizações com Ações de Confiança
                 HorizontalLayout {
                     alignment: space-between;
-                    z: restore-touch.has-hover ? 50 : 0;
 
                     VerticalLayout {
                         alignment: center;
@@ -633,7 +681,7 @@ export component MainWindow inherits Window {
                         }
 
                         // Botão Sólido: RESTAURAR PADRÃO (1 clique, padrão visual dos botões do Painel)
-                        Rectangle {
+                        restore-btn := Rectangle {
                             property <bool> can-restore: !root.is-restoring-defaults && !root.is-launching;
                             height: 36px;
                             y: (parent.height - self.height) / 2;
@@ -659,46 +707,25 @@ export component MainWindow inherits Window {
                                 }
                             }
 
-                            // Tooltip descritivo abaixo do botão (para nunca cortar no topo da janela)
-                            if restore-touch.has-hover : Rectangle {
-                                x: parent.width - self.width;
-                                y: parent.height + 8px;
-                                width: 260px;
-                                background: #0f172a;
-                                border-width: 1px;
-                                border-color: CS2Theme.accent-t-amber;
-                                border-radius: CS2Theme.radius-xs;
-                                z: 100;
-
-                                VerticalLayout {
-                                    padding-left: 10px;
-                                    padding-right: 10px;
-                                    padding-top: 6px;
-                                    padding-bottom: 6px;
-                                    spacing: 3px;
-
-                                    Text {
-                                        text: @tr("Restaurar Padrão");
-                                        font-size: 10px;
-                                        font-weight: 800;
-                                        color: CS2Theme.accent-t-amber;
-                                        wrap: word-wrap;
-                                    }
-
-                                    Text {
-                                        text: @tr("Desfaz todas as otimizações aplicadas em um clique e restaura o padrão do Windows com segurança.");
-                                        font-size: 9px;
-                                        font-weight: 600;
-                                        color: #f8fafc;
-                                        wrap: word-wrap;
-                                    }
-                                }
-                            }
-
                             restore-touch := TouchArea {
                                 mouse-cursor: can-restore ? pointer : default;
+                                changed has-hover => {
+                                    root.handle-opt-tooltip-hover(
+                                        self.has-hover,
+                                        "restore_defaults",
+                                        @tr("Restaurar Padrão"),
+                                        @tr("Desfaz todas as otimizações aplicadas em um clique e restaura o padrão do Windows com segurança."),
+                                        CS2Theme.accent-t-amber,
+                                        true,
+                                        restore-btn.absolute-position.x,
+                                        restore-btn.absolute-position.y,
+                                        restore-btn.width,
+                                        restore-btn.height
+                                    );
+                                }
                                 clicked => {
                                     if can-restore {
+                                        root.hide-opt-tooltip();
                                         root.is-restoring-defaults = true;
                                         root.restore-defaults-clicked();
                                     }
@@ -764,7 +791,7 @@ export component MainWindow inherits Window {
                                 button-width: 391px;
                                 card-height: 46px;
                                 status-badge-mode: true;
-                                tooltip-width: 245px;
+                                show-inline-tooltip: false;
                                 label: @tr("Núcleo 0 Off");
                                 info: @tr("Afinidade CPU");
                                 tooltip-text: @tr("Afinidade de CPU: Desativa o Núcleo 0 para o CS2 mitigando interrupções do SO.");
@@ -779,13 +806,16 @@ export component MainWindow inherits Window {
                                 blocked-click => {
                                     root.handle-tweak-without-profile();
                                 }
+                                hover-changed(hovered, ax, ay, aw, ah) => {
+                                    root.handle-opt-tooltip-hover(hovered, "cpu_core_0", self.label, self.tooltip-text, self.accent-color, false, ax, ay, aw, ah);
+                                }
                             }
 
                             TweakSwitch {
                                 button-width: 391px;
                                 card-height: 46px;
                                 status-badge-mode: true;
-                                tooltip-width: 245px;
+                                show-inline-tooltip: false;
                                 label: @tr("Prioridade Alta");
                                 info: @tr("Processo CS2");
                                 tooltip-text: @tr("Prioridade de Processo: Eleva a prioridade do executável cs2.exe para Tempo Real.");
@@ -800,6 +830,9 @@ export component MainWindow inherits Window {
                                 blocked-click => {
                                     root.handle-tweak-without-profile();
                                 }
+                                hover-changed(hovered, ax, ay, aw, ah) => {
+                                    root.handle-opt-tooltip-hover(hovered, "process_priority", self.label, self.tooltip-text, self.accent-color, false, ax, ay, aw, ah);
+                                }
                             }
                         }
 
@@ -810,7 +843,7 @@ export component MainWindow inherits Window {
                                 button-width: 391px;
                                 card-height: 46px;
                                 status-badge-mode: true;
-                                tooltip-width: 245px;
+                                show-inline-tooltip: false;
                                 label: @tr("Timer 0.5ms");
                                 info: @tr("Temporizador");
                                 tooltip-text: @tr("Temporizador do Sistema: Define resolução de alta precisão de 0.5ms.");
@@ -825,13 +858,16 @@ export component MainWindow inherits Window {
                                 blocked-click => {
                                     root.handle-tweak-without-profile();
                                 }
+                                hover-changed(hovered, ax, ay, aw, ah) => {
+                                    root.handle-opt-tooltip-hover(hovered, "timer_resolution", self.label, self.tooltip-text, self.accent-color, false, ax, ay, aw, ah);
+                                }
                             }
 
                             TweakSwitch {
                                 button-width: 391px;
                                 card-height: 46px;
                                 status-badge-mode: true;
-                                tooltip-width: 245px;
+                                show-inline-tooltip: false;
                                 label: @tr("Limpar RAM");
                                 info: @tr("Empty Standby");
                                 tooltip-text: @tr("Empty Standby List: Libera páginas de cache em standby na memória RAM.");
@@ -845,6 +881,9 @@ export component MainWindow inherits Window {
                                 }
                                 blocked-click => {
                                     root.handle-tweak-without-profile();
+                                }
+                                hover-changed(hovered, ax, ay, aw, ah) => {
+                                    root.handle-opt-tooltip-hover(hovered, "empty_standby", self.label, self.tooltip-text, self.accent-color, false, ax, ay, aw, ah);
                                 }
                             }
                         }
@@ -913,7 +952,7 @@ export component MainWindow inherits Window {
                                 button-width: 258px;
                                 card-height: 46px;
                                 status-badge-mode: true;
-                                tooltip-width: 235px;
+                                show-inline-tooltip: false;
                                 label: @tr("GPU Apps Off");
                                 info: @tr("VRAM & Apps");
                                 tooltip-text: @tr("Aceleração GPU: Desativa aceleração de hardware em Discord, Steam e navegadores.");
@@ -928,13 +967,16 @@ export component MainWindow inherits Window {
                                 blocked-click => {
                                     root.handle-tweak-without-profile();
                                 }
+                                hover-changed(hovered, ax, ay, aw, ah) => {
+                                    root.handle-opt-tooltip-hover(hovered, "gpu_acceleration", self.label, self.tooltip-text, self.accent-color, false, ax, ay, aw, ah);
+                                }
                             }
 
                             TweakSwitch {
                                 button-width: 258px;
                                 card-height: 46px;
                                 status-badge-mode: true;
-                                tooltip-width: 230px;
+                                show-inline-tooltip: false;
                                 label: @tr("Otimização DPI");
                                 info: @tr("Tela Cheia CS2");
                                 tooltip-text: @tr("Otimização DPI: Aplica flags de tela cheia exclusiva e reduz input lag no CS2.");
@@ -949,13 +991,16 @@ export component MainWindow inherits Window {
                                 blocked-click => {
                                     root.handle-tweak-without-profile();
                                 }
+                                hover-changed(hovered, ax, ay, aw, ah) => {
+                                    root.handle-opt-tooltip-hover(hovered, "dpi_optimization", self.label, self.tooltip-text, self.accent-color, false, ax, ay, aw, ah);
+                                }
                             }
 
                             TweakSwitch {
                                 button-width: 258px;
                                 card-height: 46px;
                                 status-badge-mode: true;
-                                tooltip-width: 235px;
+                                show-inline-tooltip: false;
                                 label: @tr("Compactar RAM");
                                 info: @tr("MMAgent Off");
                                 tooltip-text: @tr("Compactação de Memória: Desativa compressão de páginas do Windows (>16GB RAM).");
@@ -970,6 +1015,9 @@ export component MainWindow inherits Window {
                                 blocked-click => {
                                     root.handle-tweak-without-profile();
                                 }
+                                hover-changed(hovered, ax, ay, aw, ah) => {
+                                    root.handle-opt-tooltip-hover(hovered, "memory_compression", self.label, self.tooltip-text, self.accent-color, false, ax, ay, aw, ah);
+                                }
                             }
                         }
 
@@ -980,7 +1028,7 @@ export component MainWindow inherits Window {
                                 button-width: 258px;
                                 card-height: 46px;
                                 status-badge-mode: true;
-                                tooltip-width: 240px;
+                                show-inline-tooltip: false;
                                 label: @tr("Agendador MMCSS");
                                 info: @tr("Agendador Win");
                                 tooltip-text: @tr("MMCSS Games: Otimiza prioridade de rede, áudio e GPU para perfis de jogos.");
@@ -995,13 +1043,16 @@ export component MainWindow inherits Window {
                                 blocked-click => {
                                     root.handle-tweak-without-profile();
                                 }
+                                hover-changed(hovered, ax, ay, aw, ah) => {
+                                    root.handle-opt-tooltip-hover(hovered, "mmcss", self.label, self.tooltip-text, self.accent-color, false, ax, ay, aw, ah);
+                                }
                             }
 
                             TweakSwitch {
                                 button-width: 258px;
                                 card-height: 46px;
                                 status-badge-mode: true;
-                                tooltip-width: 235px;
+                                show-inline-tooltip: false;
                                 label: @tr("HPET Off");
                                 info: @tr("Timer BCD");
                                 tooltip-text: @tr("Desativar HPET: Desativa o relógio de plataforma no BCD priorizando o TSC da CPU.");
@@ -1016,13 +1067,16 @@ export component MainWindow inherits Window {
                                 blocked-click => {
                                     root.handle-tweak-without-profile();
                                 }
+                                hover-changed(hovered, ax, ay, aw, ah) => {
+                                    root.handle-opt-tooltip-hover(hovered, "hpet", self.label, self.tooltip-text, self.accent-color, false, ax, ay, aw, ah);
+                                }
                             }
 
                             TweakSwitch {
                                 button-width: 258px;
                                 card-height: 46px;
                                 status-badge-mode: true;
-                                tooltip-width: 235px;
+                                show-inline-tooltip: false;
                                 label: @tr("Game Bar Off");
                                 info: @tr("DVR & Overlay");
                                 tooltip-text: @tr("Xbox Game Bar: Desativa sobreposições, modo Xbox e gravações de fundo GameDVR.");
@@ -1037,6 +1091,9 @@ export component MainWindow inherits Window {
                                 blocked-click => {
                                     root.handle-tweak-without-profile();
                                 }
+                                hover-changed(hovered, ax, ay, aw, ah) => {
+                                    root.handle-opt-tooltip-hover(hovered, "game_bar", self.label, self.tooltip-text, self.accent-color, false, ax, ay, aw, ah);
+                                }
                             }
                         }
 
@@ -1047,7 +1104,7 @@ export component MainWindow inherits Window {
                                 button-width: 258px;
                                 card-height: 46px;
                                 status-badge-mode: true;
-                                tooltip-width: 235px;
+                                show-inline-tooltip: false;
                                 label: @tr("Modo MSI");
                                 info: @tr("PCIe IRQ Mode");
                                 tooltip-text: @tr("Modo MSI: Ativa interrupções baseadas em mensagens para GPU, Rede e portas USB.");
@@ -1062,13 +1119,16 @@ export component MainWindow inherits Window {
                                 blocked-click => {
                                     root.handle-tweak-without-profile();
                                 }
+                                hover-changed(hovered, ax, ay, aw, ah) => {
+                                    root.handle-opt-tooltip-hover(hovered, "msi", self.label, self.tooltip-text, self.accent-color, false, ax, ay, aw, ah);
+                                }
                             }
 
                             TweakSwitch {
                                 button-width: 258px;
                                 card-height: 46px;
                                 status-badge-mode: true;
-                                tooltip-width: 235px;
+                                show-inline-tooltip: false;
                                 label: @tr("Power Save Off");
                                 info: @tr("PCIe & USB");
                                 tooltip-text: @tr("Economia de Energia: Desativa PCIe ASPM e suspensão seletiva de portas USB.");
@@ -1083,13 +1143,16 @@ export component MainWindow inherits Window {
                                 blocked-click => {
                                     root.handle-tweak-without-profile();
                                 }
+                                hover-changed(hovered, ax, ay, aw, ah) => {
+                                    root.handle-opt-tooltip-hover(hovered, "power_saving", self.label, self.tooltip-text, self.accent-color, false, ax, ay, aw, ah);
+                                }
                             }
 
                             TweakSwitch {
                                 button-width: 258px;
                                 card-height: 46px;
                                 status-badge-mode: true;
-                                tooltip-width: 235px;
+                                show-inline-tooltip: false;
                                 label: @tr("Render Queue");
                                 info: @tr("Flip & Persist");
                                 tooltip-text: @tr("Fila de Renderização: FlipQueue AMD = 1 e Persistence Mode em placas NVIDIA.");
@@ -1103,6 +1166,9 @@ export component MainWindow inherits Window {
                                 }
                                 blocked-click => {
                                     root.handle-tweak-without-profile();
+                                }
+                                hover-changed(hovered, ax, ay, aw, ah) => {
+                                    root.handle-opt-tooltip-hover(hovered, "render_queue", self.label, self.tooltip-text, self.accent-color, false, ax, ay, aw, ah);
                                 }
                             }
                         }
@@ -1300,6 +1366,7 @@ export component MainWindow inherits Window {
                     text-color: #ffffff;
                     icon-src: @image-url("assets/icons/rocket.svg");
                     clicked => {
+                        root.hide-opt-tooltip();
                         root.auto-optimize-is-launch = false;
                         root.auto-optimize-is-restore = false;
                         root.auto-optimize-progress = 0.0;
@@ -1315,6 +1382,7 @@ export component MainWindow inherits Window {
                 AddPresetButton {
                     is-empty: true;
                     clicked => {
+                        root.hide-opt-tooltip();
                         root.create-modal-error = "";
                         root.show-create-modal = true;
                     }
@@ -1374,6 +1442,7 @@ export component MainWindow inherits Window {
                             root.preset-selected(preset.name);
                         }
                         delete => {
+                            root.hide-opt-tooltip();
                             root.target-delete-profile = preset.name;
                             root.show-delete-modal = true;
                         }
@@ -1382,6 +1451,7 @@ export component MainWindow inherits Window {
                     AddPresetButton {
                         is-empty: false;
                         clicked => {
+                            root.hide-opt-tooltip();
                             root.create-modal-error = "";
                             root.show-create-modal = true;
                         }
@@ -1986,6 +2056,54 @@ export component MainWindow inherits Window {
                     font-weight: 600;
                     color: CS2Theme.text-dim;
                 }
+            }
+        }
+    }
+
+    // Popup flutuante sólido e adaptativo para descrições da aba Otimizações
+    if root.opt-tooltip-visible && root.active-tab == 1 && !root.show-binds-view && !root.show-create-modal && !root.show-delete-modal && !root.show-no-profile-modal && !root.show-in-development-modal && !root.show-auto-optimize-modal : Rectangle {
+        property <length> content-left-x: 160px;
+        property <length> content-right-x: max(content-left-x, root.width - self.width - 12px);
+        property <length> local-anchor-x: root.opt-tooltip-anchor-x - root.absolute-position.x;
+        property <length> local-anchor-y: root.opt-tooltip-anchor-y - root.absolute-position.y;
+        property <length> above-y: local-anchor-y - self.height - 8px;
+        property <length> below-y: local-anchor-y + root.opt-tooltip-anchor-h + 8px;
+
+        width: clamp(opt-tooltip-content.preferred-width + 2px, 160px, 320px);
+        height: opt-tooltip-content.preferred-height;
+        x: clamp(local-anchor-x + (root.opt-tooltip-anchor-w - self.width) / 2, content-left-x, content-right-x);
+        y: root.opt-tooltip-prefer-below
+            ? (below-y + self.height <= root.height - 12px ? below-y : max(12px, above-y))
+            : (above-y >= 12px ? above-y : min(root.height - self.height - 12px, below-y));
+        background: #0f172a;
+        border-width: 1px;
+        border-color: root.opt-tooltip-accent;
+        border-radius: CS2Theme.radius-sm;
+        drop-shadow-color: rgba(0, 0, 0, 0.65);
+        drop-shadow-blur: 14px;
+        drop-shadow-offset-y: 6px;
+
+        opt-tooltip-content := VerticalLayout {
+            padding-left: 12px;
+            padding-right: 12px;
+            padding-top: 8px;
+            padding-bottom: 8px;
+            spacing: 4px;
+
+            Text {
+                text: root.opt-tooltip-title;
+                font-size: 10.5px;
+                font-weight: 800;
+                color: root.opt-tooltip-accent;
+                wrap: word-wrap;
+            }
+
+            Text {
+                text: root.opt-tooltip-description;
+                font-size: 10px;
+                font-weight: 600;
+                color: #f8fafc;
+                wrap: word-wrap;
             }
         }
     }
