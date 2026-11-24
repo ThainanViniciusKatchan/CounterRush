@@ -10,13 +10,15 @@ export component TweakSwitch inherits Rectangle {
     in-out property <bool> checked: false;
     in property <bool> enabled: true;
     in property <length> button-width: 0px;
+    in property <length> card-height: 50px;
     in property <bool> show-inline-tooltip: true;
     in property <bool> auto-toggle: true;
+    in property <bool> status-badge-mode: false;
     callback toggled(bool);
     callback blocked-click();
     callback hover-changed(bool, length, length, length, length);
 
-    height: 50px;
+    height: root.card-height;
     min-width: root.button-width > 0px ? root.button-width : 0px;
     max-width: root.button-width > 0px ? root.button-width : 10000px;
     horizontal-stretch: root.button-width > 0px ? 0 : 1;
@@ -57,8 +59,8 @@ export component TweakSwitch inherits Rectangle {
             }
         }
 
-        // Pílula Indicadora de Estado
-        Rectangle {
+        // Pílula Indicadora de Estado (Modo Padrão ON/OFF)
+        if !root.status-badge-mode : Rectangle {
             width: 44px;
             height: 22px;
             background: root.checked ? #ffffff : CS2Theme.bg-surface;
@@ -84,6 +86,44 @@ export component TweakSwitch inherits Rectangle {
                     font-weight: 900;
                     letter-spacing: 0.5px;
                     color: root.checked ? #0b0f17 : CS2Theme.text-dim;
+                    vertical-alignment: center;
+                }
+            }
+        }
+
+        // Selo Indicador de Estado (Modo Otimizações: Aplicado / Desativado)
+        if root.status-badge-mode : Rectangle {
+            min-width: 78px;
+            height: 22px;
+            background: root.checked ? #065f46 : CS2Theme.bg-surface;
+            border-radius: CS2Theme.radius-xs;
+            border-width: root.checked ? 1px : 0px;
+            border-color: root.checked ? #34d399 : transparent;
+            y: (parent.height - self.height) / 2;
+            animate background { duration: 120ms; }
+            animate border-color { duration: 120ms; }
+
+            HorizontalLayout {
+                padding-left: 8px;
+                padding-right: 8px;
+                spacing: 5px;
+                alignment: center;
+
+                Rectangle {
+                    width: 5.5px;
+                    height: 5.5px;
+                    border-radius: 2.75px;
+                    background: root.checked ? #6ee7b7 : CS2Theme.text-dim;
+                    y: (parent.height - self.height) / 2;
+                    animate background { duration: 120ms; }
+                }
+
+                Text {
+                    text: root.checked ? @tr("Aplicado") : @tr("Desativado");
+                    font-size: 8.5px;
+                    font-weight: root.checked ? 900 : 800;
+                    letter-spacing: 0.4px;
+                    color: root.checked ? #ffffff : CS2Theme.text-muted;
                     vertical-alignment: center;
                 }
             }

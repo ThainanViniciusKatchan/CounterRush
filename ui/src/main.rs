@@ -130,15 +130,71 @@ fn post_ui<F: FnOnce(&MainWindow) + Send + 'static>(ui: &slint::Weak<MainWindow>
     });
 }
 
+type AppliedSystemCache = std::sync::Arc<
+    std::sync::RwLock<std::collections::HashSet<counterrush_core::PermanentTweakKind>>,
+>;
+
+fn permanent_kind_from_tweak_name(name: &str) -> Option<counterrush_core::PermanentTweakKind> {
+    use counterrush_core::PermanentTweakKind;
+    match name {
+        "gpu_acceleration" => Some(PermanentTweakKind::DisableGpuAcceleration),
+        "dpi_optimization" => Some(PermanentTweakKind::ApplyDpiOptimization),
+        "memory_compression" => Some(PermanentTweakKind::DisableMemoryCompression),
+        "mmcss" => Some(PermanentTweakKind::ApplyMmcss),
+        "hpet" => Some(PermanentTweakKind::DisableHpet),
+        "game_bar" => Some(PermanentTweakKind::DisableGameBar),
+        "msi" => Some(PermanentTweakKind::EnableMsi),
+        "power_saving" => Some(PermanentTweakKind::DisablePowerSaving),
+        "render_queue" => Some(PermanentTweakKind::ApplyRenderQueue),
+        _ => None,
+    }
+}
+
+fn set_single_permanent_in_ui(
+    ui: &MainWindow,
+    kind: counterrush_core::PermanentTweakKind,
+    active: bool,
+) {
+    use counterrush_core::PermanentTweakKind;
+    match kind {
+        PermanentTweakKind::DisableGpuAcceleration => ui.set_gpu_accel_tweak_active(active),
+        PermanentTweakKind::ApplyDpiOptimization => ui.set_dpi_tweak_active(active),
+        PermanentTweakKind::DisableMemoryCompression => ui.set_mem_compression_tweak_active(active),
+        PermanentTweakKind::ApplyMmcss => ui.set_mmcss_tweak_active(active),
+        PermanentTweakKind::DisableHpet => ui.set_hpet_tweak_active(active),
+        PermanentTweakKind::DisableGameBar => ui.set_game_bar_tweak_active(active),
+        PermanentTweakKind::EnableMsi => ui.set_msi_tweak_active(active),
+        PermanentTweakKind::DisablePowerSaving => ui.set_power_saving_tweak_active(active),
+        PermanentTweakKind::ApplyRenderQueue => ui.set_render_queue_tweak_active(active),
+    }
+}
+
+fn merge_cache_into_config(
+    config: &mut counterrush_core::config::CustomOptimizationConfig,
+    cache: &AppliedSystemCache,
+) -> bool {
+    let mut changed = false;
+    if let Ok(guard) = cache.read() {
+        for &kind in guard.iter() {
+            if !kind.is_enabled_in(config) {
+                kind.set_enabled_in(config, true);
+                changed = true;
+            }
+        }
+    }
+    changed
+}
+
 fn spawn_command_worker(
     ui: slint::Weak<MainWindow>,
     config_path: std::sync::Arc<std::sync::RwLock<std::path::PathBuf>>,
+    applied_cache: AppliedSystemCache,
     active_lang: std::sync::Arc<std::sync::atomic::AtomicU8>,
 ) -> std::sync::mpsc::Sender<Command> {
     let (sender, receiver) = std::sync::mpsc::channel::<Command>();
     std::thread::spawn(move || {
         while let Ok(command) = receiver.recv() {
-            execute_command(command, &ui, &config_path, &active_lang);
+            execute_command(command, &ui, &config_path, &applied_cache, &active_lang);
         }
     });
     sender
@@ -148,15 +204,16 @@ fn execute_command(
     command: Command,
     ui: &slint::Weak<MainWindow>,
     config_path: &std::sync::Arc<std::sync::RwLock<std::path::PathBuf>>,
+    applied_cache: &AppliedSystemCache,
     active_lang: &std::sync::Arc<std::sync::atomic::AtomicU8>,
 ) {
     let lang = i18n::UiLanguage::load_atomic(active_lang);
     match command {
         Command::TweakToggled { name, active } => {
-            apply_tweak(ui, config_path, name, active, lang)
+            apply_tweak(ui, config_path, applied_cache, name, active, lang)
         }
         Command::BulkTweaksAction { action } => apply_bulk_action(ui, config_path, action),
-        Command::PresetSelected { name } => select_preset(ui, config_path, name, lang),
+        Command::PresetSelected { name } => select_preset(ui, config_path, applied_cache, name, lang),
         Command::CreateProfile {
             name,
             launch_args,
@@ -172,6 +229,7 @@ fn execute_command(
 fn apply_tweak(
     ui: &slint::Weak<MainWindow>,
     config_path: &std::sync::Arc<std::sync::RwLock<std::path::PathBuf>>,
+    applied_cache: &AppliedSystemCache,
     tweak_name: String,
     active: bool,
     lang: i18n::UiLanguage,
@@ -180,6 +238,42 @@ fn apply_tweak(
     if target_path.as_os_str().is_empty() {
         reject_tweak_without_profile(ui);
         return;
+    }
+
+    if !active {
+        if let Some(kind) = permanent_kind_from_tweak_name(&tweak_name) {
+            let core = counterrush_core::OptimizerCore::default();
+            let was_applied = core.is_permanent_tweak_applied(kind).unwrap_or(false);
+            if was_applied {
+                if let Err(err) = core.rollback_permanent_tweak(kind) {
+                    if let Ok(mut guard) = applied_cache.write() {
+                        guard.insert(kind);
+                    }
+                    let err_msg = i18n::tweak_rollback_failed(lang, &tweak_name, &err);
+                    post_ui(ui, move |ui| {
+                        set_single_permanent_in_ui(ui, kind, true);
+                        ui.set_status_message(err_msg.into());
+                    });
+                    return;
+                }
+            }
+            if let Ok(mut guard) = applied_cache.write() {
+                guard.remove(&kind);
+            }
+            let mut config =
+                counterrush_core::config::CustomOptimizationConfig::load_from_file(&target_path)
+                    .unwrap_or_default();
+            kind.set_enabled_in(&mut config, false);
+            let _ = config.save_to_file(&target_path);
+
+            let msg = if was_applied {
+                i18n::tweak_reverted_message(lang, &tweak_name)
+            } else {
+                i18n::tweak_toggled_message(lang, &tweak_name, false)
+            };
+            post_ui(ui, move |ui| ui.set_status_message(msg.into()));
+            return;
+        }
     }
 
     let msg = i18n::tweak_toggled_message(lang, &tweak_name, active);
@@ -260,41 +354,47 @@ enum AppliedSessionTweak {
     RenderQueue,
 }
 
+impl AppliedSessionTweak {
+    fn permanent_kind(self) -> Option<counterrush_core::PermanentTweakKind> {
+        use counterrush_core::PermanentTweakKind;
+        match self {
+            Self::Timer => None,
+            Self::Mmcss => Some(PermanentTweakKind::ApplyMmcss),
+            Self::Dpi => Some(PermanentTweakKind::ApplyDpiOptimization),
+            Self::GpuAccel => Some(PermanentTweakKind::DisableGpuAcceleration),
+            Self::MemCompression => Some(PermanentTweakKind::DisableMemoryCompression),
+            Self::Hpet => Some(PermanentTweakKind::DisableHpet),
+            Self::GameBar => Some(PermanentTweakKind::DisableGameBar),
+            Self::Msi => Some(PermanentTweakKind::EnableMsi),
+            Self::PowerSaving => Some(PermanentTweakKind::DisablePowerSaving),
+            Self::RenderQueue => Some(PermanentTweakKind::ApplyRenderQueue),
+        }
+    }
+}
+
 fn rollback_applied_tweaks(
     core: &counterrush_core::OptimizerCore,
     applied: Vec<AppliedSessionTweak>,
+    applied_cache: &AppliedSystemCache,
 ) {
     for tweak in applied.into_iter().rev() {
-        match tweak {
-            AppliedSessionTweak::Timer => {
-                let _ = core.rollback_timer_all();
-            }
-            AppliedSessionTweak::Mmcss => {
-                let _ = core.rollback_all_mmcss();
-            }
-            AppliedSessionTweak::Dpi => {
-                let _ = core.rollback_dpi_optimization();
-            }
-            AppliedSessionTweak::GpuAccel => {
-                let _ = core.rollback_all_gpu_acceleration();
-            }
-            AppliedSessionTweak::MemCompression => {
-                let _ = core.rollback_memory_compression();
-            }
-            AppliedSessionTweak::Hpet => {
-                let _ = core.rollback_hpet();
-            }
-            AppliedSessionTweak::GameBar => {
-                let _ = core.rollback_all_game_bar_features();
-            }
-            AppliedSessionTweak::Msi => {
-                let _ = core.rollback_all_msi();
-            }
-            AppliedSessionTweak::PowerSaving => {
-                let _ = core.rollback_all_power_saving();
-            }
-            AppliedSessionTweak::RenderQueue => {
-                let _ = core.rollback_render_queue();
+        let reverted_ok = match tweak {
+            AppliedSessionTweak::Timer => core.rollback_timer_all().is_ok(),
+            AppliedSessionTweak::Mmcss => core.rollback_all_mmcss().is_ok(),
+            AppliedSessionTweak::Dpi => core.rollback_dpi_optimization().is_ok(),
+            AppliedSessionTweak::GpuAccel => core.rollback_all_gpu_acceleration().is_ok(),
+            AppliedSessionTweak::MemCompression => core.rollback_memory_compression().is_ok(),
+            AppliedSessionTweak::Hpet => core.rollback_hpet().is_ok(),
+            AppliedSessionTweak::GameBar => core.rollback_all_game_bar_features().is_ok(),
+            AppliedSessionTweak::Msi => core.rollback_all_msi().is_ok(),
+            AppliedSessionTweak::PowerSaving => core.rollback_all_power_saving().is_ok(),
+            AppliedSessionTweak::RenderQueue => core.rollback_render_queue().is_ok(),
+        };
+        if reverted_ok {
+            if let Some(kind) = tweak.permanent_kind() {
+                if let Ok(mut guard) = applied_cache.write() {
+                    guard.remove(&kind);
+                }
             }
         }
     }
@@ -352,6 +452,7 @@ fn check_auto_optimize_cancelled(
     token: &std::sync::atomic::AtomicBool,
     core: &counterrush_core::OptimizerCore,
     applied_tweaks: &mut Vec<AppliedSessionTweak>,
+    applied_cache: &AppliedSystemCache,
     sleep_duration: Option<std::time::Duration>,
     reverted_msg: &str,
 ) -> bool {
@@ -364,7 +465,7 @@ fn check_auto_optimize_cancelled(
     }
 
     let to_revert = std::mem::take(applied_tweaks);
-    rollback_applied_tweaks(core, to_revert);
+    rollback_applied_tweaks(core, to_revert, applied_cache);
     let msg = reverted_msg.to_string();
     post_ui(ui, move |ui| {
         ui.set_show_auto_optimize_modal(false);
@@ -376,6 +477,7 @@ fn check_auto_optimize_cancelled(
 fn run_auto_optimize_flow(
     ui: &slint::Weak<MainWindow>,
     config_path: &std::sync::Arc<std::sync::RwLock<std::path::PathBuf>>,
+    applied_cache: &AppliedSystemCache,
     token: std::sync::Arc<std::sync::atomic::AtomicBool>,
     active_lang: std::sync::Arc<std::sync::atomic::AtomicU8>,
 ) {
@@ -396,6 +498,7 @@ fn run_auto_optimize_flow(
         &token,
         &core,
         &mut applied_tweaks,
+        applied_cache,
         Some(step_duration),
         i18n::auto_optimize_cancelled(i18n::UiLanguage::load_atomic(&active_lang)),
     ) {
@@ -421,6 +524,7 @@ fn run_auto_optimize_flow(
         &token,
         &core,
         &mut applied_tweaks,
+        applied_cache,
         Some(step_duration),
         i18n::auto_optimize_cancelled(i18n::UiLanguage::load_atomic(&active_lang)),
     ) {
@@ -526,6 +630,7 @@ fn run_auto_optimize_flow(
             &token,
             &core,
             &mut applied_tweaks,
+            applied_cache,
             None,
             cancel_reverted_msg,
         ) {
@@ -543,6 +648,12 @@ fn run_auto_optimize_flow(
                 ),
             );
             already_count += 1;
+            if let Some(kind) = step.permanent_kind {
+                kind.set_enabled_in(&mut config, true);
+                if let Ok(mut guard) = applied_cache.write() {
+                    guard.insert(kind);
+                }
+            }
         } else if !step.enabled_in_config {
             update_auto_optimize_ui(
                 ui,
@@ -569,8 +680,13 @@ fn run_auto_optimize_flow(
                     applied_tweaks.push(session_tweak);
                 }
                 if let Some(kind) = step.permanent_kind {
-                    kind.set_enabled_in(&mut config, false);
+                    kind.set_enabled_in(&mut config, true);
+                    if let Ok(mut guard) = applied_cache.write() {
+                        guard.insert(kind);
+                    }
                 }
+            } else if let Some(kind) = step.permanent_kind {
+                kind.set_enabled_in(&mut config, false);
             }
         }
 
@@ -580,6 +696,7 @@ fn run_auto_optimize_flow(
             &token,
             &core,
             &mut applied_tweaks,
+            applied_cache,
             Some(step_duration),
             i18n::auto_optimize_cancelled_reverted(lang_after),
         ) {
@@ -594,6 +711,7 @@ fn run_auto_optimize_flow(
         &token,
         &core,
         &mut applied_tweaks,
+        applied_cache,
         None,
         i18n::auto_optimize_cancelled_reverted(lang),
     ) {
@@ -659,6 +777,7 @@ fn execute_configured_tweaks_with_modal(
     ui: &slint::Weak<MainWindow>,
     core: &counterrush_core::OptimizerCore,
     config: &mut counterrush_core::config::CustomOptimizationConfig,
+    applied_cache: &AppliedSystemCache,
     token: &std::sync::atomic::AtomicBool,
     step_duration: std::time::Duration,
     cancel_msg: &str,
@@ -668,7 +787,7 @@ fn execute_configured_tweaks_with_modal(
     let mut config_dirty = false;
     let cancel_and_rollback =
         |applied: Vec<AppliedSessionTweak>| -> Option<(Vec<AppliedSessionTweak>, bool)> {
-            rollback_applied_tweaks(core, applied);
+            rollback_applied_tweaks(core, applied, applied_cache);
             let msg = cancel_msg.to_string();
             post_ui(ui, move |ui| {
                 ui.set_show_auto_optimize_modal(false);
@@ -791,24 +910,37 @@ fn execute_configured_tweaks_with_modal(
         let already_label = i18n::configured_step_already(lang, step.tweak_id);
 
         if let Some(kind) = step.permanent_kind {
-            match core.is_permanent_tweak_applied(kind) {
-                Ok(true) => {
-                    update_auto_optimize_ui(ui, step.progress, already_label);
-                    kind.set_enabled_in(config, false);
-                    config_dirty = true;
-                }
-                Ok(false) => {
-                    update_auto_optimize_ui(ui, step.progress, applying_label);
-                    if (step.apply_fn)(core) {
-                        if let Some(t) = step.session_tweak {
-                            applied_tweaks.push(t);
+            let cached_applied = applied_cache
+                .read()
+                .map(|g| g.contains(&kind))
+                .unwrap_or(false);
+            if cached_applied {
+                update_auto_optimize_ui(ui, step.progress, already_label);
+            } else {
+                match core.is_permanent_tweak_applied(kind) {
+                    Ok(true) => {
+                        update_auto_optimize_ui(ui, step.progress, already_label);
+                        if let Ok(mut guard) = applied_cache.write() {
+                            guard.insert(kind);
                         }
-                        kind.set_enabled_in(config, false);
-                        config_dirty = true;
                     }
-                }
-                Err(_) => {
-                    update_auto_optimize_ui(ui, step.progress, applying_label);
+                    Ok(false) => {
+                        update_auto_optimize_ui(ui, step.progress, applying_label);
+                        if (step.apply_fn)(core) {
+                            if let Some(t) = step.session_tweak {
+                                applied_tweaks.push(t);
+                            }
+                            if let Ok(mut guard) = applied_cache.write() {
+                                guard.insert(kind);
+                            }
+                        } else {
+                            kind.set_enabled_in(config, false);
+                            config_dirty = true;
+                        }
+                    }
+                    Err(_) => {
+                        update_auto_optimize_ui(ui, step.progress, applying_label);
+                    }
                 }
             }
         } else {
@@ -831,6 +963,7 @@ fn execute_configured_tweaks_with_modal(
 fn run_steam_auto_optimize_flow(
     ui: &slint::Weak<MainWindow>,
     config_path: &std::sync::Arc<std::sync::RwLock<std::path::PathBuf>>,
+    applied_cache: &AppliedSystemCache,
     pid: u32,
     token: &std::sync::Arc<std::sync::atomic::AtomicBool>,
     monitor_weak: &std::sync::Weak<counterrush_core::GameMonitorService>,
@@ -843,6 +976,7 @@ fn run_steam_auto_optimize_flow(
         let status_msg = i18n::steam_auto_detected_status(lang, pid);
         ui.set_is_launching(true);
         ui.set_auto_optimize_is_launch(true);
+        ui.set_auto_optimize_is_restore(false);
         ui.set_auto_optimize_progress(0.0);
         ui.set_auto_optimize_step_name(i18n::steam_auto_detected_step(lang).into());
         ui.set_auto_optimize_stage_title("".into());
@@ -905,6 +1039,7 @@ fn run_steam_auto_optimize_flow(
         ui,
         &core,
         &mut config,
+        applied_cache,
         token,
         std::time::Duration::from_millis(120),
         cancel_msg,
@@ -981,6 +1116,7 @@ fn run_steam_auto_optimize_flow(
 fn run_launch_flow(
     ui: &slint::Weak<MainWindow>,
     config_path: &std::sync::Arc<std::sync::RwLock<std::path::PathBuf>>,
+    applied_cache: &AppliedSystemCache,
     fallback_path: std::path::PathBuf,
     token: std::sync::Arc<std::sync::atomic::AtomicBool>,
     active_lang: std::sync::Arc<std::sync::atomic::AtomicU8>,
@@ -1013,6 +1149,7 @@ fn run_launch_flow(
     let initial_step = i18n::launch_flow_initial_step(i18n::UiLanguage::load_atomic(&active_lang));
     post_ui(ui, move |ui| {
         ui.set_auto_optimize_is_launch(true);
+        ui.set_auto_optimize_is_restore(false);
         ui.set_auto_optimize_progress(0.0);
         ui.set_auto_optimize_step_name(initial_step.into());
         ui.set_auto_optimize_stage_title("".into());
@@ -1034,6 +1171,7 @@ fn run_launch_flow(
         ui,
         &core,
         &mut config,
+        applied_cache,
         &token,
         std::time::Duration::from_millis(180),
         cancel_msg,
@@ -1045,7 +1183,7 @@ fn run_launch_flow(
 
     // Etapa 13: Verificação de Download/Atualização Ativa da Steam e Inicialização
     if token.load(std::sync::atomic::Ordering::SeqCst) {
-        rollback_applied_tweaks(&core, applied_tweaks);
+        rollback_applied_tweaks(&core, applied_tweaks, applied_cache);
         let msg = i18n::launch_cancelled_reverted(i18n::UiLanguage::load_atomic(&active_lang));
         post_ui(ui, move |ui| {
             ui.set_show_auto_optimize_modal(false);
@@ -1065,7 +1203,7 @@ fn run_launch_flow(
         }
 
         if token.load(std::sync::atomic::Ordering::SeqCst) {
-            rollback_applied_tweaks(&core, applied_tweaks);
+            rollback_applied_tweaks(&core, applied_tweaks, applied_cache);
             let msg = i18n::launch_cancelled_reverted(i18n::UiLanguage::load_atomic(&active_lang));
             post_ui(ui, move |ui| {
                 ui.set_show_auto_optimize_modal(false);
@@ -1099,7 +1237,7 @@ fn run_launch_flow(
         }
 
         if !sleep_with_cancellation(std::time::Duration::from_millis(500), &token) {
-            rollback_applied_tweaks(&core, applied_tweaks);
+            rollback_applied_tweaks(&core, applied_tweaks, applied_cache);
             let msg = i18n::launch_cancelled_reverted(i18n::UiLanguage::load_atomic(&active_lang));
             post_ui(ui, move |ui| {
                 ui.set_show_auto_optimize_modal(false);
@@ -1179,6 +1317,7 @@ fn run_launch_flow(
 fn select_preset(
     ui: &slint::Weak<MainWindow>,
     config_path: &std::sync::Arc<std::sync::RwLock<std::path::PathBuf>>,
+    applied_cache: &AppliedSystemCache,
     preset_name: String,
     lang: i18n::UiLanguage,
 ) {
@@ -1189,10 +1328,11 @@ fn select_preset(
     }
 
     match counterrush_core::config::CustomOptimizationConfig::load_from_file(&target_path) {
-        Ok(cfg) => {
+        Ok(mut cfg) => {
             save_active_preset_setting(Some(preset_name.clone()));
-            let tweaks = Tweaks::from_config(&cfg);
             let args_text = cfg.launch_args.join(" ");
+            let _ = merge_cache_into_config(&mut cfg, applied_cache);
+            let tweaks = Tweaks::from_config(&cfg);
             let msg = i18n::preset_selected_ok(lang, &preset_name);
 
             post_ui(ui, move |ui| {
@@ -1508,12 +1648,58 @@ fn main() -> Result<(), slint::PlatformError> {
     };
 
     let active_config_path = std::sync::Arc::new(std::sync::RwLock::new(resolved_path.clone()));
+    let applied_system_cache: AppliedSystemCache =
+        std::sync::Arc::new(std::sync::RwLock::new(std::collections::HashSet::new()));
     let auto_optimize_cancel_token =
         std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+
+    // Consulta assíncrona do estado real no Windows para sincronizar otimizações já aplicadas
+    let init_ui = main_window.as_weak();
+    let init_cfg_path = active_config_path.clone();
+    let init_cache = applied_system_cache.clone();
+    std::thread::spawn(move || {
+        let core = counterrush_core::OptimizerCore::default();
+        let hardware = match core.get_or_detect_hardware(None) {
+            Ok((_, hw, _, _)) => hw,
+            Err(_) => return,
+        };
+        let statuses = counterrush_core::SystemTweakStatuses::query_for_hardware(&hardware);
+        let mut applied_kinds = Vec::new();
+        if let Ok(mut guard) = init_cache.write() {
+            for kind in counterrush_core::PermanentTweakKind::ALL {
+                if statuses.is_permanent_applied(kind) {
+                    guard.insert(kind);
+                    applied_kinds.push(kind);
+                }
+            }
+        }
+        if applied_kinds.is_empty() {
+            return;
+        }
+        let target_path = init_cfg_path.read().map(|p| p.clone()).unwrap_or_default();
+        if !target_path.as_os_str().is_empty() {
+            if let Ok(mut cfg) =
+                counterrush_core::config::CustomOptimizationConfig::load_from_file(&target_path)
+            {
+                if merge_cache_into_config(&mut cfg, &init_cache) {
+                    let _ = cfg.save_to_file(&target_path);
+                }
+            }
+        }
+        post_ui(&init_ui, move |ui| {
+            if ui.get_is_restoring_defaults() || ui.get_active_preset().is_empty() {
+                return;
+            }
+            for kind in applied_kinds {
+                set_single_permanent_in_ui(ui, kind, true);
+            }
+        });
+    });
 
     let game_monitor = std::sync::Arc::new(counterrush_core::GameMonitorService::new());
     let monitor_ui = main_window.as_weak();
     let monitor_cfg_path = std::sync::Arc::clone(&active_config_path);
+    let monitor_cache = std::sync::Arc::clone(&applied_system_cache);
     let monitor_cancel_token = std::sync::Arc::clone(&auto_optimize_cancel_token);
     let monitor_weak = std::sync::Arc::downgrade(&game_monitor);
     let monitor_lang = std::sync::Arc::clone(&active_lang);
@@ -1521,6 +1707,7 @@ fn main() -> Result<(), slint::PlatformError> {
         run_steam_auto_optimize_flow(
             &monitor_ui,
             &monitor_cfg_path,
+            &monitor_cache,
             pid,
             &monitor_cancel_token,
             &monitor_weak,
@@ -1635,6 +1822,9 @@ fn main() -> Result<(), slint::PlatformError> {
                                 let handle = sync_window_handle.clone();
                                 move || {
                                     if let Some(ui) = handle.upgrade() {
+                                        if ui.get_is_restoring_defaults() {
+                                            return;
+                                        }
                                         if !ui.get_is_editing_launch_args() {
                                             let joined_args = cfg.launch_args.join(" ");
                                             if ui.get_launch_args_text() != joined_args.as_str() {
@@ -1695,12 +1885,14 @@ fn main() -> Result<(), slint::PlatformError> {
     let command_sender = spawn_command_worker(
         main_window.as_weak(),
         active_config_path.clone(),
+        applied_system_cache.clone(),
         active_lang.clone(),
     );
 
     // Callback para Lançamento do CS2 com Otimizações Personalizadas (test_custom_launch)
     let window_handle = main_window.as_weak();
     let launch_config_ref = active_config_path.clone();
+    let launch_cache_ref = applied_system_cache.clone();
     let fallback_path = resolved_path.clone();
     let launch_cancel_token = auto_optimize_cancel_token.clone();
     let launch_lang = active_lang.clone();
@@ -1719,6 +1911,7 @@ fn main() -> Result<(), slint::PlatformError> {
         let lang = i18n::UiLanguage::from_code(ui.get_active_language().as_str());
         ui.set_is_launching(true);
         ui.set_auto_optimize_is_launch(true);
+        ui.set_auto_optimize_is_restore(false);
         ui.set_auto_optimize_progress(0.0);
         ui.set_auto_optimize_step_name(i18n::launch_initial_step(lang).into());
         ui.set_auto_optimize_finished(false);
@@ -1728,6 +1921,7 @@ fn main() -> Result<(), slint::PlatformError> {
         launch_cancel_token.store(false, std::sync::atomic::Ordering::SeqCst);
         let handle_for_thread = window_handle.clone();
         let target_cfg_path = launch_config_ref.clone();
+        let cache_for_thread = launch_cache_ref.clone();
         let fallback_cfg = fallback_path.clone();
         let token = launch_cancel_token.clone();
         let lang_ref = launch_lang.clone();
@@ -1735,6 +1929,7 @@ fn main() -> Result<(), slint::PlatformError> {
             run_launch_flow(
                 &handle_for_thread,
                 &target_cfg_path,
+                &cache_for_thread,
                 fallback_cfg,
                 token,
                 lang_ref,
@@ -1788,15 +1983,196 @@ fn main() -> Result<(), slint::PlatformError> {
         });
     });
 
+    // Callback para o botão "Restaurar Padrão" (1 clique: reverte otimizações aplicadas no Windows com modal de progresso)
+    let restore_ui = main_window.as_weak();
+    let restore_cfg_path = active_config_path.clone();
+    let restore_cache = applied_system_cache.clone();
+    let restore_lang = active_lang.clone();
+    let restoring_guard = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    main_window.on_restore_defaults_clicked(move || {
+        if restoring_guard.swap(true, std::sync::atomic::Ordering::SeqCst) {
+            return;
+        }
+        let ui_weak = restore_ui.clone();
+        let cfg_path_ref = restore_cfg_path.clone();
+        let cache_ref = restore_cache.clone();
+        let lang_ref = restore_lang.clone();
+        let guard_flag = restoring_guard.clone();
+
+        let lang = i18n::UiLanguage::load_atomic(&lang_ref);
+        let starting_msg = i18n::restore_defaults_starting(lang);
+        let checking_step = i18n::restore_modal_checking(lang);
+        post_ui(&ui_weak, move |ui| {
+            ui.set_auto_optimize_is_launch(false);
+            ui.set_auto_optimize_is_restore(true);
+            ui.set_auto_optimize_progress(0.0);
+            ui.set_auto_optimize_step_name(checking_step.into());
+            ui.set_auto_optimize_stage_title("".into());
+            ui.set_auto_optimize_stage_subtitle("".into());
+            ui.set_auto_optimize_finished(false);
+            ui.set_show_auto_optimize_modal(true);
+            ui.set_is_restoring_defaults(true);
+            ui.set_status_message(starting_msg.into());
+        });
+
+        std::thread::spawn(move || {
+            let core = counterrush_core::OptimizerCore::default();
+            let mut reverted_count = 0usize;
+            let mut failed_kinds = Vec::new();
+            let step_pause = std::time::Duration::from_millis(120);
+
+            for (idx, &kind) in counterrush_core::PermanentTweakKind::ALL.iter().enumerate() {
+                let progress = 0.10 + (idx as f32) * 0.09;
+                let lang_step = i18n::UiLanguage::load_atomic(&lang_ref);
+                update_auto_optimize_ui(
+                    &ui_weak,
+                    progress,
+                    i18n::restore_step_label(
+                        lang_step,
+                        kind.id(),
+                        i18n::RestoreStepStatusKind::Checking,
+                    ),
+                );
+                if core.is_permanent_tweak_applied(kind).unwrap_or(false) {
+                    update_auto_optimize_ui(
+                        &ui_weak,
+                        progress,
+                        i18n::restore_step_label(
+                            lang_step,
+                            kind.id(),
+                            i18n::RestoreStepStatusKind::Reverting,
+                        ),
+                    );
+                    match core.rollback_permanent_tweak(kind) {
+                        Ok(()) => {
+                            reverted_count += 1;
+                            if let Ok(mut guard) = cache_ref.write() {
+                                guard.remove(&kind);
+                            }
+                        }
+                        Err(_) => {
+                            failed_kinds.push(kind);
+                            if let Ok(mut guard) = cache_ref.write() {
+                                guard.insert(kind);
+                            }
+                        }
+                    }
+                } else {
+                    update_auto_optimize_ui(
+                        &ui_weak,
+                        progress,
+                        i18n::restore_step_label(
+                            lang_step,
+                            kind.id(),
+                            i18n::RestoreStepStatusKind::AlreadyDefault,
+                        ),
+                    );
+                    if let Ok(mut guard) = cache_ref.write() {
+                        guard.remove(&kind);
+                    }
+                }
+                std::thread::sleep(step_pause);
+            }
+
+            let lang_timer = i18n::UiLanguage::load_atomic(&lang_ref);
+            update_auto_optimize_ui(
+                &ui_weak,
+                0.90,
+                i18n::restore_step_label(
+                    lang_timer,
+                    "apply_timer_resolution",
+                    i18n::RestoreStepStatusKind::Checking,
+                ),
+            );
+            if core.is_timer_registry_applied().unwrap_or(false) {
+                update_auto_optimize_ui(
+                    &ui_weak,
+                    0.90,
+                    i18n::restore_step_label(
+                        lang_timer,
+                        "apply_timer_resolution",
+                        i18n::RestoreStepStatusKind::Reverting,
+                    ),
+                );
+                if core.rollback_timer_all().is_ok() {
+                    reverted_count += 1;
+                }
+            } else {
+                update_auto_optimize_ui(
+                    &ui_weak,
+                    0.90,
+                    i18n::restore_step_label(
+                        lang_timer,
+                        "apply_timer_resolution",
+                        i18n::RestoreStepStatusKind::AlreadyDefault,
+                    ),
+                );
+            }
+            std::thread::sleep(step_pause);
+
+            let lang_save = i18n::UiLanguage::load_atomic(&lang_ref);
+            update_auto_optimize_ui(
+                &ui_weak,
+                0.96,
+                i18n::restore_step_label(
+                    lang_save,
+                    "saving_profile",
+                    i18n::RestoreStepStatusKind::Reverting,
+                ),
+            );
+
+            let target_path = cfg_path_ref.read().map(|p| p.clone()).unwrap_or_default();
+            let final_tweaks = if !target_path.as_os_str().is_empty() {
+                let preserved_args =
+                    counterrush_core::config::CustomOptimizationConfig::load_from_file(&target_path)
+                        .map(|c| c.launch_args)
+                        .unwrap_or_default();
+                let mut final_cfg =
+                    counterrush_core::config::CustomOptimizationConfig::all_disabled();
+                final_cfg.launch_args = preserved_args;
+                for &kind in &failed_kinds {
+                    kind.set_enabled_in(&mut final_cfg, true);
+                }
+                let _ = final_cfg.save_to_file(&target_path);
+                Tweaks::from_config(&final_cfg)
+            } else {
+                Tweaks::default()
+            };
+            std::thread::sleep(step_pause);
+
+            let lang_done = i18n::UiLanguage::load_atomic(&lang_ref);
+            let done_msg =
+                i18n::restore_defaults_done(lang_done, reverted_count, failed_kinds.len());
+            let modal_sub = done_msg.clone();
+            let modal_step = done_msg.clone();
+
+            post_ui(&ui_weak, move |ui| {
+                final_tweaks.apply_to_ui(ui);
+                ui.set_auto_optimize_progress(1.0);
+                ui.set_auto_optimize_stage_subtitle(modal_sub.into());
+                ui.set_auto_optimize_step_name(modal_step.into());
+                ui.set_auto_optimize_finished(true);
+                ui.set_is_restoring_defaults(false);
+                ui.set_status_message(done_msg.into());
+            });
+
+            guard_flag.store(false, std::sync::atomic::Ordering::SeqCst);
+        });
+    });
+
     // Callback para o botão "Otimizar Automaticamente" na aba Otimizações
     let auto_opt_ui = main_window.as_weak();
     let auto_opt_config_path = active_config_path.clone();
+    let auto_opt_cache = applied_system_cache.clone();
     let auto_opt_cancel = auto_optimize_cancel_token.clone();
     let auto_opt_lang = active_lang.clone();
     main_window.on_auto_optimize_clicked(move || {
         if let Some(ui) = auto_opt_ui.upgrade() {
             let lang = i18n::UiLanguage::from_code(ui.get_active_language().as_str());
             ui.set_auto_optimize_is_launch(false);
+            ui.set_auto_optimize_is_restore(false);
+            ui.set_auto_optimize_stage_title("".into());
+            ui.set_auto_optimize_stage_subtitle("".into());
             ui.set_auto_optimize_progress(0.0);
             ui.set_auto_optimize_step_name(i18n::auto_optimize_initial_step(lang).into());
             ui.set_auto_optimize_finished(false);
@@ -1805,10 +2181,11 @@ fn main() -> Result<(), slint::PlatformError> {
         auto_opt_cancel.store(false, std::sync::atomic::Ordering::SeqCst);
         let ui_weak = auto_opt_ui.clone();
         let cfg_path = auto_opt_config_path.clone();
+        let cache = auto_opt_cache.clone();
         let token = auto_opt_cancel.clone();
         let lang_ref = auto_opt_lang.clone();
         std::thread::spawn(move || {
-            run_auto_optimize_flow(&ui_weak, &cfg_path, token, lang_ref);
+            run_auto_optimize_flow(&ui_weak, &cfg_path, &cache, token, lang_ref);
         });
     });
 

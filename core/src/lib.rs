@@ -121,7 +121,7 @@ fn detect_supported_gpu_vendor(hardware: &windows_api::HardwareInfo) -> (bool, b
     (is_nvidia, is_amd)
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PermanentTweakKind {
     DisableGpuAcceleration,
     ApplyDpiOptimization,
@@ -281,6 +281,20 @@ impl SystemTweakStatuses {
                 && is_applied(tweaks::RenderQueueTweak.status()),
         }
     }
+
+    pub fn is_permanent_applied(&self, kind: PermanentTweakKind) -> bool {
+        match kind {
+            PermanentTweakKind::DisableGpuAcceleration => self.disable_gpu_acceleration,
+            PermanentTweakKind::ApplyDpiOptimization => self.apply_dpi_optimization,
+            PermanentTweakKind::DisableMemoryCompression => self.disable_memory_compression,
+            PermanentTweakKind::ApplyMmcss => self.apply_mmcss,
+            PermanentTweakKind::DisableHpet => self.disable_hpet,
+            PermanentTweakKind::DisableGameBar => self.disable_game_bar,
+            PermanentTweakKind::EnableMsi => self.enable_msi,
+            PermanentTweakKind::DisablePowerSaving => self.disable_power_saving,
+            PermanentTweakKind::ApplyRenderQueue => self.apply_render_queue,
+        }
+    }
 }
 
 struct EvaluationCollector {
@@ -346,7 +360,7 @@ fn format_status_suffix(
         return "Status SO: Otimização de execução (sempre executada ao iniciar o CS2; sem teste de status).";
     }
     if already_applied {
-        "Status SO: Já otimizado no sistema (marcado como false no AutoDetect.json)."
+        "Status SO: Já otimizado no sistema (marcado como true no AutoDetect.json)."
     } else if active {
         "Status SO: Pendente (marcado como true no AutoDetect.json para aplicar)."
     } else {
@@ -728,7 +742,7 @@ impl OptimizerCore {
 
         let mem_comp_supported = hardware.ram.total_gb > 16.0;
         let mem_comp_already_applied = mem_comp_supported && statuses.disable_memory_compression;
-        let mem_comp_active = mem_comp_supported && !mem_comp_already_applied;
+        let mem_comp_active = mem_comp_supported;
         let mem_comp_base = if mem_comp_supported {
             format!(
                 "Compatível: Sistema possui {:.2} GB de RAM (> 16 GB). Desativar compactação reduz latência de CPU sem risco de exaustão de memória.",
@@ -762,7 +776,7 @@ impl OptimizerCore {
         let (is_nvidia, is_amd) = detect_supported_gpu_vendor(&hardware);
         let render_queue_supported = is_nvidia || is_amd;
         let render_queue_already_applied = render_queue_supported && statuses.apply_render_queue;
-        let render_queue_active = render_queue_supported && !render_queue_already_applied;
+        let render_queue_active = render_queue_supported;
         let render_queue_base = if is_nvidia {
             "Compatível: GPU NVIDIA detectada. Modo de persistência do driver suportado para baixa latência.".to_string()
         } else if is_amd {
@@ -794,7 +808,7 @@ impl OptimizerCore {
 
         let gpu_accel_recommended = category != PcCategory::Potente;
         let gpu_accel_already_applied = statuses.disable_gpu_acceleration;
-        let gpu_accel_active = gpu_accel_recommended && !gpu_accel_already_applied;
+        let gpu_accel_active = gpu_accel_recommended || gpu_accel_already_applied;
         let gpu_accel_base = if gpu_accel_recommended {
             format!(
                 "Ativado: Recomendado para perfil {} para poupar VRAM dedicada e ciclos de decodificação.",
@@ -882,7 +896,7 @@ impl OptimizerCore {
         ];
 
         for (id, name, hardware_reason, is_runtime, already_applied) in universal_tweaks {
-            let active = if is_runtime { true } else { !already_applied };
+            let active = true;
             let reason = format!(
                 "{hardware_reason} | {}",
                 format_status_suffix(active, true, already_applied, is_runtime)
@@ -896,14 +910,14 @@ impl OptimizerCore {
             cs2_priority: false,
             cs2_affinity: affinity_supported,
             disable_gpu_acceleration: gpu_accel_active,
-            apply_dpi_optimization: !statuses.apply_dpi_optimization,
+            apply_dpi_optimization: true,
             disable_memory_compression: mem_comp_active,
             apply_timer_resolution: true,
-            apply_mmcss: !statuses.apply_mmcss,
-            disable_hpet: !statuses.disable_hpet,
-            disable_game_bar: !statuses.disable_game_bar,
-            enable_msi: !statuses.enable_msi,
-            disable_power_saving: !statuses.disable_power_saving,
+            apply_mmcss: true,
+            disable_hpet: true,
+            disable_game_bar: true,
+            enable_msi: true,
+            disable_power_saving: true,
             apply_render_queue: render_queue_active,
         };
 
@@ -989,9 +1003,23 @@ impl OptimizerCore {
         }
     }
 
+    pub fn rollback_permanent_tweak(&self, kind: PermanentTweakKind) -> Result<(), CoreError> {
+        match kind {
+            PermanentTweakKind::DisableGpuAcceleration => self.rollback_all_gpu_acceleration(),
+            PermanentTweakKind::ApplyDpiOptimization => self.rollback_dpi_optimization(),
+            PermanentTweakKind::DisableMemoryCompression => self.rollback_memory_compression(),
+            PermanentTweakKind::ApplyMmcss => self.rollback_all_mmcss(),
+            PermanentTweakKind::DisableHpet => self.rollback_hpet(),
+            PermanentTweakKind::DisableGameBar => self.rollback_all_game_bar_features(),
+            PermanentTweakKind::EnableMsi => self.rollback_all_msi(),
+            PermanentTweakKind::DisablePowerSaving => self.rollback_all_power_saving(),
+            PermanentTweakKind::ApplyRenderQueue => self.rollback_render_queue(),
+        }
+    }
+
     /// Verifica uma otimização permanente respeitando a flag do JSON:
     /// se `false`, pula o teste de status e a execução; se `true`, testa o status,
-    /// aplica apenas se pendente e atualiza a flag para `false` quando já estiver aplicada.
+    /// aplica apenas se pendente e mantém a flag como `true` quando aplicada.
     pub fn check_and_apply_permanent_tweak(
         &self,
         cfg: &mut config::CustomOptimizationConfig,
@@ -1002,13 +1030,9 @@ impl OptimizerCore {
         }
 
         match self.is_permanent_tweak_applied(kind) {
-            Ok(true) => {
-                kind.set_enabled_in(cfg, false);
-                PermanentTweakSyncOutcome::AlreadyApplied
-            }
+            Ok(true) => PermanentTweakSyncOutcome::AlreadyApplied,
             Ok(false) => {
                 if self.apply_permanent_tweak(kind).is_ok() {
-                    kind.set_enabled_in(cfg, false);
                     PermanentTweakSyncOutcome::AppliedNow
                 } else {
                     PermanentTweakSyncOutcome::Failed
@@ -2040,15 +2064,15 @@ mod tests {
             .expect("Falha ao avaliar hardware + status");
 
         // Otimizações de inicialização ficam true (exceto cs2_priority opcional);
-        // permanentes já aplicadas ficam false e pendentes ficam true.
+        // permanentes aplicadas ou pendentes ficam true no JSON para refletir o estado ativo na UI.
         assert!(cfg.empty_standby_list);
         assert!(cfg.apply_timer_resolution);
         assert!(cfg.cs2_affinity);
         assert!(!cfg.cs2_priority);
-        assert!(!cfg.apply_dpi_optimization);
-        assert!(!cfg.apply_mmcss);
-        assert!(!cfg.disable_game_bar);
-        assert!(!cfg.enable_msi);
+        assert!(cfg.apply_dpi_optimization);
+        assert!(cfg.apply_mmcss);
+        assert!(cfg.disable_game_bar);
+        assert!(cfg.enable_msi);
         assert!(cfg.disable_hpet);
         assert!(cfg.disable_gpu_acceleration);
         assert!(cfg.apply_render_queue);
@@ -2099,11 +2123,12 @@ mod tests {
             )
             .expect("Falha ao avaliar hardware com GPU integrada");
         assert!(!cfg_igpu.apply_render_queue);
-        assert!(!cfg_igpu.disable_game_bar);
+        assert!(cfg_igpu.disable_game_bar);
         assert!(!report_igpu.is_already_applied("apply_render_queue"));
         assert!(!report_igpu.needs_optimization("apply_render_queue"));
         assert!(!report_igpu.blocked_tweaks.is_empty());
         assert!(report_igpu.is_already_applied("disable_game_bar"));
+        assert!(!report_igpu.needs_optimization("disable_game_bar"));
     }
 
     #[test]
@@ -2175,43 +2200,31 @@ mod tests {
         assert_eq!(config.cs2_affinity, expected_affinity);
         assert_eq!(parsed["cs2_affinity"], expected_affinity);
 
-        // Permanentes ficam false quando já aplicadas, true apenas quando compatíveis e pendentes
-        assert_eq!(
-            config.disable_memory_compression,
-            expected_mem_comp && !expected_mem_comp_applied
-        );
-        assert_eq!(
-            parsed["disable_memory_compression"],
-            expected_mem_comp && !expected_mem_comp_applied
-        );
+        // Permanentes permanecem true quando compatíveis ou já aplicadas (para UI mostrar como ativas)
+        assert_eq!(config.disable_memory_compression, expected_mem_comp);
+        assert_eq!(parsed["disable_memory_compression"], expected_mem_comp);
         assert_eq!(
             config.disable_gpu_acceleration,
-            expected_gpu_accel_flag && !expected_gpu_accel_applied
+            expected_gpu_accel_flag || expected_gpu_accel_applied
         );
         assert_eq!(
             parsed["disable_gpu_acceleration"],
-            expected_gpu_accel_flag && !expected_gpu_accel_applied
+            expected_gpu_accel_flag || expected_gpu_accel_applied
         );
-        assert_eq!(
-            config.apply_render_queue,
-            expected_render_queue_flag && !expected_render_queue_applied
-        );
-        assert_eq!(
-            parsed["apply_render_queue"],
-            expected_render_queue_flag && !expected_render_queue_applied
-        );
-        assert_eq!(config.apply_dpi_optimization, !expected_dpi_applied);
-        assert_eq!(parsed["apply_dpi_optimization"], !expected_dpi_applied);
-        assert_eq!(config.apply_mmcss, !expected_mmcss_applied);
-        assert_eq!(parsed["apply_mmcss"], !expected_mmcss_applied);
-        assert_eq!(config.disable_hpet, !expected_hpet_applied);
-        assert_eq!(parsed["disable_hpet"], !expected_hpet_applied);
-        assert_eq!(config.disable_game_bar, !expected_game_bar_applied);
-        assert_eq!(parsed["disable_game_bar"], !expected_game_bar_applied);
-        assert_eq!(config.enable_msi, !expected_msi_applied);
-        assert_eq!(parsed["enable_msi"], !expected_msi_applied);
-        assert_eq!(config.disable_power_saving, !expected_power_saving_applied);
-        assert_eq!(parsed["disable_power_saving"], !expected_power_saving_applied);
+        assert_eq!(config.apply_render_queue, expected_render_queue_flag);
+        assert_eq!(parsed["apply_render_queue"], expected_render_queue_flag);
+        assert!(config.apply_dpi_optimization);
+        assert_eq!(parsed["apply_dpi_optimization"], true);
+        assert!(config.apply_mmcss);
+        assert_eq!(parsed["apply_mmcss"], true);
+        assert!(config.disable_hpet);
+        assert_eq!(parsed["disable_hpet"], true);
+        assert!(config.disable_game_bar);
+        assert_eq!(parsed["disable_game_bar"], true);
+        assert!(config.enable_msi);
+        assert_eq!(parsed["enable_msi"], true);
+        assert!(config.disable_power_saving);
+        assert_eq!(parsed["disable_power_saving"], true);
 
         assert!(!report.is_already_applied("empty_standby_list"));
         assert!(!report.is_already_applied("cs2_priority"));
@@ -2292,9 +2305,29 @@ mod tests {
             let updated = config::CustomOptimizationConfig::load_from_file(&autodetect_path)
                 .expect("Falha ao recarregar JSON");
             assert!(
-                !updated.apply_dpi_optimization,
-                "Otimização permanente já aplicada deve ser marcada como false no arquivo"
+                updated.apply_dpi_optimization,
+                "Otimização permanente já aplicada deve permanecer marcada como true no arquivo"
             );
+        }
+    }
+
+    #[test]
+    fn test_system_tweak_statuses_permanent_mapping() {
+        let mut statuses = SystemTweakStatuses::default();
+        for kind in PermanentTweakKind::ALL {
+            assert!(!statuses.is_permanent_applied(kind));
+        }
+        statuses.disable_gpu_acceleration = true;
+        statuses.apply_dpi_optimization = true;
+        statuses.disable_memory_compression = true;
+        statuses.apply_mmcss = true;
+        statuses.disable_hpet = true;
+        statuses.disable_game_bar = true;
+        statuses.enable_msi = true;
+        statuses.disable_power_saving = true;
+        statuses.apply_render_queue = true;
+        for kind in PermanentTweakKind::ALL {
+            assert!(statuses.is_permanent_applied(kind));
         }
     }
 

@@ -797,3 +797,78 @@ msgstr "+ New file (clear selection)"
 
 msgid "Nenhum arquivo .cfg encontrado"
 msgstr "No .cfg files found"
+
+msgid "Aplicado"
+msgstr "Applied"
+
+msgid "Desativado"
+msgstr "Disabled"
+
+msgid "{} de 13 aplicadas"
+msgstr "{} of 13 applied"
+
+msgid "Restaurando..."
+msgstr "Restoring..."
+
+msgid "Restaurar Padrão"
+msgstr "Restore Defaults"
+
+msgid "Desfaz tudo em 1 clique"
+msgstr "Undo all in 1 click"
+
+msgid "Desfaz todas as otimizações aplicadas em um clique e restaura o padrão do Windows com segurança."
+msgstr "Undoes all applied optimizations in one click and safely restores Windows defaults."
+
+msgid "OTIMIZAÇÕES EM GAME"
+msgstr "IN-GAME OPTIMIZATIONS"
+
+msgid "Aplicadas somente com o processo do CS2 em execução"
+msgstr "Applied only while the CS2 process is running"
+
+msgid "OTIMIZAÇÕES DO SISTEMA"
+msgstr "SYSTEM OPTIMIZATIONS"
+
+msgid "Ajustes permanentes aplicados no Windows"
+msgstr "Permanent tweaks applied to Windows"
+
+msgid "Algumas otimizações podem reiniciar programas como: Discord, Navegadores e Steam."
+msgstr "Some optimizations may restart programs such as: Discord, Browsers, and Steam."
+
+msgid "ATIVAR TUDO"
+msgstr "ENABLE ALL"
+
+msgid "RESTAURANDO..."
+msgstr "RESTORING..."
+
+msgid "RESTAURAR PADRÃO"
+msgstr "RESTORE DEFAULTS"
+
+msgid "ATENÇÃO:"
+msgstr "WARNING:"
+
+msgid "PADRÃO RESTAURADO"
+msgstr "DEFAULTS RESTORED"
+
+msgid "RESTAURANDO PADRÃO"
+msgstr "RESTORING DEFAULTS"
+
+msgid "REVERTENDO OTIMIZAÇÕES PARA O PADRÃO DO WINDOWS"
+msgstr "REVERTING OPTIMIZATIONS TO WINDOWS DEFAULTS"
+
+msgid "Verificando otimizações aplicadas..."
+msgstr "Checking applied optimizations..."
+
+msgid "Progresso da Restauração"
+msgstr "Restoration Progress"
+
+msgid "Aguarde enquanto o sistema retorna às configurações padrão do Windows..."
+msgstr "Please wait while the system returns to Windows default settings..."
+
+msgid "PADRÃO RESTAURADO COM SUCESSO!"
+msgstr "DEFAULTS RESTORED SUCCESSFULLY!"
+
+msgid "Todas as otimizações foram revertidas para o padrão do Windows."
+msgstr "All optimizations have been reverted to Windows defaults."
+
+msgid "CONCLUÍDO"
+msgstr "DONE"

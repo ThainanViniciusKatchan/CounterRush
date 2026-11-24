@@ -797,3 +797,78 @@ msgstr "+ Novo arquivo (limpar seleção)"
 
 msgid "Nenhum arquivo .cfg encontrado"
 msgstr "Nenhum arquivo .cfg encontrado"
+
+msgid "Aplicado"
+msgstr "Aplicado"
+
+msgid "Desativado"
+msgstr "Desativado"
+
+msgid "{} de 13 aplicadas"
+msgstr "{} de 13 aplicadas"
+
+msgid "Restaurando..."
+msgstr "Restaurando..."
+
+msgid "Restaurar Padrão"
+msgstr "Restaurar Padrão"
+
+msgid "Desfaz tudo em 1 clique"
+msgstr "Desfaz tudo em 1 clique"
+
+msgid "Desfaz todas as otimizações aplicadas em um clique e restaura o padrão do Windows com segurança."
+msgstr "Desfaz todas as otimizações aplicadas em um clique e restaura o padrão do Windows com segurança."
+
+msgid "OTIMIZAÇÕES EM GAME"
+msgstr "OTIMIZAÇÕES EM GAME"
+
+msgid "Aplicadas somente com o processo do CS2 em execução"
+msgstr "Aplicadas somente com o processo do CS2 em execução"
+
+msgid "OTIMIZAÇÕES DO SISTEMA"
+msgstr "OTIMIZAÇÕES DO SISTEMA"
+
+msgid "Ajustes permanentes aplicados no Windows"
+msgstr "Ajustes permanentes aplicados no Windows"
+
+msgid "Algumas otimizações podem reiniciar programas como: Discord, Navegadores e Steam."
+msgstr "Algumas otimizações podem reiniciar programas como: Discord, Navegadores e Steam."
+
+msgid "ATIVAR TUDO"
+msgstr "ATIVAR TUDO"
+
+msgid "RESTAURANDO..."
+msgstr "RESTAURANDO..."
+
+msgid "RESTAURAR PADRÃO"
+msgstr "RESTAURAR PADRÃO"
+
+msgid "ATENÇÃO:"
+msgstr "ATENÇÃO:"
+
+msgid "PADRÃO RESTAURADO"
+msgstr "PADRÃO RESTAURADO"
+
+msgid "RESTAURANDO PADRÃO"
+msgstr "RESTAURANDO PADRÃO"
+
+msgid "REVERTENDO OTIMIZAÇÕES PARA O PADRÃO DO WINDOWS"
+msgstr "REVERTENDO OTIMIZAÇÕES PARA O PADRÃO DO WINDOWS"
+
+msgid "Verificando otimizações aplicadas..."
+msgstr "Verificando otimizações aplicadas..."
+
+msgid "Progresso da Restauração"
+msgstr "Progresso da Restauração"
+
+msgid "Aguarde enquanto o sistema retorna às configurações padrão do Windows..."
+msgstr "Aguarde enquanto o sistema retorna às configurações padrão do Windows..."
+
+msgid "PADRÃO RESTAURADO COM SUCESSO!"
+msgstr "PADRÃO RESTAURADO COM SUCESSO!"
+
+msgid "Todas as otimizações foram revertidas para o padrão do Windows."
+msgstr "Todas as otimizações foram revertidas para o padrão do Windows."
+
+msgid "CONCLUÍDO"
+msgstr "CONCLUÍDO"

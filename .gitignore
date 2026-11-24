@@ -70,6 +70,7 @@ $RECYCLE.BIN/
 *.tmp
 *.temp
 *.bak
+*.cmd
 
 # ==============================================================================
 # Segredos e Credenciais
@@ -89,4 +90,6 @@ Desativar_Aceleração_GPU
 guia_completo_de_binds_no_cs2.md
 Empty_Standby_List_Clean
 Optimization.md
+verificacao_auto_otimizacao.md
+Guia_Visual_Janela_Binds.md
 *.mo

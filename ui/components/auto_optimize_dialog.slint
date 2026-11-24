@@ -8,6 +8,7 @@ export component AutoOptimizeDialog inherits Rectangle {
     in property <string> stage-subtitle: "";
     in property <bool> is-finished: false;
     in property <bool> is-launch-mode: false;
+    in property <bool> is-restore-mode: false;
     in-out property <bool> show-cancel-confirm: false;
 
     callback request-cancel();
@@ -34,7 +35,7 @@ export component AutoOptimizeDialog inherits Rectangle {
         background: CS2Theme.bg-card;
         border-radius: CS2Theme.radius-md;
         border-width: 1px;
-        border-color: root.is-finished ? CS2Theme.status-success : CS2Theme.accent-orange;
+        border-color: root.is-finished ? CS2Theme.status-success : (root.is-restore-mode ? CS2Theme.accent-t-gold : CS2Theme.accent-orange);
         clip: true;
 
         VerticalLayout {
@@ -54,22 +55,22 @@ export component AutoOptimizeDialog inherits Rectangle {
                         width: 8px;
                         height: 8px;
                         border-radius: 4px;
-                        background: root.is-finished ? CS2Theme.status-success : CS2Theme.accent-orange;
+                        background: root.is-finished ? CS2Theme.status-success : (root.is-restore-mode ? CS2Theme.accent-t-amber : CS2Theme.accent-orange);
                         y: (parent.height - self.height) / 2;
                     }
 
                     Text {
-                        text: root.is-launch-mode ? (root.is-finished ? @tr("CS2 OTIMIZADO COM SUCESSO") : @tr("INICIANDO CS2")) : (root.is-finished ? @tr("OTIMIZAÇÃO CONCLUÍDA") : @tr("CALIBRAÇÃO AUTOMÁTICA"));
+                        text: root.is-restore-mode ? (root.is-finished ? @tr("PADRÃO RESTAURADO") : @tr("RESTAURANDO PADRÃO")) : (root.is-launch-mode ? (root.is-finished ? @tr("CS2 OTIMIZADO COM SUCESSO") : @tr("INICIANDO CS2")) : (root.is-finished ? @tr("OTIMIZAÇÃO CONCLUÍDA") : @tr("CALIBRAÇÃO AUTOMÁTICA")));
                         font-size: 13px;
                         font-weight: 900;
                         letter-spacing: 0.8px;
-                        color: root.is-finished ? CS2Theme.status-success-bright : CS2Theme.accent-orange;
+                        color: root.is-finished ? CS2Theme.status-success-bright : (root.is-restore-mode ? CS2Theme.accent-t-amber : CS2Theme.accent-orange);
                         vertical-alignment: center;
                     }
                 }
 
                 // Botão Fechar (✕)
-                Rectangle {
+                if !root.is-restore-mode || root.is-finished : Rectangle {
                     width: 24px;
                     height: 24px;
                     border-radius: CS2Theme.radius-xs;
@@ -116,16 +117,16 @@ export component AutoOptimizeDialog inherits Rectangle {
                     alignment: center;
 
                     Text {
-                        text: root.stage-title != "" ? root.stage-title : (root.is-launch-mode ? @tr("APLICANDO OTIMIZAÇÕES PARA O COUNTER-STRIKE 2") : @tr("CALIBRANDO SISTEMA PARA COUNTER-STRIKE 2"));
+                        text: root.stage-title != "" ? root.stage-title : (root.is-restore-mode ? @tr("REVERTENDO OTIMIZAÇÕES PARA O PADRÃO DO WINDOWS") : (root.is-launch-mode ? @tr("APLICANDO OTIMIZAÇÕES PARA O COUNTER-STRIKE 2") : @tr("CALIBRANDO SISTEMA PARA COUNTER-STRIKE 2")));
                         font-size: root.stage-title != "" ? 12px : 10px;
                         font-weight: 800;
                         letter-spacing: 0.6px;
-                        color: CS2Theme.accent-orange;
+                        color: root.is-restore-mode ? CS2Theme.accent-t-amber : CS2Theme.accent-orange;
                         horizontal-alignment: center;
                     }
 
                     Text {
-                        text: root.stage-subtitle != "" ? root.stage-subtitle : (root.current-step-name != "" ? root.current-step-name : (root.is-launch-mode ? @tr("Iniciando aplicação dos tweaks...") : @tr("Iniciando calibração...")));
+                        text: root.stage-subtitle != "" ? root.stage-subtitle : (root.current-step-name != "" ? root.current-step-name : (root.is-restore-mode ? @tr("Verificando otimizações aplicadas...") : (root.is-launch-mode ? @tr("Iniciando aplicação dos tweaks...") : @tr("Iniciando calibração..."))));
                         font-size: 13px;
                         font-weight: 700;
                         color: CS2Theme.text-primary;
@@ -142,7 +143,7 @@ export component AutoOptimizeDialog inherits Rectangle {
                         alignment: space-between;
 
                         Text {
-                            text: @tr("Progresso da Aplicação");
+                            text: root.is-restore-mode ? @tr("Progresso da Restauração") : @tr("Progresso da Aplicação");
                             font-size: 11px;
                             font-weight: 600;
                             color: CS2Theme.text-muted;
@@ -153,7 +154,7 @@ export component AutoOptimizeDialog inherits Rectangle {
                             text: Math.round(Math.clamp(root.progress, 0.0, 1.0) * 100) + "%";
                             font-size: 16px;
                             font-weight: 900;
-                            color: CS2Theme.accent-orange-bright;
+                            color: root.is-restore-mode ? CS2Theme.accent-t-amber : CS2Theme.accent-orange-bright;
                             vertical-alignment: center;
                         }
                     }
@@ -171,15 +172,15 @@ export component AutoOptimizeDialog inherits Rectangle {
                             y: 0px;
                             height: 100%;
                             width: Math.clamp(root.progress, 0.0, 1.0) * parent.width;
-                            background: CS2Theme.accent-orange;
+                            background: root.is-restore-mode ? CS2Theme.accent-t-gold : CS2Theme.accent-orange;
                             border-radius: 4px;
                             animate width { duration: 150ms; easing: ease-out; }
                         }
                     }
                 }
 
-                // Botão Cancelar
-                HorizontalLayout {
+                // Botão Cancelar (oculto durante restauração para evitar rollback parcial)
+                if !root.is-restore-mode : HorizontalLayout {
                     alignment: center;
                     padding-top: 4px;
 
@@ -209,6 +210,14 @@ export component AutoOptimizeDialog inherits Rectangle {
                             }
                         }
                     }
+                }
+
+                if root.is-restore-mode : Text {
+                    text: @tr("Aguarde enquanto o sistema retorna às configurações padrão do Windows...");
+                    font-size: 10px;
+                    color: CS2Theme.text-muted;
+                    horizontal-alignment: center;
+                    wrap: word-wrap;
                 }
             }
 
@@ -244,7 +253,7 @@ export component AutoOptimizeDialog inherits Rectangle {
                         spacing: 2px;
 
                         Text {
-                            text: root.is-launch-mode ? @tr("CS2 OTIMIZADO COM SUCESSO") : @tr("SISTEMA OTIMIZADO COM SUCESSO!");
+                            text: root.is-restore-mode ? @tr("PADRÃO RESTAURADO COM SUCESSO!") : (root.is-launch-mode ? @tr("CS2 OTIMIZADO COM SUCESSO") : @tr("SISTEMA OTIMIZADO COM SUCESSO!"));
                             font-size: 14px;
                             font-weight: 900;
                             letter-spacing: 0.5px;
@@ -252,7 +261,7 @@ export component AutoOptimizeDialog inherits Rectangle {
                         }
 
                         Text {
-                            text: root.is-launch-mode ? @tr("O jogo foi iniciado com todas as otimizações ativas.") : @tr("Perfil AutoDetect gerado e aplicado para o seu hardware.");
+                            text: root.is-restore-mode ? (root.stage-subtitle != "" ? root.stage-subtitle : @tr("Todas as otimizações foram revertidas para o padrão do Windows.")) : (root.is-launch-mode ? @tr("O jogo foi iniciado com todas as otimizações ativas.") : @tr("Perfil AutoDetect gerado e aplicado para o seu hardware."));
                             font-size: 11px;
                             color: CS2Theme.text-muted;
                         }
@@ -278,8 +287,8 @@ export component AutoOptimizeDialog inherits Rectangle {
                     }
                 }
 
-                // Botão "JOGAR CS2" de Destaque (exibido apenas se NÃO for modo de inicialização)
-                if !root.is-launch-mode : HorizontalLayout {
+                // Botão "JOGAR CS2" de Destaque (exibido apenas se NÃO for modo de inicialização nem restauração)
+                if !root.is-launch-mode && !root.is-restore-mode : HorizontalLayout {
                     alignment: center;
                     padding-top: 6px;
 
@@ -301,7 +310,7 @@ export component AutoOptimizeDialog inherits Rectangle {
                 }
 
                 // Indicativo tático no modo de inicialização
-                if root.is-launch-mode : HorizontalLayout {
+                if root.is-launch-mode && !root.is-restore-mode : HorizontalLayout {
                     alignment: center;
                     padding-top: 6px;
 
@@ -333,6 +342,37 @@ export component AutoOptimizeDialog inherits Rectangle {
                                 letter-spacing: 0.5px;
                                 color: CS2Theme.status-success-bright;
                                 vertical-alignment: center;
+                            }
+                        }
+                    }
+                }
+
+                // Botão sólido de conclusão para o modo restauração
+                if root.is-restore-mode : HorizontalLayout {
+                    alignment: center;
+                    padding-top: 6px;
+
+                    Rectangle {
+                        width: 180px;
+                        height: 36px;
+                        background: done-touch.has-hover ? #059669 : CS2Theme.status-success;
+                        border-radius: CS2Theme.radius-xs;
+                        animate background { duration: 100ms; }
+
+                        Text {
+                            text: @tr("CONCLUÍDO");
+                            font-size: 10px;
+                            font-weight: 900;
+                            letter-spacing: 0.5px;
+                            color: #ffffff;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+
+                        done-touch := TouchArea {
+                            mouse-cursor: pointer;
+                            clicked => {
+                                root.close();
                             }
                         }
                     }

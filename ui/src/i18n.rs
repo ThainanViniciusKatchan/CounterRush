@@ -59,6 +59,13 @@ pub enum AutoStepStatusKind {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RestoreStepStatusKind {
+    Checking,
+    Reverting,
+    AlreadyDefault,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BindSaveModeKind {
     NewFile,
     EnterName,
@@ -108,8 +115,8 @@ pub fn profile_required_status_message(lang: UiLanguage) -> &'static str {
     }
 }
 
-pub fn tweak_toggled_message(lang: UiLanguage, tweak_name: &str, active: bool) -> String {
-    let display_name = match (lang, tweak_name) {
+fn tweak_display_name(lang: UiLanguage, tweak_name: &str) -> &str {
+    match (lang, tweak_name) {
         (UiLanguage::EnUs, "cpu_core_0") => "CPU Affinity (Core 0)",
         (UiLanguage::EnUs, "timer_resolution") => "Timer Resolution (0.5ms)",
         (UiLanguage::EnUs, "process_priority") => "Process Priority",
@@ -152,8 +159,11 @@ pub fn tweak_toggled_message(lang: UiLanguage, tweak_name: &str, active: bool) -
         (_, "power_saving") => "Economia de Energia PCIe/USB",
         (_, "render_queue") => "Fila de Renderização",
         (_, other) => other,
-    };
+    }
+}
 
+pub fn tweak_toggled_message(lang: UiLanguage, tweak_name: &str, active: bool) -> String {
+    let display_name = tweak_display_name(lang, tweak_name);
     match (lang, active) {
         (UiLanguage::EnUs, true) => format!("Module '{display_name}' enabled."),
         (UiLanguage::EnUs, false) => format!("Module '{display_name}' disabled."),
@@ -161,6 +171,375 @@ pub fn tweak_toggled_message(lang: UiLanguage, tweak_name: &str, active: bool) -
         (UiLanguage::RuRu, false) => format!("Модуль «{display_name}» отключён."),
         (UiLanguage::PtBr, true) => format!("Módulo '{display_name}' ativado."),
         (UiLanguage::PtBr, false) => format!("Módulo '{display_name}' desativado."),
+    }
+}
+
+pub fn tweak_reverted_message(lang: UiLanguage, tweak_name: &str) -> String {
+    let display_name = tweak_display_name(lang, tweak_name);
+    match lang {
+        UiLanguage::EnUs => format!("Module '{display_name}' disabled and reverted to Windows default."),
+        UiLanguage::RuRu => format!("Модуль «{display_name}» отключён и возвращён к стандартным настройкам Windows."),
+        UiLanguage::PtBr => format!("Módulo '{display_name}' desativado e restaurado ao padrão do Windows."),
+    }
+}
+
+pub fn tweak_rollback_failed(
+    lang: UiLanguage,
+    tweak_name: &str,
+    err: &dyn std::fmt::Display,
+) -> String {
+    let display_name = tweak_display_name(lang, tweak_name);
+    match lang {
+        UiLanguage::EnUs => format!("Could not revert '{display_name}': {err}"),
+        UiLanguage::RuRu => format!("Не удалось откатить «{display_name}»: {err}"),
+        UiLanguage::PtBr => format!("Não foi possível reverter '{display_name}': {err}"),
+    }
+}
+
+pub fn restore_defaults_starting(lang: UiLanguage) -> &'static str {
+    match lang {
+        UiLanguage::EnUs => "Restoring Windows default settings...",
+        UiLanguage::RuRu => "Восстановление стандартных настроек Windows...",
+        UiLanguage::PtBr => "Restaurando configurações padrão do Windows...",
+    }
+}
+
+pub fn restore_modal_checking(lang: UiLanguage) -> &'static str {
+    match lang {
+        UiLanguage::EnUs => "Checking applied optimizations in Windows...",
+        UiLanguage::RuRu => "Проверка применённых оптимизаций в Windows...",
+        UiLanguage::PtBr => "Verificando otimizações aplicadas no Windows...",
+    }
+}
+
+pub fn restore_step_label(
+    lang: UiLanguage,
+    tweak_id: &str,
+    status: RestoreStepStatusKind,
+) -> &'static str {
+    match (lang, tweak_id, status) {
+        // PT-BR
+        (UiLanguage::PtBr, "disable_gpu_acceleration", RestoreStepStatusKind::Checking) => {
+            "Verificando aceleração de GPU em aplicativos..."
+        }
+        (UiLanguage::PtBr, "disable_gpu_acceleration", RestoreStepStatusKind::Reverting) => {
+            "Reativando aceleração de GPU em aplicativos secundários..."
+        }
+        (UiLanguage::PtBr, "disable_gpu_acceleration", RestoreStepStatusKind::AlreadyDefault) => {
+            "Aceleração de GPU em aplicativos já está no padrão."
+        }
+        (UiLanguage::PtBr, "apply_dpi_optimization", RestoreStepStatusKind::Checking) => {
+            "Verificando configuração de DPI e tela cheia..."
+        }
+        (UiLanguage::PtBr, "apply_dpi_optimization", RestoreStepStatusKind::Reverting) => {
+            "Removendo flags de compatibilidade DPI do CS2..."
+        }
+        (UiLanguage::PtBr, "apply_dpi_optimization", RestoreStepStatusKind::AlreadyDefault) => {
+            "Configuração de DPI do CS2 já está no padrão."
+        }
+        (UiLanguage::PtBr, "disable_memory_compression", RestoreStepStatusKind::Checking) => {
+            "Verificando compactação de memória do Windows..."
+        }
+        (UiLanguage::PtBr, "disable_memory_compression", RestoreStepStatusKind::Reverting) => {
+            "Reativando compactação de memória do Windows..."
+        }
+        (UiLanguage::PtBr, "disable_memory_compression", RestoreStepStatusKind::AlreadyDefault) => {
+            "Compactação de memória já está no padrão."
+        }
+        (UiLanguage::PtBr, "apply_mmcss", RestoreStepStatusKind::Checking) => {
+            "Verificando agendador multimídia (MMCSS)..."
+        }
+        (UiLanguage::PtBr, "apply_mmcss", RestoreStepStatusKind::Reverting) => {
+            "Restaurando agendador multimídia (MMCSS) ao padrão..."
+        }
+        (UiLanguage::PtBr, "apply_mmcss", RestoreStepStatusKind::AlreadyDefault) => {
+            "Agendador multimídia (MMCSS) já está no padrão."
+        }
+        (UiLanguage::PtBr, "disable_hpet", RestoreStepStatusKind::Checking) => {
+            "Verificando configuração HPET no BCD..."
+        }
+        (UiLanguage::PtBr, "disable_hpet", RestoreStepStatusKind::Reverting) => {
+            "Restaurando HPET ao padrão de boot do Windows..."
+        }
+        (UiLanguage::PtBr, "disable_hpet", RestoreStepStatusKind::AlreadyDefault) => {
+            "Configuração HPET já está no padrão."
+        }
+        (UiLanguage::PtBr, "disable_game_bar", RestoreStepStatusKind::Checking) => {
+            "Verificando Xbox Game Bar e GameDVR..."
+        }
+        (UiLanguage::PtBr, "disable_game_bar", RestoreStepStatusKind::Reverting) => {
+            "Restaurando Xbox Game Bar, Game Mode e GameDVR..."
+        }
+        (UiLanguage::PtBr, "disable_game_bar", RestoreStepStatusKind::AlreadyDefault) => {
+            "Xbox Game Bar e GameDVR já estão no padrão."
+        }
+        (UiLanguage::PtBr, "enable_msi", RestoreStepStatusKind::Checking) => {
+            "Verificando modo de interrupção MSI..."
+        }
+        (UiLanguage::PtBr, "enable_msi", RestoreStepStatusKind::Reverting) => {
+            "Revertendo modo MSI para o padrão dos dispositivos..."
+        }
+        (UiLanguage::PtBr, "enable_msi", RestoreStepStatusKind::AlreadyDefault) => {
+            "Modo de interrupção MSI já está no padrão."
+        }
+        (UiLanguage::PtBr, "disable_power_saving", RestoreStepStatusKind::Checking) => {
+            "Verificando economia de energia PCIe e USB..."
+        }
+        (UiLanguage::PtBr, "disable_power_saving", RestoreStepStatusKind::Reverting) => {
+            "Restaurando economia de energia PCIe e USB..."
+        }
+        (UiLanguage::PtBr, "disable_power_saving", RestoreStepStatusKind::AlreadyDefault) => {
+            "Economia de energia PCIe e USB já está no padrão."
+        }
+        (UiLanguage::PtBr, "apply_render_queue", RestoreStepStatusKind::Checking) => {
+            "Verificando fila de renderização (Render Queue)..."
+        }
+        (UiLanguage::PtBr, "apply_render_queue", RestoreStepStatusKind::Reverting) => {
+            "Restaurando fila de renderização (Render Queue)..."
+        }
+        (UiLanguage::PtBr, "apply_render_queue", RestoreStepStatusKind::AlreadyDefault) => {
+            "Fila de renderização já está no padrão."
+        }
+        (UiLanguage::PtBr, "apply_timer_resolution", RestoreStepStatusKind::Checking) => {
+            "Verificando resolução do temporizador (0.5ms)..."
+        }
+        (UiLanguage::PtBr, "apply_timer_resolution", RestoreStepStatusKind::Reverting) => {
+            "Restaurando resolução do temporizador ao padrão..."
+        }
+        (UiLanguage::PtBr, "apply_timer_resolution", RestoreStepStatusKind::AlreadyDefault) => {
+            "Resolução do temporizador já está no padrão."
+        }
+        (UiLanguage::PtBr, "saving_profile", _) => {
+            "Atualizando perfil e limpando otimizações..."
+        }
+
+        // EN-US
+        (UiLanguage::EnUs, "disable_gpu_acceleration", RestoreStepStatusKind::Checking) => {
+            "Checking app GPU acceleration..."
+        }
+        (UiLanguage::EnUs, "disable_gpu_acceleration", RestoreStepStatusKind::Reverting) => {
+            "Re-enabling GPU acceleration in background apps..."
+        }
+        (UiLanguage::EnUs, "disable_gpu_acceleration", RestoreStepStatusKind::AlreadyDefault) => {
+            "App GPU acceleration is already at default."
+        }
+        (UiLanguage::EnUs, "apply_dpi_optimization", RestoreStepStatusKind::Checking) => {
+            "Checking DPI and fullscreen settings..."
+        }
+        (UiLanguage::EnUs, "apply_dpi_optimization", RestoreStepStatusKind::Reverting) => {
+            "Removing CS2 DPI compatibility flags..."
+        }
+        (UiLanguage::EnUs, "apply_dpi_optimization", RestoreStepStatusKind::AlreadyDefault) => {
+            "CS2 DPI configuration is already at default."
+        }
+        (UiLanguage::EnUs, "disable_memory_compression", RestoreStepStatusKind::Checking) => {
+            "Checking Windows memory compression..."
+        }
+        (UiLanguage::EnUs, "disable_memory_compression", RestoreStepStatusKind::Reverting) => {
+            "Re-enabling Windows memory compression..."
+        }
+        (UiLanguage::EnUs, "disable_memory_compression", RestoreStepStatusKind::AlreadyDefault) => {
+            "Memory compression is already at default."
+        }
+        (UiLanguage::EnUs, "apply_mmcss", RestoreStepStatusKind::Checking) => {
+            "Checking multimedia scheduler (MMCSS)..."
+        }
+        (UiLanguage::EnUs, "apply_mmcss", RestoreStepStatusKind::Reverting) => {
+            "Restoring multimedia scheduler (MMCSS) to default..."
+        }
+        (UiLanguage::EnUs, "apply_mmcss", RestoreStepStatusKind::AlreadyDefault) => {
+            "Multimedia scheduler (MMCSS) is already at default."
+        }
+        (UiLanguage::EnUs, "disable_hpet", RestoreStepStatusKind::Checking) => {
+            "Checking HPET boot configuration..."
+        }
+        (UiLanguage::EnUs, "disable_hpet", RestoreStepStatusKind::Reverting) => {
+            "Restoring HPET to Windows boot default..."
+        }
+        (UiLanguage::EnUs, "disable_hpet", RestoreStepStatusKind::AlreadyDefault) => {
+            "HPET configuration is already at default."
+        }
+        (UiLanguage::EnUs, "disable_game_bar", RestoreStepStatusKind::Checking) => {
+            "Checking Xbox Game Bar and GameDVR..."
+        }
+        (UiLanguage::EnUs, "disable_game_bar", RestoreStepStatusKind::Reverting) => {
+            "Restoring Xbox Game Bar, Game Mode, and GameDVR..."
+        }
+        (UiLanguage::EnUs, "disable_game_bar", RestoreStepStatusKind::AlreadyDefault) => {
+            "Xbox Game Bar and GameDVR are already at default."
+        }
+        (UiLanguage::EnUs, "enable_msi", RestoreStepStatusKind::Checking) => {
+            "Checking MSI interrupt mode..."
+        }
+        (UiLanguage::EnUs, "enable_msi", RestoreStepStatusKind::Reverting) => {
+            "Reverting MSI mode to device default..."
+        }
+        (UiLanguage::EnUs, "enable_msi", RestoreStepStatusKind::AlreadyDefault) => {
+            "MSI interrupt mode is already at default."
+        }
+        (UiLanguage::EnUs, "disable_power_saving", RestoreStepStatusKind::Checking) => {
+            "Checking PCIe and USB power saving..."
+        }
+        (UiLanguage::EnUs, "disable_power_saving", RestoreStepStatusKind::Reverting) => {
+            "Restoring PCIe and USB power saving..."
+        }
+        (UiLanguage::EnUs, "disable_power_saving", RestoreStepStatusKind::AlreadyDefault) => {
+            "PCIe and USB power saving is already at default."
+        }
+        (UiLanguage::EnUs, "apply_render_queue", RestoreStepStatusKind::Checking) => {
+            "Checking Render Queue settings..."
+        }
+        (UiLanguage::EnUs, "apply_render_queue", RestoreStepStatusKind::Reverting) => {
+            "Restoring Render Queue settings..."
+        }
+        (UiLanguage::EnUs, "apply_render_queue", RestoreStepStatusKind::AlreadyDefault) => {
+            "Render Queue is already at default."
+        }
+        (UiLanguage::EnUs, "apply_timer_resolution", RestoreStepStatusKind::Checking) => {
+            "Checking timer resolution (0.5ms)..."
+        }
+        (UiLanguage::EnUs, "apply_timer_resolution", RestoreStepStatusKind::Reverting) => {
+            "Restoring timer resolution to Windows default..."
+        }
+        (UiLanguage::EnUs, "apply_timer_resolution", RestoreStepStatusKind::AlreadyDefault) => {
+            "Timer resolution is already at default."
+        }
+        (UiLanguage::EnUs, "saving_profile", _) => {
+            "Updating profile and clearing optimizations..."
+        }
+
+        // RU-RU
+        (UiLanguage::RuRu, "disable_gpu_acceleration", RestoreStepStatusKind::Checking) => {
+            "Проверка ускорения GPU в приложениях..."
+        }
+        (UiLanguage::RuRu, "disable_gpu_acceleration", RestoreStepStatusKind::Reverting) => {
+            "Восстановление ускорения GPU в фоновых приложениях..."
+        }
+        (UiLanguage::RuRu, "disable_gpu_acceleration", RestoreStepStatusKind::AlreadyDefault) => {
+            "Ускорение GPU в приложениях уже в исходном состоянии."
+        }
+        (UiLanguage::RuRu, "apply_dpi_optimization", RestoreStepStatusKind::Checking) => {
+            "Проверка параметров DPI и полного экрана..."
+        }
+        (UiLanguage::RuRu, "apply_dpi_optimization", RestoreStepStatusKind::Reverting) => {
+            "Удаление флагов совместимости DPI для CS2..."
+        }
+        (UiLanguage::RuRu, "apply_dpi_optimization", RestoreStepStatusKind::AlreadyDefault) => {
+            "Параметры DPI для CS2 уже в исходном состоянии."
+        }
+        (UiLanguage::RuRu, "disable_memory_compression", RestoreStepStatusKind::Checking) => {
+            "Проверка сжатия памяти Windows..."
+        }
+        (UiLanguage::RuRu, "disable_memory_compression", RestoreStepStatusKind::Reverting) => {
+            "Повторное включение сжатия памяти Windows..."
+        }
+        (UiLanguage::RuRu, "disable_memory_compression", RestoreStepStatusKind::AlreadyDefault) => {
+            "Сжатие памяти уже в исходном состоянии."
+        }
+        (UiLanguage::RuRu, "apply_mmcss", RestoreStepStatusKind::Checking) => {
+            "Проверка планировщика MMCSS..."
+        }
+        (UiLanguage::RuRu, "apply_mmcss", RestoreStepStatusKind::Reverting) => {
+            "Восстановление планировщика MMCSS по умолчанию..."
+        }
+        (UiLanguage::RuRu, "apply_mmcss", RestoreStepStatusKind::AlreadyDefault) => {
+            "Планировщик MMCSS уже в исходном состоянии."
+        }
+        (UiLanguage::RuRu, "disable_hpet", RestoreStepStatusKind::Checking) => {
+            "Проверка параметров HPET в BCD..."
+        }
+        (UiLanguage::RuRu, "disable_hpet", RestoreStepStatusKind::Reverting) => {
+            "Восстановление HPET к параметрам загрузки Windows..."
+        }
+        (UiLanguage::RuRu, "disable_hpet", RestoreStepStatusKind::AlreadyDefault) => {
+            "Параметры HPET уже в исходном состоянии."
+        }
+        (UiLanguage::RuRu, "disable_game_bar", RestoreStepStatusKind::Checking) => {
+            "Проверка Xbox Game Bar и GameDVR..."
+        }
+        (UiLanguage::RuRu, "disable_game_bar", RestoreStepStatusKind::Reverting) => {
+            "Восстановление Xbox Game Bar, Game Mode и GameDVR..."
+        }
+        (UiLanguage::RuRu, "disable_game_bar", RestoreStepStatusKind::AlreadyDefault) => {
+            "Xbox Game Bar и GameDVR уже в исходном состоянии."
+        }
+        (UiLanguage::RuRu, "enable_msi", RestoreStepStatusKind::Checking) => {
+            "Проверка режима прерываний MSI..."
+        }
+        (UiLanguage::RuRu, "enable_msi", RestoreStepStatusKind::Reverting) => {
+            "Возврат режима прерываний MSI по умолчанию..."
+        }
+        (UiLanguage::RuRu, "enable_msi", RestoreStepStatusKind::AlreadyDefault) => {
+            "Режим прерываний MSI уже в исходном состоянии."
+        }
+        (UiLanguage::RuRu, "disable_power_saving", RestoreStepStatusKind::Checking) => {
+            "Проверка энергосбережения PCIe и USB..."
+        }
+        (UiLanguage::RuRu, "disable_power_saving", RestoreStepStatusKind::Reverting) => {
+            "Восстановление энергосбережения PCIe и USB..."
+        }
+        (UiLanguage::RuRu, "disable_power_saving", RestoreStepStatusKind::AlreadyDefault) => {
+            "Энергосбережение PCIe и USB уже в исходном состоянии."
+        }
+        (UiLanguage::RuRu, "apply_render_queue", RestoreStepStatusKind::Checking) => {
+            "Проверка очереди рендеринга (Render Queue)..."
+        }
+        (UiLanguage::RuRu, "apply_render_queue", RestoreStepStatusKind::Reverting) => {
+            "Восстановление очереди рендеринга (Render Queue)..."
+        }
+        (UiLanguage::RuRu, "apply_render_queue", RestoreStepStatusKind::AlreadyDefault) => {
+            "Очередь рендеринга уже в исходном состоянии."
+        }
+        (UiLanguage::RuRu, "apply_timer_resolution", RestoreStepStatusKind::Checking) => {
+            "Проверка разрешения таймера (0.5 мс)..."
+        }
+        (UiLanguage::RuRu, "apply_timer_resolution", RestoreStepStatusKind::Reverting) => {
+            "Восстановление разрешения таймера Windows..."
+        }
+        (UiLanguage::RuRu, "apply_timer_resolution", RestoreStepStatusKind::AlreadyDefault) => {
+            "Разрешение таймера уже в исходном состоянии."
+        }
+        (UiLanguage::RuRu, "saving_profile", _) => {
+            "Обновление профиля и сброс оптимизаций..."
+        }
+
+        _ => "",
+    }
+}
+
+pub fn restore_defaults_done(
+    lang: UiLanguage,
+    reverted_count: usize,
+    failed_count: usize,
+) -> String {
+    match (lang, reverted_count, failed_count) {
+        (UiLanguage::EnUs, 0, 0) => {
+            "Defaults restored: all optimizations disabled successfully.".to_string()
+        }
+        (UiLanguage::RuRu, 0, 0) => {
+            "Настройки по умолчанию восстановлены: все оптимизации отключены.".to_string()
+        }
+        (UiLanguage::PtBr, 0, 0) => {
+            "Padrão restaurado: todas as otimizações desativadas com sucesso.".to_string()
+        }
+        (UiLanguage::EnUs, rev, 0) => {
+            format!("Defaults restored successfully ({rev} optimizations reverted in Windows).")
+        }
+        (UiLanguage::RuRu, rev, 0) => {
+            format!("Стандартные настройки восстановлены ({rev} оптимизаций отменено в Windows).")
+        }
+        (UiLanguage::PtBr, rev, 0) => {
+            format!("Padrão restaurado com sucesso ({rev} otimizações revertidas no Windows).")
+        }
+        (UiLanguage::EnUs, rev, fail) => {
+            format!("Partial restore: {rev} reverted, {fail} could not be reverted (check permissions).")
+        }
+        (UiLanguage::RuRu, rev, fail) => {
+            format!("Частичный откат: отменено {rev}, ошибок {fail} (проверьте права администратора).")
+        }
+        (UiLanguage::PtBr, rev, fail) => {
+            format!("Restauração parcial: {rev} revertidas, {fail} não puderam ser revertidas (verifique permissões).")
+        }
     }
 }
 

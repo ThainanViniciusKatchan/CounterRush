@@ -124,13 +124,13 @@ fn main() {
     println!("    - Marcadas como true no AutoDetect.json:          {}", count_active);
     println!("      * Execução ao iniciar o jogo (sem teste):       {}", count_runtime_active);
     println!("      * Permanentes pendentes (Status Default):       {}", count_permanent_pending);
-    println!("    - Permanentes já aplicadas (marcadas false):      {}", count_already);
+    println!("    - Permanentes já aplicadas (marcadas true):       {}", count_already);
     println!("    - Opcionais mantidas desativadas (false):         {}", count_optional);
     println!("    - Bloqueadas por limite de hardware (false):      {}", count_blocked);
     println!("================================================================================");
 
     if !report.already_optimized_tweaks.is_empty() {
-        println!("\nJá aplicadas -> false: {}", report.already_optimized_tweaks.join(", "));
+        println!("\nJá aplicadas -> true: {}", report.already_optimized_tweaks.join(", "));
     }
     if !report.pending_tweaks.is_empty() {
         println!("Ativas no JSON -> true: {}", report.pending_tweaks.join(", "));
