@@ -95,6 +95,7 @@ export component MainWindow inherits Window {
     in-out property <bool> minimize-to-tray: false;
     in-out property <bool> start-with-system: false;
     in-out property <bool> optimize-on-steam-launch: false;
+    in-out property <bool> content-is-grid-view: false;
     in-out property <bool> is-restoring-defaults: false;
 
     // Indica se existe um perfil selecionado pronto para edição de tweaks
@@ -176,6 +177,7 @@ export component MainWindow inherits Window {
     callback minimize-to-tray-toggled(bool);
     callback start-with-system-toggled(bool);
     callback optimize-on-steam-launch-toggled(bool);
+    callback content-view-mode-changed(bool);
 
     function handle-tweak-without-profile() {
         if !root.is-restoring-defaults {
@@ -604,6 +606,9 @@ export component MainWindow inherits Window {
             back-clicked => {
                 root.close-binds-view();
                 root.status-message = @tr("Visualizando Painel Geral");
+            }
+            view-mode-changed(grid-mode) => {
+                root.content-is-grid-view = grid-mode;
             }
         }
 
@@ -1577,7 +1582,7 @@ export component MainWindow inherits Window {
             alignment: space-between;
 
             VerticalLayout {
-                spacing: 18px;
+                spacing: 14px;
 
                 // Cabeçalho da Aba
                 VerticalLayout {
@@ -1666,7 +1671,136 @@ export component MainWindow inherits Window {
                     }
                 }
 
-                // Seção 2: Inicialização e Sistema
+                // Seção 2: Visualização de Conteúdo (Padrão Global)
+                VerticalLayout {
+                    spacing: 8px;
+
+                    VerticalLayout {
+                        spacing: 2px;
+                        Text {
+                            text: @tr("VISUALIZAÇÃO DE CONTEÚDO");
+                            font-size: 12px;
+                            font-weight: 800;
+                            letter-spacing: 0.5px;
+                            color: CS2Theme.text-cyan;
+                        }
+                        Text {
+                            text: @tr("Defina o modo padrão (Lista ou Grade) para exibir conteúdos em todo o CounterRush.");
+                            font-size: 10px;
+                            color: CS2Theme.text-dim;
+                        }
+                    }
+
+                    HorizontalLayout {
+                        alignment: start;
+                        spacing: 10px;
+
+                        Rectangle {
+                            property <bool> is-selected: !root.content-is-grid-view;
+                            width: 120px;
+                            height: 32px;
+                            background: is-selected ? CS2Theme.bg-card-selected : (settings-list-touch.has-hover ? CS2Theme.bg-card-hover : CS2Theme.bg-surface);
+                            border-radius: CS2Theme.radius-sm;
+                            border-width: 1px;
+                            border-color: is-selected ? CS2Theme.accent-ct-cyan : (settings-list-touch.has-hover ? CS2Theme.border-hover : CS2Theme.border);
+                            animate background { duration: 100ms; }
+                            animate border-color { duration: 100ms; }
+
+                            HorizontalLayout {
+                                padding-left: 12px;
+                                padding-right: 12px;
+                                spacing: 6px;
+                                alignment: center;
+
+                                VerticalLayout {
+                                    alignment: center;
+                                    Path {
+                                        width: 12px;
+                                        height: 10px;
+                                        viewbox-width: 14;
+                                        viewbox-height: 12;
+                                        stroke: is-selected ? CS2Theme.accent-ct-cyan : CS2Theme.text-muted;
+                                        stroke-width: 1.7px;
+                                        commands: "M 1 2 L 13 2 M 1 6 L 13 6 M 1 10 L 13 10";
+                                    }
+                                }
+
+                                Text {
+                                    text: @tr("Lista");
+                                    font-size: 11px;
+                                    font-weight: is-selected ? 800 : 600;
+                                    color: is-selected ? CS2Theme.text-primary : CS2Theme.text-muted;
+                                    vertical-alignment: center;
+                                }
+                            }
+
+                            settings-list-touch := TouchArea {
+                                mouse-cursor: pointer;
+                                clicked => {
+                                    if root.content-is-grid-view {
+                                        root.content-is-grid-view = false;
+                                        BindsState.is-grid-view = false;
+                                        root.content-view-mode-changed(false);
+                                    }
+                                }
+                            }
+                        }
+
+                        Rectangle {
+                            property <bool> is-selected: root.content-is-grid-view;
+                            width: 120px;
+                            height: 32px;
+                            background: is-selected ? CS2Theme.bg-card-selected : (settings-grid-touch.has-hover ? CS2Theme.bg-card-hover : CS2Theme.bg-surface);
+                            border-radius: CS2Theme.radius-sm;
+                            border-width: 1px;
+                            border-color: is-selected ? CS2Theme.accent-ct-cyan : (settings-grid-touch.has-hover ? CS2Theme.border-hover : CS2Theme.border);
+                            animate background { duration: 100ms; }
+                            animate border-color { duration: 100ms; }
+
+                            HorizontalLayout {
+                                padding-left: 12px;
+                                padding-right: 12px;
+                                spacing: 6px;
+                                alignment: center;
+
+                                VerticalLayout {
+                                    alignment: center;
+                                    Path {
+                                        width: 11px;
+                                        height: 11px;
+                                        viewbox-width: 12;
+                                        viewbox-height: 12;
+                                        stroke: is-selected ? CS2Theme.accent-ct-cyan : CS2Theme.text-muted;
+                                        stroke-width: 1.4px;
+                                        fill: is-selected ? CS2Theme.accent-ct-cyan : transparent;
+                                        commands: "M 1 1 L 4.5 1 L 4.5 4.5 L 1 4.5 Z M 7.5 1 L 11 1 L 11 4.5 L 7.5 4.5 Z M 1 7.5 L 4.5 7.5 L 4.5 11 L 1 11 Z M 7.5 7.5 L 11 7.5 L 11 11 L 7.5 11 Z";
+                                    }
+                                }
+
+                                Text {
+                                    text: @tr("Grade");
+                                    font-size: 11px;
+                                    font-weight: is-selected ? 800 : 600;
+                                    color: is-selected ? CS2Theme.text-primary : CS2Theme.text-muted;
+                                    vertical-alignment: center;
+                                }
+                            }
+
+                            settings-grid-touch := TouchArea {
+                                mouse-cursor: pointer;
+                                clicked => {
+                                    if !root.content-is-grid-view {
+                                        root.content-is-grid-view = true;
+                                        BindsState.is-grid-view = true;
+                                        root.content-view-mode-changed(true);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Seção 3: Inicialização e Sistema
                 VerticalLayout {
                     spacing: 8px;
 
@@ -2348,12 +2482,17 @@ export component MainWindow inherits Window {
     // Modal Overlay de Criação de Perfil de Otimização (.json)
     if root.show-create-modal : CreateProfileDialog {
         error-message: root.create-modal-error;
+        is-grid-view <=> root.content-is-grid-view;
         cancel => {
             root.show-create-modal = false;
             root.create-modal-error = "";
         }
         confirmed(data) => {
             root.create-profile-confirmed(data);
+        }
+        view-mode-changed(grid-mode) => {
+            BindsState.is-grid-view = grid-mode;
+            root.content-view-mode-changed(grid-mode);
         }
     }
 

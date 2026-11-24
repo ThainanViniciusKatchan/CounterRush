@@ -896,3 +896,9 @@ msgstr "Crie arquivos em Painel → Binds Táticas."
 
 msgid "Aguardando CS2"
 msgstr "Aguardando CS2"
+
+msgid "VISUALIZAÇÃO DE CONTEÚDO"
+msgstr "VISUALIZAÇÃO DE CONTEÚDO"
+
+msgid "Defina o modo padrão (Lista ou Grade) para exibir conteúdos em todo o CounterRush."
+msgstr "Defina o modo padrão (Lista ou Grade) para exibir conteúdos em todo o CounterRush."

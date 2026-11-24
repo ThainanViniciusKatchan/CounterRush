@@ -1752,3 +1752,14 @@ pub fn binds_overwrite_cancelled(lang: UiLanguage) -> &'static str {
         UiLanguage::PtBr => "Substituição cancelada. Nenhuma alteração foi gravada no arquivo.",
     }
 }
+
+pub fn content_view_mode_changed_status(lang: UiLanguage, is_grid: bool) -> &'static str {
+    match (lang, is_grid) {
+        (UiLanguage::EnUs, true) => "Default content view mode set to Grid.",
+        (UiLanguage::EnUs, false) => "Default content view mode set to List.",
+        (UiLanguage::RuRu, true) => "Режим отображения по умолчанию установлен: Сетка.",
+        (UiLanguage::RuRu, false) => "Режим отображения по умолчанию установлен: Список.",
+        (UiLanguage::PtBr, true) => "Modo de visualização padrão definido para Grade.",
+        (UiLanguage::PtBr, false) => "Modo de visualização padrão definido para Lista.",
+    }
+}

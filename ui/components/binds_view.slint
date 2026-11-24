@@ -151,6 +151,7 @@ export component BindsView inherits Rectangle {
     clip: true;
 
     callback back-clicked();
+    callback view-mode-changed(bool);
 
     // Função dedicada de ativação da escuta da próxima tecla
     public function activate-key-listener() {
@@ -1301,6 +1302,7 @@ export component BindsView inherits Rectangle {
                                         if BindsState.is-grid-view {
                                             BindsState.is-grid-view = false;
                                             catalog-scroll.content-y = 0px;
+                                            root.view-mode-changed(false);
                                             BindsState.view-mode-changed(false);
                                         }
                                     }
@@ -1352,6 +1354,7 @@ export component BindsView inherits Rectangle {
                                         if !BindsState.is-grid-view {
                                             BindsState.is-grid-view = true;
                                             catalog-scroll.content-y = 0px;
+                                            root.view-mode-changed(true);
                                             BindsState.view-mode-changed(true);
                                         }
                                     }

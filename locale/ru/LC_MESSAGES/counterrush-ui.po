@@ -896,3 +896,9 @@ msgstr "Создайте файлы в разделе Панель → Такт�
 
 msgid "Aguardando CS2"
 msgstr "Ожидание CS2"
+
+msgid "VISUALIZAÇÃO DE CONTEÚDO"
+msgstr "РЕЖИМ ОТОБРАЖЕНИЯ КОНТЕНТА"
+
+msgid "Defina o modo padrão (Lista ou Grade) para exibir conteúdos em todo o CounterRush."
+msgstr "Выберите режим по умолчанию (Список или Сетка) для отображения контента во всём CounterRush."

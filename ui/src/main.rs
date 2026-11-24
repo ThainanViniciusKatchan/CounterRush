@@ -903,6 +903,21 @@ fn save_active_preset_setting(preset_name: Option<String>) {
     }
 }
 
+pub(crate) fn save_content_view_mode_setting(settings_path: &std::path::Path, is_grid_view: bool) {
+    if let Ok(mut settings) = counterrush_core::config::AppSettings::load_or_create(settings_path) {
+        settings.content_view_mode =
+            counterrush_core::config::ContentViewMode::from_is_grid(is_grid_view);
+        let _ = settings.save_to_file(settings_path);
+    }
+}
+
+fn ensure_content_view_mode_key_migrated(
+    settings_path: &std::path::Path,
+    settings: &counterrush_core::config::AppSettings,
+) {
+    settings.ensure_content_view_mode_migrated(settings_path);
+}
+
 struct ConfiguredExecutionResult {
     applied_tweaks: Vec<AppliedSessionTweak>,
     config_dirty: bool,
@@ -1829,6 +1844,9 @@ fn main() -> Result<(), slint::PlatformError> {
     let settings_path = counterrush_core::resolve_app_settings_path();
     let app_settings = counterrush_core::config::AppSettings::load_or_create(&settings_path)
         .unwrap_or_default();
+    ensure_content_view_mode_key_migrated(&settings_path, &app_settings);
+    let initial_is_grid_view = app_settings.content_view_mode.is_grid();
+    main_window.set_content_is_grid_view(initial_is_grid_view);
 
     // Reconciliação do estado de inicialização e auto-otimização Steam
     let startup_task_active =
@@ -2296,7 +2314,25 @@ fn main() -> Result<(), slint::PlatformError> {
 
     // Inicializa controlador da view interna de gerenciamento de binds
     let binds_dirs = counterrush_core::BindDirectories::default();
-    let binds_controller = binds::wire_binds_view(&main_window, binds_dirs.clone());
+    let binds_controller = binds::wire_binds_view(
+        &main_window,
+        binds_dirs.clone(),
+        settings_path.clone(),
+        initial_is_grid_view,
+    );
+
+    let window_handle = main_window.as_weak();
+    let settings_path_for_view = settings_path.clone();
+    let binds_ctrl_for_view = binds_controller.clone();
+    main_window.on_content_view_mode_changed(move |grid_mode| {
+        save_content_view_mode_setting(&settings_path_for_view, grid_mode);
+        if let Some(ui) = window_handle.upgrade() {
+            ui.set_content_is_grid_view(grid_mode);
+            binds_ctrl_for_view.set_view_mode(&ui, grid_mode);
+            let lang = i18n::UiLanguage::from_code(ui.get_active_language().as_str());
+            ui.set_status_message(i18n::content_view_mode_changed_status(lang, grid_mode).into());
+        }
+    });
 
     // Callback para clique nos cards de ação
     let window_handle = main_window.as_weak();
@@ -2836,5 +2872,66 @@ mod in_game_state_tests {
         state.clear();
         assert_eq!(state, InGameRuntimeState::default());
         assert!(!state.any_applied());
+    }
+}
+
+#[cfg(test)]
+mod content_view_mode_tests {
+    use super::{ensure_content_view_mode_key_migrated, save_content_view_mode_setting};
+    use counterrush_core::config::{AppSettings, ContentViewMode};
+
+    #[test]
+    fn test_ensure_content_view_mode_key_migrated_for_legacy_settings() {
+        let temp = tempfile::tempdir().expect("Falha ao criar tempdir");
+        let settings_path = temp.path().join("settings.json");
+
+        std::fs::write(
+            &settings_path,
+            r#"{
+  "language": "en_US",
+  "start_with_system": true,
+  "optimize_on_steam_launch": false,
+  "initial_optimization_done": true,
+  "minimize_to_tray": true,
+  "active_preset": "AutoDetect"
+}"#,
+        )
+        .unwrap();
+
+        let loaded = AppSettings::load_or_create(&settings_path).unwrap();
+        assert_eq!(loaded.content_view_mode, ContentViewMode::List);
+
+        ensure_content_view_mode_key_migrated(&settings_path, &loaded);
+        let raw = std::fs::read_to_string(&settings_path).unwrap();
+        assert!(raw.contains("\"content_view_mode\": \"list\""));
+
+        let reloaded = AppSettings::load_from_file(&settings_path).unwrap();
+        assert_eq!(reloaded.language, "en_US");
+        assert!(reloaded.start_with_system);
+        assert!(reloaded.minimize_to_tray);
+        assert_eq!(reloaded.active_preset.as_deref(), Some("AutoDetect"));
+        assert_eq!(reloaded.content_view_mode, ContentViewMode::List);
+    }
+
+    #[test]
+    fn test_save_content_view_mode_setting_updates_only_view_mode() {
+        let temp = tempfile::tempdir().expect("Falha ao criar tempdir");
+        let settings_path = temp.path().join("settings.json");
+
+        let mut initial = AppSettings::default();
+        initial.language = "ru_RU".to_string();
+        initial.minimize_to_tray = true;
+        initial.save_to_file(&settings_path).unwrap();
+
+        save_content_view_mode_setting(&settings_path, true);
+        let after_grid = AppSettings::load_from_file(&settings_path).unwrap();
+        assert_eq!(after_grid.content_view_mode, ContentViewMode::Grid);
+        assert_eq!(after_grid.language, "ru_RU");
+        assert!(after_grid.minimize_to_tray);
+
+        save_content_view_mode_setting(&settings_path, false);
+        let after_list = AppSettings::load_from_file(&settings_path).unwrap();
+        assert_eq!(after_list.content_view_mode, ContentViewMode::List);
+        assert_eq!(after_list.language, "ru_RU");
     }
 }

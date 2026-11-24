@@ -28,11 +28,11 @@ struct BindsViewState {
 }
 
 impl BindsViewState {
-    fn new(lang: UiLanguage) -> Self {
+    fn new(lang: UiLanguage, is_grid_view: bool) -> Self {
         Self {
             selected_flags: vec![false; cs2_bind_catalog().len()],
             active_category: 0,
-            is_grid_view: false,
+            is_grid_view,
             search_query: String::new(),
             lang,
         }
@@ -46,6 +46,19 @@ pub struct BindsController {
 }
 
 impl BindsController {
+    pub fn set_view_mode(&self, ui: &MainWindow, is_grid_view: bool) {
+        {
+            let mut st = self.state.borrow_mut();
+            if st.is_grid_view == is_grid_view && ui.global::<BindsState>().get_is_grid_view() == is_grid_view {
+                return;
+            }
+            st.is_grid_view = is_grid_view;
+        }
+        let binds = ui.global::<BindsState>();
+        binds.set_tooltip_visible(false);
+        refresh_catalog_view(&binds, &self.state.borrow(), &self.rows_model);
+    }
+
     pub fn refresh_for_language(&self, ui: &MainWindow, lang: UiLanguage) {
         {
             let mut st = self.state.borrow_mut();
@@ -693,12 +706,18 @@ pub fn refresh_existing_cfg_files(ui: &MainWindow, dirs: &BindDirectories) {
     binds.set_existing_cfg_files(ModelRc::new(VecModel::from(cfg_names)));
 }
 
-pub fn wire_binds_view(ui: &MainWindow, dirs: BindDirectories) -> BindsController {
+pub fn wire_binds_view(
+    ui: &MainWindow,
+    dirs: BindDirectories,
+    settings_path: std::path::PathBuf,
+    initial_is_grid_view: bool,
+) -> BindsController {
     let initial_lang = UiLanguage::from_code(ui.get_active_language().as_str());
-    let state = Rc::new(RefCell::new(BindsViewState::new(initial_lang)));
+    let state = Rc::new(RefCell::new(BindsViewState::new(initial_lang, initial_is_grid_view)));
     let rows_model = Rc::new(VecModel::default());
     let binds = ui.global::<BindsState>();
 
+    ui.set_content_is_grid_view(initial_is_grid_view);
     binds.set_backend_connected(true);
     binds.set_catalog_rows(ModelRc::from(rows_model.clone()));
     binds.set_status_message(i18n::binds_default_status(initial_lang).into());
@@ -783,12 +802,15 @@ pub fn wire_binds_view(ui: &MainWindow, dirs: BindDirectories) -> BindsControlle
     let ui_weak = ui.as_weak();
     let state_view = state.clone();
     let model_view = rows_model.clone();
+    let settings_path_view = settings_path;
     binds.on_view_mode_changed(move |grid_mode| {
         {
             let mut st = state_view.borrow_mut();
             st.is_grid_view = grid_mode;
         }
+        crate::save_content_view_mode_setting(&settings_path_view, grid_mode);
         if let Some(ui) = ui_weak.upgrade() {
+            ui.set_content_is_grid_view(grid_mode);
             let binds = ui.global::<BindsState>();
             refresh_catalog_view(&binds, &state_view.borrow(), &model_view);
         }
@@ -953,8 +975,8 @@ mod tests {
 
         assert!(!ui.get_show_binds_view(), "Painel deve iniciar sem view de binds aberta");
 
-        crate::tray::setup_tray(&ui, &app_tray, settings_path, false);
-        let controller = wire_binds_view(&ui, dirs.clone());
+        crate::tray::setup_tray(&ui, &app_tray, settings_path.clone(), false);
+        let controller = wire_binds_view(&ui, dirs.clone(), settings_path.clone(), false);
 
         let binds = ui.global::<BindsState>();
 
@@ -993,9 +1015,16 @@ mod tests {
         }
         assert_eq!(total_across_tabs, 186);
 
-        // 2. Alternância Lista <-> Grade mantendo contagem e descrições
+        // 2. Alternância Lista <-> Grade mantendo contagem, descrições e persistência em settings.json
         binds.invoke_category_tab_selected(1);
         binds.invoke_view_mode_changed(true);
+        assert!(ui.get_content_is_grid_view());
+        assert_eq!(
+            counterrush_core::config::AppSettings::load_from_file(&settings_path)
+                .unwrap()
+                .content_view_mode,
+            counterrush_core::config::ContentViewMode::Grid
+        );
         let grid_rows = binds.get_catalog_rows();
         let mut has_grid_row = false;
         for i in 0..grid_rows.row_count() {
@@ -1014,6 +1043,13 @@ mod tests {
         assert_eq!(count_visible_commands_in_model(&grid_rows), 23);
 
         binds.invoke_view_mode_changed(false);
+        assert!(!ui.get_content_is_grid_view());
+        assert_eq!(
+            counterrush_core::config::AppSettings::load_from_file(&settings_path)
+                .unwrap()
+                .content_view_mode,
+            counterrush_core::config::ContentViewMode::List
+        );
         assert_eq!(count_visible_commands_in_model(&binds.get_catalog_rows()), 23);
 
         // 3. Pesquisa global por comando e descrição (sem acento)
@@ -1228,5 +1264,34 @@ mod tests {
             binds.get_category_tabs().row_data(0).unwrap().tab_label,
             "Movimentação"
         );
+    }
+
+    #[test]
+    fn test_binds_view_initial_grid_state_and_controller_sync() {
+        let temp = tempfile::tempdir().expect("Falha ao criar tempdir");
+        let local_cfg = temp.path().join("local_cfg");
+        let bkp_cfg = local_cfg.join("bkp");
+        let cs2_cfg = temp.path().join("cs2_cfg");
+        std::fs::create_dir_all(&local_cfg).unwrap();
+        std::fs::create_dir_all(&cs2_cfg).unwrap();
+
+        let dirs = BindDirectories::with_paths(&local_cfg, &bkp_cfg, &cs2_cfg);
+        let ui = MainWindow::new().expect("Falha ao instanciar MainWindow");
+        let settings_path = temp.path().join("settings.json");
+
+        let controller = wire_binds_view(&ui, dirs, settings_path, true);
+        let binds = ui.global::<BindsState>();
+
+        assert!(binds.get_is_grid_view());
+        assert!(ui.get_content_is_grid_view());
+        let rows_grid = binds.get_catalog_rows();
+        assert!((0..rows_grid.row_count()).any(|i| rows_grid.row_data(i).unwrap().row_kind == 3));
+        assert!(!(0..rows_grid.row_count()).any(|i| rows_grid.row_data(i).unwrap().row_kind == 2));
+
+        controller.set_view_mode(&ui, false);
+        assert!(!binds.get_is_grid_view());
+        let rows_list = binds.get_catalog_rows();
+        assert!((0..rows_list.row_count()).any(|i| rows_list.row_data(i).unwrap().row_kind == 2));
+        assert!(!(0..rows_list.row_count()).any(|i| rows_list.row_data(i).unwrap().row_kind == 3));
     }
 }

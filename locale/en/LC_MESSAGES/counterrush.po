@@ -896,3 +896,9 @@ msgstr "Create files in Dashboard → Tactical Binds."
 
 msgid "Aguardando CS2"
 msgstr "Awaiting CS2"
+
+msgid "VISUALIZAÇÃO DE CONTEÚDO"
+msgstr "CONTENT VIEW MODE"
+
+msgid "Defina o modo padrão (Lista ou Grade) para exibir conteúdos em todo o CounterRush."
+msgstr "Set the default layout (List or Grid) used to display content across CounterRush."

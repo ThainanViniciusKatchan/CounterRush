@@ -66,8 +66,10 @@ component ProfileGridSwitchSlot inherits Rectangle {
 
 export component CreateProfileDialog inherits Rectangle {
     in property <string> error-message: "";
+    in-out property <bool> is-grid-view: false;
     callback cancel();
     callback confirmed(NewProfileData);
+    callback view-mode-changed(bool);
 
     // Variáveis internas para os campos e switches
     property <string> profile-name: "";
@@ -86,8 +88,6 @@ export component CreateProfileDialog inherits Rectangle {
     property <bool> disable-power-saving: false;
     property <bool> apply-render-queue: false;
 
-    // Estado de visualização (Lista por padrão, igual à página de Binds)
-    property <bool> is-grid-view: false;
     property <int> selected-count:
         (root.cs2-affinity ? 1 : 0)
         + (root.apply-timer-resolution ? 1 : 0)
@@ -725,6 +725,7 @@ export component CreateProfileDialog inherits Rectangle {
                                             if root.is-grid-view {
                                                 root.is-grid-view = false;
                                                 modules-scroll.content-y = 0px;
+                                                root.view-mode-changed(false);
                                             }
                                         }
                                     }
@@ -773,6 +774,7 @@ export component CreateProfileDialog inherits Rectangle {
                                             if !root.is-grid-view {
                                                 root.is-grid-view = true;
                                                 modules-scroll.content-y = 0px;
+                                                root.view-mode-changed(true);
                                             }
                                         }
                                     }

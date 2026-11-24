@@ -17,6 +17,28 @@ pub struct AppConfig {
     pub auto_backup: bool,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum ContentViewMode {
+    #[default]
+    List,
+    Grid,
+}
+
+impl ContentViewMode {
+    pub fn is_grid(self) -> bool {
+        matches!(self, Self::Grid)
+    }
+
+    pub fn from_is_grid(is_grid: bool) -> Self {
+        if is_grid {
+            Self::Grid
+        } else {
+            Self::List
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct AppSettings {
@@ -26,6 +48,7 @@ pub struct AppSettings {
     pub initial_optimization_done: bool,
     pub minimize_to_tray: bool,
     pub active_preset: Option<String>,
+    pub content_view_mode: ContentViewMode,
 }
 
 impl Default for AppSettings {
@@ -37,6 +60,7 @@ impl Default for AppSettings {
             initial_optimization_done: false,
             minimize_to_tray: false,
             active_preset: None,
+            content_view_mode: ContentViewMode::List,
         }
     }
 }
@@ -104,6 +128,21 @@ impl AppSettings {
             let default_settings = Self::default();
             default_settings.save_to_file(path)?;
             Ok(default_settings)
+        }
+    }
+
+    pub fn ensure_content_view_mode_migrated<P: AsRef<Path>>(&self, path: P) {
+        let path = path.as_ref();
+        let Ok(raw) = std::fs::read_to_string(path) else {
+            return;
+        };
+        let trimmed = raw.trim_start_matches('\u{feff}').trim();
+        if let Ok(serde_json::Value::Object(map)) =
+            serde_json::from_str::<serde_json::Value>(trimmed)
+        {
+            if !map.contains_key("content_view_mode") {
+                let _ = self.save_to_file(path);
+            }
         }
     }
 }
@@ -329,6 +368,8 @@ mod tests {
         assert!(!settings.initial_optimization_done);
         assert!(!settings.minimize_to_tray);
         assert!(settings.active_preset.is_none());
+        assert_eq!(settings.content_view_mode, ContentViewMode::List);
+        assert!(!settings.content_view_mode.is_grid());
     }
 
     #[test]
@@ -340,6 +381,7 @@ mod tests {
             initial_optimization_done: true,
             minimize_to_tray: true,
             active_preset: Some("AutoDetect".to_string()),
+            content_view_mode: ContentViewMode::Grid,
         };
 
         let json = serde_json::to_string_pretty(&original).expect("Falha ao serializar AppSettings");
@@ -362,6 +404,7 @@ mod tests {
         assert!(!settings.initial_optimization_done);
         assert!(!settings.minimize_to_tray);
         assert!(settings.active_preset.is_none());
+        assert_eq!(settings.content_view_mode, ContentViewMode::List);
     }
 
     #[test]
@@ -379,6 +422,49 @@ mod tests {
         assert!(settings.initial_optimization_done);
         assert!(!settings.minimize_to_tray);
         assert!(settings.active_preset.is_none());
+        assert_eq!(settings.content_view_mode, ContentViewMode::List);
+    }
+
+    #[test]
+    fn test_app_settings_backwards_compatible_with_missing_content_view_mode() {
+        let json_legacy = r#"{
+            "language": "en_US",
+            "start_with_system": false,
+            "optimize_on_steam_launch": true,
+            "initial_optimization_done": true,
+            "minimize_to_tray": true,
+            "active_preset": "AutoDetect"
+        }"#;
+        let settings: AppSettings = serde_json::from_str(json_legacy).expect("Falha ao desserializar");
+        assert_eq!(settings.active_preset.as_deref(), Some("AutoDetect"));
+        assert_eq!(settings.content_view_mode, ContentViewMode::List);
+    }
+
+    #[test]
+    fn test_content_view_mode_helpers_and_serialization() {
+        assert_eq!(ContentViewMode::from_is_grid(false), ContentViewMode::List);
+        assert_eq!(ContentViewMode::from_is_grid(true), ContentViewMode::Grid);
+        assert!(!ContentViewMode::List.is_grid());
+        assert!(ContentViewMode::Grid.is_grid());
+
+        assert_eq!(serde_json::to_string(&ContentViewMode::List).unwrap(), "\"list\"");
+        assert_eq!(serde_json::to_string(&ContentViewMode::Grid).unwrap(), "\"grid\"");
+        assert_eq!(
+            serde_json::from_str::<ContentViewMode>("\"list\"").unwrap(),
+            ContentViewMode::List
+        );
+        assert_eq!(
+            serde_json::from_str::<ContentViewMode>("\"grid\"").unwrap(),
+            ContentViewMode::Grid
+        );
+
+        let temp_dir = tempfile::tempdir().expect("Falha ao criar tempdir");
+        let invalid_path = temp_dir.path().join("invalid_view_mode.json");
+        std::fs::write(&invalid_path, r#"{"content_view_mode": "invalid"}"#).unwrap();
+        assert!(matches!(
+            AppSettings::load_from_file(&invalid_path),
+            Err(ConfigError::Json(_))
+        ));
     }
 
     #[test]
@@ -393,10 +479,13 @@ mod tests {
             initial_optimization_done: true,
             minimize_to_tray: false,
             active_preset: Some("custom_optimization".to_string()),
+            content_view_mode: ContentViewMode::Grid,
         };
 
         settings.save_to_file(&path).expect("Falha ao salvar settings.json");
         assert!(path.exists());
+        let raw = std::fs::read_to_string(&path).expect("Falha ao ler settings.json");
+        assert!(raw.contains("\"content_view_mode\": \"grid\""));
 
         let loaded = AppSettings::load_from_file(&path).expect("Falha ao carregar settings.json");
         assert_eq!(settings, loaded);
@@ -411,6 +500,43 @@ mod tests {
         let created = AppSettings::load_or_create(&path).expect("Falha no load_or_create");
         assert!(path.exists());
         assert_eq!(created, AppSettings::default());
+    }
+
+    #[test]
+    fn test_app_settings_ensure_content_view_mode_migrated() {
+        let temp_dir = tempfile::tempdir().expect("Falha ao criar tempdir");
+        let legacy_path = temp_dir.path().join("legacy_settings.json");
+
+        std::fs::write(
+            &legacy_path,
+            "{\n  \"language\": \"en_US\",\n  \"start_with_system\": true,\n  \"optimize_on_steam_launch\": false,\n  \"initial_optimization_done\": true,\n  \"minimize_to_tray\": true,\n  \"active_preset\": \"AutoDetect\"\n}",
+        )
+        .unwrap();
+
+        let loaded = AppSettings::load_or_create(&legacy_path).expect("Falha ao carregar legado");
+        assert_eq!(loaded.content_view_mode, ContentViewMode::List);
+
+        loaded.ensure_content_view_mode_migrated(&legacy_path);
+        let raw = std::fs::read_to_string(&legacy_path).expect("Falha ao ler legado migrado");
+        assert!(raw.contains("\"content_view_mode\": \"list\""));
+
+        let reloaded = AppSettings::load_from_file(&legacy_path).expect("Falha ao recarregar migrado");
+        assert_eq!(reloaded.language, "en_US");
+        assert!(reloaded.start_with_system);
+        assert!(reloaded.minimize_to_tray);
+        assert_eq!(reloaded.active_preset.as_deref(), Some("AutoDetect"));
+        assert_eq!(reloaded.content_view_mode, ContentViewMode::List);
+
+        // Idempotência quando content_view_mode já existe (não sobrescreve "grid")
+        let grid_path = temp_dir.path().join("grid_settings.json");
+        let grid_raw = "{\n  \"language\": \"pt_BR\",\n  \"content_view_mode\": \"grid\"\n}";
+        std::fs::write(&grid_path, grid_raw).unwrap();
+        let default_settings = AppSettings::default();
+        default_settings.ensure_content_view_mode_migrated(&grid_path);
+        assert_eq!(
+            std::fs::read_to_string(&grid_path).unwrap(),
+            grid_raw
+        );
     }
 
     #[test]
