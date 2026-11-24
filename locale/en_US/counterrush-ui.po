@@ -540,7 +540,6 @@ msgstr "Optimizing system for CS2..."
 msgid "Otimizando sistema para o CS2..."
 msgstr "Optimizing system for CS2..."
 
-
 msgid "Preferências do aplicativo, integração com o sistema e links da comunidade."
 msgstr "Application preferences, system integration and community links."
 
@@ -628,7 +627,6 @@ msgstr "Minimize to system tray"
 msgid "Manter o CounterRush em execução em segundo plano ao fechar a janela principal."
 msgstr "Keep CounterRush running in the background when the main window is closed."
 
-
 msgid "Configurações"
 msgstr "Settings"
 
@@ -643,3 +641,159 @@ msgstr "No active optimization profile. Create or detect a profile to begin."
 
 msgid "Crie ou selecione um perfil para ativar otimizações."
 msgstr "Create or select a profile to enable optimizations."
+
+msgid "CS2 OTIMIZADO COM SUCESSO"
+msgstr "CS2 OPTIMIZED SUCCESSFULLY"
+
+msgid "INICIANDO CS2"
+msgstr "LAUNCHING CS2"
+
+msgid "OTIMIZAÇÃO CONCLUÍDA"
+msgstr "OPTIMIZATION COMPLETE"
+
+msgid "CALIBRAÇÃO AUTOMÁTICA"
+msgstr "AUTOMATIC CALIBRATION"
+
+msgid "APLICANDO OTIMIZAÇÕES PARA O COUNTER-STRIKE 2"
+msgstr "APPLYING OPTIMIZATIONS FOR COUNTER-STRIKE 2"
+
+msgid "CALIBRANDO SISTEMA PARA COUNTER-STRIKE 2"
+msgstr "CALIBRATING SYSTEM FOR COUNTER-STRIKE 2"
+
+msgid "Iniciando aplicação dos tweaks..."
+msgstr "Starting tweak application..."
+
+msgid "Iniciando calibração..."
+msgstr "Starting calibration..."
+
+msgid "Progresso da Aplicação"
+msgstr "Application Progress"
+
+msgid "SISTEMA OTIMIZADO COM SUCESSO!"
+msgstr "SYSTEM OPTIMIZED SUCCESSFULLY!"
+
+msgid "O jogo foi iniciado com todas as otimizações ativas."
+msgstr "The game was launched with all optimizations active."
+
+msgid "Perfil AutoDetect gerado e aplicado para o seu hardware."
+msgstr "AutoDetect profile generated and applied for your hardware."
+
+msgid "PROCESSO ATIVO • BOM JOGO!"
+msgstr "PROCESS ACTIVE • GOOD LUCK, HAVE FUN!"
+
+msgid "CANCELAR INICIALIZAÇÃO?"
+msgstr "CANCEL LAUNCH?"
+
+msgid "CANCELAR OTIMIZAÇÃO?"
+msgstr "CANCEL OPTIMIZATION?"
+
+msgid "Deseja realmente cancelar a inicialização do Counter-Strike 2?"
+msgstr "Do you really want to cancel launching Counter-Strike 2?"
+
+msgid "Deseja realmente cancelar o processo de calibração automática?"
+msgstr "Do you really want to cancel the automatic calibration process?"
+
+msgid "As otimizações parciais aplicadas serão revertidas e o jogo não será iniciado."
+msgstr "Partially applied optimizations will be reverted and the game will not launch."
+
+msgid "Os ajustes aplicados nesta sessão serão revertidos e o perfil não será salvo."
+msgstr "Tweaks applied in this session will be reverted and the profile will not be saved."
+
+msgid "NÃO, CONTINUAR"
+msgstr "NO, CONTINUE"
+
+msgid "SIM, CANCELAR"
+msgstr "YES, CANCEL"
+
+msgid "NOVO ARQUIVO"
+msgstr "NEW FILE"
+
+msgid "DIGITE O NOME"
+msgstr "ENTER NAME"
+
+msgid "ATUALIZAR ATUAL"
+msgstr "UPDATE CURRENT"
+
+msgid "CRIAR NOVO"
+msgstr "CREATE NEW"
+
+msgid "Selecione ou digite um arquivo .cfg, capture uma tecla e marque os comandos desejados."
+msgstr "Select or type a .cfg file, capture a key, and check the desired commands."
+
+msgid "Voltar"
+msgstr "Back"
+
+msgid "GERADOR DE BINDS CS2"
+msgstr "CS2 BIND GENERATOR"
+
+msgid "1. ARQUIVO .CFG"
+msgstr "1. .CFG FILE"
+
+msgid "Ex: minhas_binds.cfg"
+msgstr "e.g.: my_binds.cfg"
+
+msgid "Existentes ({})"
+msgstr "Existing ({})"
+
+msgid "Existentes"
+msgstr "Existing"
+
+msgid "2. TECLA DE ATALHO"
+msgstr "2. SHORTCUT KEY"
+
+msgid "Aguardando tecla/scroll..."
+msgstr "Waiting for key/scroll..."
+
+msgid "Alterar"
+msgstr "Change"
+
+msgid "Clique e pressione..."
+msgstr "Click and press..."
+
+msgid "SALVAR BIND"
+msgstr "SAVE BIND"
+
+msgid "PRÉVIA"
+msgstr "PREVIEW"
+
+msgid "Limpar marcados ({})"
+msgstr "Clear selected ({})"
+
+msgid "SUBSTITUIR TECLA"
+msgstr "REPLACE KEY"
+
+msgid "Pesquisar por comando ou descrição (ex: smoke, radar, +jump)..."
+msgstr "Search by command or description (e.g.: smoke, radar, +jump)..."
+
+msgid "{} resultado"
+msgstr "{} result"
+
+msgid "{} resultados"
+msgstr "{} results"
+
+msgid "Lista"
+msgstr "List"
+
+msgid "Grade"
+msgstr "Grid"
+
+msgid "Exibindo {} comando encontrado para \"{}\" em todas as categorias"
+msgstr "Showing {} command found for \"{}\" across all categories"
+
+msgid "Exibindo {} comandos encontrados para \"{}\" em todas as categorias"
+msgstr "Showing {} commands found for \"{}\" across all categories"
+
+msgid "Limpar pesquisa"
+msgstr "Clear search"
+
+msgid "Nenhum comando encontrado para \"{}\""
+msgstr "No commands found for \"{}\""
+
+msgid "Tente buscar pelo nome do comando (ex: noclip, slot8, buy) ou por palavras da descrição (ex: fumaça, radar, recuo)."
+msgstr "Try searching by command name (e.g.: noclip, slot8, buy) or description words (e.g.: smoke, radar, recoil)."
+
+msgid "+ Novo arquivo (limpar seleção)"
+msgstr "+ New file (clear selection)"
+
+msgid "Nenhum arquivo .cfg encontrado"
+msgstr "No .cfg files found"

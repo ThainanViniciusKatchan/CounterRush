@@ -133,7 +133,7 @@ msgid "APLICANDO TWEAKS & STEAM"
 msgstr "ПРИМЕНЕНИЕ ТВЕКОВ И STEAM"
 
 msgid "INICIAR COM ALTA PERFORMANCE"
-msgstr "ЗАПУСТИТЬ С ВЫСОКОЙ ПРОИЗВОДИТЕЛЬНОСТЬЮ"
+msgstr "МАКС. ПРОИЗВОДИТЕЛЬНОСТЬ"
 
 msgid "Iniciando Counter-Strike 2 pela Steam com perfil otimizado..."
 msgstr "Запуск Counter-Strike 2 через Steam с оптимизированным профилем..."
@@ -283,7 +283,7 @@ msgid "Render Queue"
 msgstr "Очередь рендеринга"
 
 msgid "Flip & Persist"
-msgstr "Flip & Persist"
+msgstr "Flip и Persist"
 
 msgid "Fila de Renderização: FlipQueue AMD = 1 e Persistence Mode em placas NVIDIA."
 msgstr "Очередь рендеринга: FlipQueue AMD = 1 и Persistence Mode на картах NVIDIA."
@@ -474,8 +474,8 @@ msgstr "Панель"
 msgid "Otimizações"
 msgstr "Оптимизации"
 
-msgid "Configurações"
-msgstr "Настройки"
+msgid "Configurar"
+msgstr "Настройка"
 
 msgid "Ranking CS"
 msgstr "Рейтинг CS"
@@ -490,7 +490,7 @@ msgid "Otimização"
 msgstr "Оптимизация"
 
 msgid "CPU Affinity"
-msgstr "CPU Affinity"
+msgstr "Привязка ЦП"
 
 msgid "ON"
 msgstr "ВКЛ"
@@ -539,7 +539,6 @@ msgstr "Оптимизация системы для CS2..."
 
 msgid "Otimizando sistema para o CS2..."
 msgstr "Оптимизация системы для CS2..."
-
 
 msgid "Preferências do aplicativo, integração com o sistema e links da comunidade."
 msgstr "Настройки приложения, системные интеграции и ссылки сообщества."
@@ -628,9 +627,8 @@ msgstr "Сворачивать в системный трей"
 msgid "Manter o CounterRush em execução em segundo plano ao fechar a janela principal."
 msgstr "Оставлять CounterRush работать в фоновом режиме при закрытии главного окна."
 
-
-msgid "Configurar"
-msgstr "Настройка"
+msgid "Configurações"
+msgstr "Настройки"
 
 msgid "JOGO EM PROCESSO DE DOWNLOAD OU ATUALIZAÇÃO"
 msgstr "ИГРА В ПРОЦЕССЕ ЗАГРУЗКИ ИЛИ ОБНОВЛЕНИЯ"
@@ -643,3 +641,159 @@ msgstr "Нет активного профиля оптимизации. Соз�
 
 msgid "Crie ou selecione um perfil para ativar otimizações."
 msgstr "Создайте или выберите профиль для включения оптимизаций."
+
+msgid "CS2 OTIMIZADO COM SUCESSO"
+msgstr "CS2 УСПЕШНО ОПТИМИЗИРОВАН"
+
+msgid "INICIANDO CS2"
+msgstr "ЗАПУСК CS2"
+
+msgid "OTIMIZAÇÃO CONCLUÍDA"
+msgstr "ОПТИМИЗАЦИЯ ЗАВЕРШЕНА"
+
+msgid "CALIBRAÇÃO AUTOMÁTICA"
+msgstr "АВТОМАТИЧЕСКАЯ КАЛИБРОВКА"
+
+msgid "APLICANDO OTIMIZAÇÕES PARA O COUNTER-STRIKE 2"
+msgstr "ПРИМЕНЕНИЕ ОПТИМИЗАЦИЙ ДЛЯ COUNTER-STRIKE 2"
+
+msgid "CALIBRANDO SISTEMA PARA COUNTER-STRIKE 2"
+msgstr "КАЛИБРОВКА СИСТЕМЫ ДЛЯ COUNTER-STRIKE 2"
+
+msgid "Iniciando aplicação dos tweaks..."
+msgstr "Запуск применения оптимизаций..."
+
+msgid "Iniciando calibração..."
+msgstr "Запуск калибровки..."
+
+msgid "Progresso da Aplicação"
+msgstr "Прогресс применения"
+
+msgid "SISTEMA OTIMIZADO COM SUCESSO!"
+msgstr "СИСТЕМА УСПЕШНО ОПТИМИЗИРОВАНА!"
+
+msgid "O jogo foi iniciado com todas as otimizações ativas."
+msgstr "Игра запущена со всеми активными оптимизациями."
+
+msgid "Perfil AutoDetect gerado e aplicado para o seu hardware."
+msgstr "Профиль AutoDetect создан и применён для вашего оборудования."
+
+msgid "PROCESSO ATIVO • BOM JOGO!"
+msgstr "ПРОЦЕСС АКТИВЕН • ПРИЯТНОЙ ИГРЫ!"
+
+msgid "CANCELAR INICIALIZAÇÃO?"
+msgstr "ОТМЕНИТЬ ЗАПУСК?"
+
+msgid "CANCELAR OTIMIZAÇÃO?"
+msgstr "ОТМЕНИТЬ ОПТИМИЗАЦИЮ?"
+
+msgid "Deseja realmente cancelar a inicialização do Counter-Strike 2?"
+msgstr "Вы действительно хотите отменить запуск Counter-Strike 2?"
+
+msgid "Deseja realmente cancelar o processo de calibração automática?"
+msgstr "Вы действительно хотите отменить процесс автоматической калибровки?"
+
+msgid "As otimizações parciais aplicadas serão revertidas e o jogo não será iniciado."
+msgstr "Частично применённые оптимизации будут отменены, и игра не будет запущена."
+
+msgid "Os ajustes aplicados nesta sessão serão revertidos e o perfil não será salvo."
+msgstr "Изменения, применённые в этой сессии, будут отменены, а профиль не будет сохранён."
+
+msgid "NÃO, CONTINUAR"
+msgstr "НЕТ, ПРОДОЛЖИТЬ"
+
+msgid "SIM, CANCELAR"
+msgstr "ДА, ОТМЕНИТЬ"
+
+msgid "NOVO ARQUIVO"
+msgstr "НОВЫЙ ФАЙЛ"
+
+msgid "DIGITE O NOME"
+msgstr "ВВЕДИТЕ ИМЯ"
+
+msgid "ATUALIZAR ATUAL"
+msgstr "ОБНОВИТЬ ТЕКУЩИЙ"
+
+msgid "CRIAR NOVO"
+msgstr "СОЗДАТЬ НОВЫЙ"
+
+msgid "Selecione ou digite um arquivo .cfg, capture uma tecla e marque os comandos desejados."
+msgstr "Выберите или введите файл .cfg, назначьте клавишу и отметьте нужные команды."
+
+msgid "Voltar"
+msgstr "Назад"
+
+msgid "GERADOR DE BINDS CS2"
+msgstr "ГЕНЕРАТОР БИНДОВ CS2"
+
+msgid "1. ARQUIVO .CFG"
+msgstr "1. ФАЙЛ .CFG"
+
+msgid "Ex: minhas_binds.cfg"
+msgstr "Напр.: my_binds.cfg"
+
+msgid "Existentes ({})"
+msgstr "Файлы ({})"
+
+msgid "Existentes"
+msgstr "Файлы"
+
+msgid "2. TECLA DE ATALHO"
+msgstr "2. КЛАВИША БИНДА"
+
+msgid "Aguardando tecla/scroll..."
+msgstr "Ожидание клавиши..."
+
+msgid "Alterar"
+msgstr "Изменить"
+
+msgid "Clique e pressione..."
+msgstr "Нажмите клавишу..."
+
+msgid "SALVAR BIND"
+msgstr "СОХРАНИТЬ БИНД"
+
+msgid "PRÉVIA"
+msgstr "ПРЕВЬЮ"
+
+msgid "Limpar marcados ({})"
+msgstr "Снять выбор ({})"
+
+msgid "SUBSTITUIR TECLA"
+msgstr "ЗАМЕНИТЬ КЛАВИШУ"
+
+msgid "Pesquisar por comando ou descrição (ex: smoke, radar, +jump)..."
+msgstr "Поиск по команде или описанию (напр.: smoke, radar, +jump)..."
+
+msgid "{} resultado"
+msgstr "{} результат"
+
+msgid "{} resultados"
+msgstr "{} результатов"
+
+msgid "Lista"
+msgstr "Список"
+
+msgid "Grade"
+msgstr "Сетка"
+
+msgid "Exibindo {} comando encontrado para \"{}\" em todas as categorias"
+msgstr "Найдена {} команда по запросу \"{}\" во всех категориях"
+
+msgid "Exibindo {} comandos encontrados para \"{}\" em todas as categorias"
+msgstr "Найдено {} команд по запросу \"{}\" во всех категориях"
+
+msgid "Limpar pesquisa"
+msgstr "Очистить поиск"
+
+msgid "Nenhum comando encontrado para \"{}\""
+msgstr "Команды по запросу \"{}\" не найдены"
+
+msgid "Tente buscar pelo nome do comando (ex: noclip, slot8, buy) ou por palavras da descrição (ex: fumaça, radar, recuo)."
+msgstr "Попробуйте искать по имени команды (напр.: noclip, slot8, buy) или словам из описания (напр.: дым, радар, отдача)."
+
+msgid "+ Novo arquivo (limpar seleção)"
+msgstr "+ Новый файл (сбросить выбор)"
+
+msgid "Nenhum arquivo .cfg encontrado"
+msgstr "Файлы .cfg не найдены"

@@ -3,6 +3,8 @@
 slint::include_modules!();
 
 mod binds;
+mod binds_i18n;
+mod i18n;
 mod tray;
 
 fn scan_presets() -> Vec<PresetModel> {
@@ -97,42 +99,6 @@ impl Tweaks {
     }
 }
 
-fn neutral_status_message(lang: &str) -> &'static str {
-    match lang {
-        "en" | "en_US" | "en-US" | "en-EUA" => {
-            "No active optimization profile. Create or detect a profile to begin."
-        }
-        "ru" | "ru_RU" | "ru-RU" => {
-            "Нет активного профиля оптимизации. Создайте или определите профиль для начала."
-        }
-        _ => "Nenhum perfil de otimização ativo. Crie ou detecte um perfil para começar.",
-    }
-}
-
-fn ready_status_message(lang: &str) -> &'static str {
-    match lang {
-        "en" | "en_US" | "en-US" | "en-EUA" => {
-            "Ready to launch CS2 with 0.5ms polling rate and optimized CPU affinity."
-        }
-        "ru" | "ru_RU" | "ru-RU" => {
-            "Готово к запуску CS2 с частотой опроса 0.5 мс и оптимизированной привязкой ЦП."
-        }
-        _ => "Pronto para iniciar o CS2 com taxa de polling de 0.5ms e afinidade de CPU otimizada.",
-    }
-}
-
-fn profile_required_status_message(lang: &str) -> &'static str {
-    match lang {
-        "en" | "en_US" | "en-US" | "en-EUA" => {
-            "Create or select a profile to enable optimizations."
-        }
-        "ru" | "ru_RU" | "ru-RU" => {
-            "Создайте или выберите профиль для включения оптимизаций."
-        }
-        _ => "Crie ou selecione um perfil para ativar otimizações.",
-    }
-}
-
 fn enforce_neutral_no_profile_state(ui: &MainWindow, status_msg: &str) {
     Tweaks::default().apply_to_ui(ui);
     ui.set_status_message(status_msg.into());
@@ -140,8 +106,8 @@ fn enforce_neutral_no_profile_state(ui: &MainWindow, status_msg: &str) {
 
 fn reject_tweak_without_profile(ui: &slint::Weak<MainWindow>) {
     post_ui(ui, |ui| {
-        let lang = ui.get_active_language();
-        enforce_neutral_no_profile_state(ui, profile_required_status_message(lang.as_str()));
+        let lang = i18n::UiLanguage::from_code(ui.get_active_language().as_str());
+        enforce_neutral_no_profile_state(ui, i18n::profile_required_status_message(lang));
     });
 }
 
@@ -167,11 +133,12 @@ fn post_ui<F: FnOnce(&MainWindow) + Send + 'static>(ui: &slint::Weak<MainWindow>
 fn spawn_command_worker(
     ui: slint::Weak<MainWindow>,
     config_path: std::sync::Arc<std::sync::RwLock<std::path::PathBuf>>,
+    active_lang: std::sync::Arc<std::sync::atomic::AtomicU8>,
 ) -> std::sync::mpsc::Sender<Command> {
     let (sender, receiver) = std::sync::mpsc::channel::<Command>();
     std::thread::spawn(move || {
         while let Ok(command) = receiver.recv() {
-            execute_command(command, &ui, &config_path);
+            execute_command(command, &ui, &config_path, &active_lang);
         }
     });
     sender
@@ -181,18 +148,24 @@ fn execute_command(
     command: Command,
     ui: &slint::Weak<MainWindow>,
     config_path: &std::sync::Arc<std::sync::RwLock<std::path::PathBuf>>,
+    active_lang: &std::sync::Arc<std::sync::atomic::AtomicU8>,
 ) {
+    let lang = i18n::UiLanguage::load_atomic(active_lang);
     match command {
-        Command::TweakToggled { name, active } => apply_tweak(ui, config_path, name, active),
+        Command::TweakToggled { name, active } => {
+            apply_tweak(ui, config_path, name, active, lang)
+        }
         Command::BulkTweaksAction { action } => apply_bulk_action(ui, config_path, action),
-        Command::PresetSelected { name } => select_preset(ui, config_path, name),
+        Command::PresetSelected { name } => select_preset(ui, config_path, name, lang),
         Command::CreateProfile {
             name,
             launch_args,
             tweaks,
-        } => create_profile(ui, config_path, name, launch_args, tweaks),
-        Command::SaveLaunchArgs { args } => save_launch_args(ui, config_path, args),
-        Command::DeleteProfile { name, active } => delete_profile(ui, config_path, name, active),
+        } => create_profile(ui, config_path, name, launch_args, tweaks, lang),
+        Command::SaveLaunchArgs { args } => save_launch_args(ui, config_path, args, lang),
+        Command::DeleteProfile { name, active } => {
+            delete_profile(ui, config_path, name, active, lang)
+        }
     }
 }
 
@@ -201,6 +174,7 @@ fn apply_tweak(
     config_path: &std::sync::Arc<std::sync::RwLock<std::path::PathBuf>>,
     tweak_name: String,
     active: bool,
+    lang: i18n::UiLanguage,
 ) {
     let target_path = config_path.read().map(|p| p.clone()).unwrap_or_default();
     if target_path.as_os_str().is_empty() {
@@ -208,24 +182,7 @@ fn apply_tweak(
         return;
     }
 
-    let display_name = match tweak_name.as_str() {
-        "cpu_core_0" => "Afinidade de CPU (Núcleo 0)",
-        "timer_resolution" => "Temporizador (0.5ms)",
-        "process_priority" => "Prioridade de Processo",
-        "empty_standby" => "Limpeza de RAM (Standby)",
-        "gpu_acceleration" => "Aceleração de GPU em Apps",
-        "dpi_optimization" => "Otimização de DPI e Janela",
-        "memory_compression" => "Compactação de Memória",
-        "mmcss" => "Agendador MMCSS",
-        "hpet" => "Temporizador HPET",
-        "game_bar" => "Xbox Game Bar e DVR",
-        "msi" => "Modo de Interrupção MSI",
-        "power_saving" => "Economia de Energia PCIe/USB",
-        "render_queue" => "Fila de Renderização",
-        _ => tweak_name.as_str(),
-    };
-    let state = if active { "ativado" } else { "desativado" };
-    let msg = format!("Módulo '{}' {}.", display_name, state);
+    let msg = i18n::tweak_toggled_message(lang, &tweak_name, active);
 
     let mut config = counterrush_core::config::CustomOptimizationConfig::load_from_file(&target_path)
         .unwrap_or_default();
@@ -377,18 +334,14 @@ struct AutoTweakStep {
     tweak_id: &'static str,
     permanent_kind: Option<counterrush_core::PermanentTweakKind>,
     enabled_in_config: bool,
-    applying_label: &'static str,
-    already_label: &'static str,
-    skipped_label: &'static str,
     session_tweak: Option<AppliedSessionTweak>,
     apply_fn: fn(&counterrush_core::OptimizerCore) -> bool,
 }
 
 struct ConfiguredTweakStep {
+    tweak_id: &'static str,
     enabled_in_config: bool,
     progress: f32,
-    applying_label: &'static str,
-    already_label: &'static str,
     permanent_kind: Option<counterrush_core::PermanentTweakKind>,
     session_tweak: Option<AppliedSessionTweak>,
     apply_fn: fn(&counterrush_core::OptimizerCore) -> bool,
@@ -424,6 +377,7 @@ fn run_auto_optimize_flow(
     ui: &slint::Weak<MainWindow>,
     config_path: &std::sync::Arc<std::sync::RwLock<std::path::PathBuf>>,
     token: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    active_lang: std::sync::Arc<std::sync::atomic::AtomicU8>,
 ) {
     let step_duration = std::time::Duration::from_millis(200);
     let core = counterrush_core::OptimizerCore::default();
@@ -435,26 +389,29 @@ fn run_auto_optimize_flow(
     if token.load(std::sync::atomic::Ordering::SeqCst) {
         return;
     }
-    update_auto_optimize_ui(ui, 0.08, "Detectando hardware e configurações do sistema...");
+    let lang = i18n::UiLanguage::load_atomic(&active_lang);
+    update_auto_optimize_ui(ui, 0.08, i18n::auto_optimize_detecting_hw(lang));
     if check_auto_optimize_cancelled(
         ui,
         &token,
         &core,
         &mut applied_tweaks,
         Some(step_duration),
-        "Calibração automática cancelada pelo usuário.",
+        i18n::auto_optimize_cancelled(i18n::UiLanguage::load_atomic(&active_lang)),
     ) {
         return;
     }
 
     // Etapa 1: Avaliação Combinada (Hardware + Status atual do SO)
-    update_auto_optimize_ui(ui, 0.16, "Analisando hardware e otimizações existentes...");
+    let lang = i18n::UiLanguage::load_atomic(&active_lang);
+    update_auto_optimize_ui(ui, 0.16, i18n::auto_optimize_analyzing_hw(lang));
     let (mut config, report) = match core.generate_autodetect_config() {
         Ok(res) => res,
         Err(e) => {
+            let err_msg = i18n::auto_optimize_err_generate(lang, &e);
             post_ui(ui, move |ui| {
                 ui.set_show_auto_optimize_modal(false);
-                ui.set_status_message(format!("Erro ao gerar perfil de otimização: {e}").into());
+                ui.set_status_message(err_msg.into());
             });
             return;
         }
@@ -465,7 +422,7 @@ fn run_auto_optimize_flow(
         &core,
         &mut applied_tweaks,
         Some(step_duration),
-        "Calibração automática cancelada pelo usuário.",
+        i18n::auto_optimize_cancelled(i18n::UiLanguage::load_atomic(&active_lang)),
     ) {
         return;
     }
@@ -476,9 +433,6 @@ fn run_auto_optimize_flow(
             tweak_id: "apply_timer_resolution",
             permanent_kind: None,
             enabled_in_config: config.apply_timer_resolution,
-            applying_label: "Otimizando resolução do temporizador (0.5ms)...",
-            already_label: "Resolução do temporizador (0.5ms) já configurada — preservada.",
-            skipped_label: "Resolução do temporizador mantida padrão.",
             session_tweak: Some(AppliedSessionTweak::Timer),
             apply_fn: |c| c.apply_timer_resolution().is_ok(),
         },
@@ -487,9 +441,6 @@ fn run_auto_optimize_flow(
             tweak_id: "apply_mmcss",
             permanent_kind: Some(counterrush_core::PermanentTweakKind::ApplyMmcss),
             enabled_in_config: config.apply_mmcss,
-            applying_label: "Configurando agendador multimídia e rede (MMCSS)...",
-            already_label: "Agendador multimídia (MMCSS) já otimizado — preservado.",
-            skipped_label: "Agendador multimídia (MMCSS) ignorado.",
             session_tweak: Some(AppliedSessionTweak::Mmcss),
             apply_fn: |c| c.apply_all_mmcss().is_ok(),
         },
@@ -498,9 +449,6 @@ fn run_auto_optimize_flow(
             tweak_id: "apply_dpi_optimization",
             permanent_kind: Some(counterrush_core::PermanentTweakKind::ApplyDpiOptimization),
             enabled_in_config: config.apply_dpi_optimization,
-            applying_label: "Ajustando DPI e compatibilidade de tela inteira CS2...",
-            already_label: "Otimização de DPI já configurada — preservada.",
-            skipped_label: "Otimização de DPI ignorada.",
             session_tweak: Some(AppliedSessionTweak::Dpi),
             apply_fn: |c| c.apply_dpi_optimization().is_ok(),
         },
@@ -509,9 +457,6 @@ fn run_auto_optimize_flow(
             tweak_id: "disable_gpu_acceleration",
             permanent_kind: Some(counterrush_core::PermanentTweakKind::DisableGpuAcceleration),
             enabled_in_config: config.disable_gpu_acceleration,
-            applying_label: "Desativando aceleração de GPU em aplicativos secundários...",
-            already_label: "Aceleração de GPU em apps já desativada — preservada.",
-            skipped_label: "Aceleração de GPU em apps mantida para perfil Potente.",
             session_tweak: Some(AppliedSessionTweak::GpuAccel),
             apply_fn: |c| c.disable_all_gpu_acceleration().is_ok(),
         },
@@ -520,9 +465,6 @@ fn run_auto_optimize_flow(
             tweak_id: "disable_memory_compression",
             permanent_kind: Some(counterrush_core::PermanentTweakKind::DisableMemoryCompression),
             enabled_in_config: config.disable_memory_compression,
-            applying_label: "Desativando compactação de memória do Windows...",
-            already_label: "Compactação de memória já desativada — preservada.",
-            skipped_label: "Compactação de memória mantida (RAM <= 16 GB).",
             session_tweak: Some(AppliedSessionTweak::MemCompression),
             apply_fn: |c| c.disable_memory_compression().is_ok(),
         },
@@ -531,9 +473,6 @@ fn run_auto_optimize_flow(
             tweak_id: "empty_standby_list",
             permanent_kind: None,
             enabled_in_config: config.empty_standby_list,
-            applying_label: "Liberando cache de memória RAM em Standby...",
-            already_label: "Standby List já verificada.",
-            skipped_label: "Limpeza da Standby List ignorada.",
             session_tweak: None,
             apply_fn: |c| c.empty_standby_list().is_ok(),
         },
@@ -542,9 +481,6 @@ fn run_auto_optimize_flow(
             tweak_id: "disable_hpet",
             permanent_kind: Some(counterrush_core::PermanentTweakKind::DisableHpet),
             enabled_in_config: config.disable_hpet,
-            applying_label: "Desativando HPET no BCD do Windows...",
-            already_label: "HPET já desativado no sistema — preservado.",
-            skipped_label: "Configuração HPET mantida.",
             session_tweak: Some(AppliedSessionTweak::Hpet),
             apply_fn: |c| c.disable_hpet().is_ok(),
         },
@@ -553,9 +489,6 @@ fn run_auto_optimize_flow(
             tweak_id: "disable_game_bar",
             permanent_kind: Some(counterrush_core::PermanentTweakKind::DisableGameBar),
             enabled_in_config: config.disable_game_bar,
-            applying_label: "Desativando Xbox Game Bar e capturas GameDVR...",
-            already_label: "Xbox Game Bar / GameDVR já desativados — preservados.",
-            skipped_label: "Xbox Game Bar mantido.",
             session_tweak: Some(AppliedSessionTweak::GameBar),
             apply_fn: |c| c.disable_all_game_bar_features().is_ok(),
         },
@@ -564,9 +497,6 @@ fn run_auto_optimize_flow(
             tweak_id: "enable_msi",
             permanent_kind: Some(counterrush_core::PermanentTweakKind::EnableMsi),
             enabled_in_config: config.enable_msi,
-            applying_label: "Ativando Modo MSI para GPU e periféricos...",
-            already_label: "Modo MSI já habilitado nos dispositivos — preservado.",
-            skipped_label: "Modo MSI ignorado.",
             session_tweak: Some(AppliedSessionTweak::Msi),
             apply_fn: |c| c.enable_all_msi().is_ok(),
         },
@@ -575,9 +505,6 @@ fn run_auto_optimize_flow(
             tweak_id: "disable_power_saving",
             permanent_kind: Some(counterrush_core::PermanentTweakKind::DisablePowerSaving),
             enabled_in_config: config.disable_power_saving,
-            applying_label: "Desativando suspensão de energia PCIe e USB...",
-            already_label: "Economia de energia PCIe/USB já desativada — preservada.",
-            skipped_label: "Economia de energia PCIe/USB mantida.",
             session_tweak: Some(AppliedSessionTweak::PowerSaving),
             apply_fn: |c| c.disable_all_power_saving().is_ok(),
         },
@@ -586,16 +513,14 @@ fn run_auto_optimize_flow(
             tweak_id: "apply_render_queue",
             permanent_kind: Some(counterrush_core::PermanentTweakKind::ApplyRenderQueue),
             enabled_in_config: config.apply_render_queue,
-            applying_label: "Configurando fila de renderização (Render Queue)...",
-            already_label: "Fila de renderização já configurada — preservada.",
-            skipped_label: "Fila de renderização não aplicável ao adaptador atual.",
             session_tweak: Some(AppliedSessionTweak::RenderQueue),
             apply_fn: |c| c.apply_render_queue().is_ok(),
         },
     ];
 
-    let cancel_reverted_msg = "Calibração automática cancelada pelo usuário. Alterações revertidas.";
     for step in steps {
+        let lang = i18n::UiLanguage::load_atomic(&active_lang);
+        let cancel_reverted_msg = i18n::auto_optimize_cancelled_reverted(lang);
         if check_auto_optimize_cancelled(
             ui,
             &token,
@@ -608,12 +533,36 @@ fn run_auto_optimize_flow(
         }
 
         if report.is_already_applied(step.tweak_id) {
-            update_auto_optimize_ui(ui, step.progress, step.already_label);
+            update_auto_optimize_ui(
+                ui,
+                step.progress,
+                i18n::auto_optimize_step_label(
+                    lang,
+                    step.tweak_id,
+                    i18n::AutoStepStatusKind::Already,
+                ),
+            );
             already_count += 1;
         } else if !step.enabled_in_config {
-            update_auto_optimize_ui(ui, step.progress, step.skipped_label);
+            update_auto_optimize_ui(
+                ui,
+                step.progress,
+                i18n::auto_optimize_step_label(
+                    lang,
+                    step.tweak_id,
+                    i18n::AutoStepStatusKind::Skipped,
+                ),
+            );
         } else {
-            update_auto_optimize_ui(ui, step.progress, step.applying_label);
+            update_auto_optimize_ui(
+                ui,
+                step.progress,
+                i18n::auto_optimize_step_label(
+                    lang,
+                    step.tweak_id,
+                    i18n::AutoStepStatusKind::Applying,
+                ),
+            );
             if (step.apply_fn)(&core) {
                 applied_count += 1;
                 if let Some(session_tweak) = step.session_tweak {
@@ -625,35 +574,38 @@ fn run_auto_optimize_flow(
             }
         }
 
+        let lang_after = i18n::UiLanguage::load_atomic(&active_lang);
         if check_auto_optimize_cancelled(
             ui,
             &token,
             &core,
             &mut applied_tweaks,
             Some(step_duration),
-            cancel_reverted_msg,
+            i18n::auto_optimize_cancelled_reverted(lang_after),
         ) {
             return;
         }
     }
 
     // Etapa Final: Gravação de AutoDetect.json e atualização da UI
+    let lang = i18n::UiLanguage::load_atomic(&active_lang);
     if check_auto_optimize_cancelled(
         ui,
         &token,
         &core,
         &mut applied_tweaks,
         None,
-        cancel_reverted_msg,
+        i18n::auto_optimize_cancelled_reverted(lang),
     ) {
         return;
     }
 
     let autodetect_path = counterrush_core::resolve_autodetect_config_path(None);
     if let Err(e) = config.save_to_file(&autodetect_path) {
+        let err_msg = i18n::auto_optimize_err_save(lang, &e);
         post_ui(ui, move |ui| {
             ui.set_show_auto_optimize_modal(false);
-            ui.set_status_message(format!("Erro ao salvar AutoDetect.json: {e}").into());
+            ui.set_status_message(err_msg.into());
         });
         return;
     }
@@ -672,19 +624,15 @@ fn run_auto_optimize_flow(
     let updated_presets = scan_presets();
     let args_text = config.launch_args.join(" ");
     let tweaks = Tweaks::from_config(&config);
-    let msg = if report.blocked_tweaks.is_empty() {
-        format!(
-            "Hardware detectado ({:?} • {}). AutoDetect salvo ({applied_count} aplicadas agora, {already_count} já estavam otimizadas).",
-            report.category, report.hardware.gpu.model
-        )
-    } else {
-        format!(
-            "Hardware detectado ({:?} • {}). AutoDetect salvo ({applied_count} aplicadas agora, {already_count} já otimizadas, {} não aplicáveis ao hardware).",
-            report.category,
-            report.hardware.gpu.model,
-            report.blocked_tweaks.len()
-        )
-    };
+    let msg = i18n::auto_optimize_completed_status(
+        lang,
+        report.category,
+        &report.hardware.gpu.model,
+        applied_count,
+        already_count,
+        report.blocked_tweaks.len(),
+    );
+    let completed_step = i18n::auto_optimize_completed_step(lang);
 
     post_ui(ui, move |ui| {
         ui.set_presets(slint::ModelRc::new(slint::VecModel::from(updated_presets)));
@@ -694,7 +642,7 @@ fn run_auto_optimize_flow(
         tweaks.apply_to_ui(ui);
         ui.set_status_message(msg.into());
         ui.set_auto_optimize_progress(1.0);
-        ui.set_auto_optimize_step_name("Sistema otimizado com sucesso!".into());
+        ui.set_auto_optimize_step_name(completed_step.into());
         ui.set_auto_optimize_finished(true);
     });
 }
@@ -714,6 +662,7 @@ fn execute_configured_tweaks_with_modal(
     token: &std::sync::atomic::AtomicBool,
     step_duration: std::time::Duration,
     cancel_msg: &str,
+    active_lang: &std::sync::Arc<std::sync::atomic::AtomicU8>,
 ) -> Option<(Vec<AppliedSessionTweak>, bool)> {
     let mut applied_tweaks = Vec::new();
     let mut config_dirty = false;
@@ -732,107 +681,97 @@ fn execute_configured_tweaks_with_modal(
     if token.load(std::sync::atomic::Ordering::SeqCst) {
         return cancel_and_rollback(applied_tweaks);
     }
-    update_auto_optimize_ui(ui, 0.08, "Verificando perfil e compatibilidade do hardware...");
+    let lang = i18n::UiLanguage::load_atomic(active_lang);
+    update_auto_optimize_ui(ui, 0.08, i18n::configured_checking_profile(lang));
     if !sleep_with_cancellation(step_duration, token) {
         return cancel_and_rollback(applied_tweaks);
     }
 
     let steps = [
         ConfiguredTweakStep {
+            tweak_id: "empty_standby_list",
             enabled_in_config: config.empty_standby_list,
             progress: 0.16,
-            applying_label: "Liberando cache de memória RAM em Standby...",
-            already_label: "",
             permanent_kind: None,
             session_tweak: None,
             apply_fn: |c| c.empty_standby_list().is_ok(),
         },
         ConfiguredTweakStep {
+            tweak_id: "apply_timer_resolution",
             enabled_in_config: config.apply_timer_resolution,
             progress: 0.24,
-            applying_label: "Otimizando resolução do temporizador (0.5ms)...",
-            already_label: "",
             permanent_kind: None,
             session_tweak: Some(AppliedSessionTweak::Timer),
             apply_fn: |c| c.apply_timer_resolution().is_ok(),
         },
         ConfiguredTweakStep {
+            tweak_id: "apply_mmcss",
             enabled_in_config: config.apply_mmcss,
             progress: 0.32,
-            applying_label: "Configurando agendador multimídia e rede (MMCSS)...",
-            already_label: "Agendador multimídia (MMCSS) já otimizado — preservado.",
             permanent_kind: Some(counterrush_core::PermanentTweakKind::ApplyMmcss),
             session_tweak: Some(AppliedSessionTweak::Mmcss),
             apply_fn: |c| c.apply_all_mmcss().is_ok(),
         },
         ConfiguredTweakStep {
+            tweak_id: "apply_dpi_optimization",
             enabled_in_config: config.apply_dpi_optimization,
             progress: 0.40,
-            applying_label: "Ajustando DPI e compatibilidade de tela inteira CS2...",
-            already_label: "Otimização de DPI já configurada — preservada.",
             permanent_kind: Some(counterrush_core::PermanentTweakKind::ApplyDpiOptimization),
             session_tweak: Some(AppliedSessionTweak::Dpi),
             apply_fn: |c| c.apply_dpi_optimization().is_ok(),
         },
         ConfiguredTweakStep {
+            tweak_id: "disable_gpu_acceleration",
             enabled_in_config: config.disable_gpu_acceleration,
             progress: 0.48,
-            applying_label: "Desativando aceleração de GPU em aplicativos secundários...",
-            already_label: "Aceleração de GPU em apps já desativada — preservada.",
             permanent_kind: Some(counterrush_core::PermanentTweakKind::DisableGpuAcceleration),
             session_tweak: Some(AppliedSessionTweak::GpuAccel),
             apply_fn: |c| c.disable_all_gpu_acceleration().is_ok(),
         },
         ConfiguredTweakStep {
+            tweak_id: "disable_memory_compression",
             enabled_in_config: config.disable_memory_compression,
             progress: 0.56,
-            applying_label: "Calibrando compactação de memória do Windows...",
-            already_label: "Compactação de memória já desativada — preservada.",
             permanent_kind: Some(counterrush_core::PermanentTweakKind::DisableMemoryCompression),
             session_tweak: Some(AppliedSessionTweak::MemCompression),
             apply_fn: |c| c.disable_memory_compression().is_ok(),
         },
         ConfiguredTweakStep {
+            tweak_id: "disable_hpet",
             enabled_in_config: config.disable_hpet,
             progress: 0.64,
-            applying_label: "Desativando HPET (temporizador de alta precisão)...",
-            already_label: "HPET já desativado no sistema — preservado.",
             permanent_kind: Some(counterrush_core::PermanentTweakKind::DisableHpet),
             session_tweak: Some(AppliedSessionTweak::Hpet),
             apply_fn: |c| c.disable_hpet().is_ok(),
         },
         ConfiguredTweakStep {
+            tweak_id: "disable_game_bar",
             enabled_in_config: config.disable_game_bar,
             progress: 0.72,
-            applying_label: "Desativando Xbox Game Bar e capturas GameDVR...",
-            already_label: "Xbox Game Bar / GameDVR já desativados — preservados.",
             permanent_kind: Some(counterrush_core::PermanentTweakKind::DisableGameBar),
             session_tweak: Some(AppliedSessionTweak::GameBar),
             apply_fn: |c| c.disable_all_game_bar_features().is_ok(),
         },
         ConfiguredTweakStep {
+            tweak_id: "enable_msi",
             enabled_in_config: config.enable_msi,
             progress: 0.80,
-            applying_label: "Ativando Modo MSI para GPU e periféricos...",
-            already_label: "Modo MSI já habilitado nos dispositivos — preservado.",
             permanent_kind: Some(counterrush_core::PermanentTweakKind::EnableMsi),
             session_tweak: Some(AppliedSessionTweak::Msi),
             apply_fn: |c| c.enable_all_msi().is_ok(),
         },
         ConfiguredTweakStep {
+            tweak_id: "disable_power_saving",
             enabled_in_config: config.disable_power_saving,
             progress: 0.86,
-            applying_label: "Desativando suspensão de energia PCIe e USB...",
-            already_label: "Economia de energia PCIe/USB já desativada — preservada.",
             permanent_kind: Some(counterrush_core::PermanentTweakKind::DisablePowerSaving),
             session_tweak: Some(AppliedSessionTweak::PowerSaving),
             apply_fn: |c| c.disable_all_power_saving().is_ok(),
         },
         ConfiguredTweakStep {
+            tweak_id: "apply_render_queue",
             enabled_in_config: config.apply_render_queue,
             progress: 0.92,
-            applying_label: "Configurando fila de renderização (Render Queue)...",
-            already_label: "Fila de renderização já configurada — preservada.",
             permanent_kind: Some(counterrush_core::PermanentTweakKind::ApplyRenderQueue),
             session_tweak: Some(AppliedSessionTweak::RenderQueue),
             apply_fn: |c| c.apply_render_queue().is_ok(),
@@ -847,15 +786,19 @@ fn execute_configured_tweaks_with_modal(
             continue;
         }
 
+        let lang = i18n::UiLanguage::load_atomic(active_lang);
+        let applying_label = i18n::configured_step_applying(lang, step.tweak_id);
+        let already_label = i18n::configured_step_already(lang, step.tweak_id);
+
         if let Some(kind) = step.permanent_kind {
             match core.is_permanent_tweak_applied(kind) {
                 Ok(true) => {
-                    update_auto_optimize_ui(ui, step.progress, step.already_label);
+                    update_auto_optimize_ui(ui, step.progress, already_label);
                     kind.set_enabled_in(config, false);
                     config_dirty = true;
                 }
                 Ok(false) => {
-                    update_auto_optimize_ui(ui, step.progress, step.applying_label);
+                    update_auto_optimize_ui(ui, step.progress, applying_label);
                     if (step.apply_fn)(core) {
                         if let Some(t) = step.session_tweak {
                             applied_tweaks.push(t);
@@ -865,11 +808,11 @@ fn execute_configured_tweaks_with_modal(
                     }
                 }
                 Err(_) => {
-                    update_auto_optimize_ui(ui, step.progress, step.applying_label);
+                    update_auto_optimize_ui(ui, step.progress, applying_label);
                 }
             }
         } else {
-            update_auto_optimize_ui(ui, step.progress, step.applying_label);
+            update_auto_optimize_ui(ui, step.progress, applying_label);
             if (step.apply_fn)(core) {
                 if let Some(t) = step.session_tweak {
                     applied_tweaks.push(t);
@@ -891,24 +834,17 @@ fn run_steam_auto_optimize_flow(
     pid: u32,
     token: &std::sync::Arc<std::sync::atomic::AtomicBool>,
     monitor_weak: &std::sync::Weak<counterrush_core::GameMonitorService>,
+    active_lang: &std::sync::Arc<std::sync::atomic::AtomicU8>,
 ) {
     token.store(false, std::sync::atomic::Ordering::SeqCst);
 
     post_ui(ui, move |ui| {
-        let lang = ui.get_active_language();
-        let status_msg = match lang.as_str() {
-            "en" | "en_US" | "en-US" | "en-EUA" => {
-                format!("CS2 detected via Steam (PID: {pid}). Applying optimizations...")
-            }
-            "ru" | "ru_RU" | "ru-RU" => {
-                format!("CS2 обнаружен через Steam (PID: {pid}). Применение оптимизаций...")
-            }
-            _ => format!("CS2 detectado via Steam (PID: {pid}). Aplicando otimizações..."),
-        };
+        let lang = i18n::UiLanguage::from_code(ui.get_active_language().as_str());
+        let status_msg = i18n::steam_auto_detected_status(lang, pid);
         ui.set_is_launching(true);
         ui.set_auto_optimize_is_launch(true);
         ui.set_auto_optimize_progress(0.0);
-        ui.set_auto_optimize_step_name("CS2 detectado via Steam. Iniciando otimizações...".into());
+        ui.set_auto_optimize_step_name(i18n::steam_auto_detected_step(lang).into());
         ui.set_auto_optimize_stage_title("".into());
         ui.set_auto_optimize_stage_subtitle("".into());
         ui.set_auto_optimize_finished(false);
@@ -927,13 +863,13 @@ fn run_steam_auto_optimize_flow(
             }
             resolved
         } else {
-            post_ui(ui, |ui| {
+            let lang = i18n::UiLanguage::load_atomic(active_lang);
+            let msg = i18n::steam_auto_no_profile(lang);
+            post_ui(ui, move |ui| {
                 ui.set_is_launching(false);
                 ui.set_show_auto_optimize_modal(false);
                 ui.set_show_no_profile_modal(true);
-                ui.set_status_message(
-                    "Nenhum perfil de otimização selecionado para auto-otimização Steam.".into(),
-                );
+                ui.set_status_message(msg.into());
             });
             return;
         }
@@ -946,7 +882,8 @@ fn run_steam_auto_optimize_flow(
         match core.load_or_create_custom_config(Some(&effective_path)) {
             Ok(res) => res,
             Err(err) => {
-                let err_msg = format!("Erro na configuração: {err}");
+                let lang = i18n::UiLanguage::load_atomic(active_lang);
+                let err_msg = i18n::launch_config_error(lang, &err);
                 post_ui(ui, move |ui| {
                     ui.set_show_auto_optimize_modal(false);
                     ui.set_is_launching(false);
@@ -963,13 +900,15 @@ fn run_steam_auto_optimize_flow(
         hw_dirty = config != before;
     }
 
+    let cancel_msg = i18n::steam_auto_cancelled(i18n::UiLanguage::load_atomic(active_lang));
     let steps_dirty = match execute_configured_tweaks_with_modal(
         ui,
         &core,
         &mut config,
         token,
         std::time::Duration::from_millis(120),
-        "Auto-otimização Steam cancelada pelo usuário. Alterações revertidas.",
+        cancel_msg,
+        active_lang,
     ) {
         Some((_, dirty)) => dirty,
         None => return,
@@ -982,7 +921,8 @@ fn run_steam_auto_optimize_flow(
     }
 
     if config.cs2_priority || config.cs2_affinity {
-        update_auto_optimize_ui(ui, 0.96, "Aplicando prioridade e afinidade no processo CS2...");
+        let lang = i18n::UiLanguage::load_atomic(active_lang);
+        update_auto_optimize_ui(ui, 0.96, i18n::steam_auto_applying_process(lang));
         let is_running = counterrush_core::windows_api::is_pid_alive(pid)
             || counterrush_core::windows_api::is_cs2_process_running_win32().unwrap_or(false);
         if is_running {
@@ -999,26 +939,16 @@ fn run_steam_auto_optimize_flow(
     let profile_label = resolved_cfg_path
         .file_stem()
         .and_then(|s| s.to_str())
-        .unwrap_or("selecionado")
+        .unwrap_or("AutoDetect")
         .to_string();
 
     post_ui(ui, move |ui| {
-        let lang = ui.get_active_language();
-        let msg = match lang.as_str() {
-            "en" | "en_US" | "en-US" | "en-EUA" => {
-                format!("CS2 optimized with profile '{profile_label}'! Waiting for game focus...")
-            }
-            "ru" | "ru_RU" | "ru-RU" => {
-                format!("CS2 оптимизирован с профилем '{profile_label}'! Ожидание фокуса игры...")
-            }
-            _ => format!(
-                "CS2 otimizado com o perfil '{profile_label}'! Aguardando foco do jogo..."
-            ),
-        };
+        let lang = i18n::UiLanguage::from_code(ui.get_active_language().as_str());
+        let msg = i18n::steam_auto_done_status(lang, &profile_label);
         ui.set_auto_optimize_stage_title("".into());
         ui.set_auto_optimize_stage_subtitle("".into());
         ui.set_auto_optimize_progress(1.0);
-        ui.set_auto_optimize_step_name("CS2 OTIMIZADO COM SUCESSO".into());
+        ui.set_auto_optimize_step_name(i18n::launch_success(lang).into());
         ui.set_auto_optimize_finished(true);
         ui.set_is_launching(false);
         ui.set_status_message(msg.into());
@@ -1053,6 +983,7 @@ fn run_launch_flow(
     config_path: &std::sync::Arc<std::sync::RwLock<std::path::PathBuf>>,
     fallback_path: std::path::PathBuf,
     token: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    active_lang: std::sync::Arc<std::sync::atomic::AtomicU8>,
 ) {
     if scan_presets().is_empty() {
         post_ui(ui, |ui| {
@@ -1068,7 +999,8 @@ fn run_launch_flow(
     let (resolved_cfg_path, mut config) = match core.load_or_create_custom_config(Some(&target_cfg_path)) {
         Ok(res) => res,
         Err(err) => {
-            let err_msg = format!("Erro na configuração: {err}");
+            let lang = i18n::UiLanguage::load_atomic(&active_lang);
+            let err_msg = i18n::launch_config_error(lang, &err);
             post_ui(ui, move |ui| {
                 ui.set_show_auto_optimize_modal(false);
                 ui.set_is_launching(false);
@@ -1078,10 +1010,11 @@ fn run_launch_flow(
         }
     };
 
-    post_ui(ui, |ui| {
+    let initial_step = i18n::launch_flow_initial_step(i18n::UiLanguage::load_atomic(&active_lang));
+    post_ui(ui, move |ui| {
         ui.set_auto_optimize_is_launch(true);
         ui.set_auto_optimize_progress(0.0);
-        ui.set_auto_optimize_step_name("Iniciando calibração e aplicação de otimizações...".into());
+        ui.set_auto_optimize_step_name(initial_step.into());
         ui.set_auto_optimize_stage_title("".into());
         ui.set_auto_optimize_stage_subtitle("".into());
         ui.set_auto_optimize_finished(false);
@@ -1096,13 +1029,15 @@ fn run_launch_flow(
         hw_dirty = config != before;
     }
 
+    let cancel_msg = i18n::launch_cancelled_reverted(i18n::UiLanguage::load_atomic(&active_lang));
     let (applied_tweaks, steps_dirty) = match execute_configured_tweaks_with_modal(
         ui,
         &core,
         &mut config,
         &token,
         std::time::Duration::from_millis(180),
-        "Inicialização cancelada pelo usuário. Alterações revertidas.",
+        cancel_msg,
+        &active_lang,
     ) {
         Some(res) => res,
         None => return,
@@ -1111,10 +1046,11 @@ fn run_launch_flow(
     // Etapa 13: Verificação de Download/Atualização Ativa da Steam e Inicialização
     if token.load(std::sync::atomic::Ordering::SeqCst) {
         rollback_applied_tweaks(&core, applied_tweaks);
-        post_ui(ui, |ui| {
+        let msg = i18n::launch_cancelled_reverted(i18n::UiLanguage::load_atomic(&active_lang));
+        post_ui(ui, move |ui| {
             ui.set_show_auto_optimize_modal(false);
             ui.set_is_launching(false);
-            ui.set_status_message("Inicialização cancelada pelo usuário. Alterações revertidas.".into());
+            ui.set_status_message(msg.into());
         });
         return;
     }
@@ -1130,12 +1066,13 @@ fn run_launch_flow(
 
         if token.load(std::sync::atomic::Ordering::SeqCst) {
             rollback_applied_tweaks(&core, applied_tweaks);
-            post_ui(ui, |ui| {
+            let msg = i18n::launch_cancelled_reverted(i18n::UiLanguage::load_atomic(&active_lang));
+            post_ui(ui, move |ui| {
                 ui.set_show_auto_optimize_modal(false);
                 ui.set_is_launching(false);
                 ui.set_auto_optimize_stage_title("".into());
                 ui.set_auto_optimize_stage_subtitle("".into());
-                ui.set_status_message("Inicialização cancelada pelo usuário. Alterações revertidas.".into());
+                ui.set_status_message(msg.into());
             });
             return;
         }
@@ -1151,21 +1088,25 @@ fn run_launch_flow(
 
         if !was_downloading {
             was_downloading = true;
-            post_ui(ui, |ui| {
-                ui.set_auto_optimize_stage_title("JOGO EM PROCESSO DE DOWNLOAD OU ATUALIZAÇÃO".into());
-                ui.set_auto_optimize_stage_subtitle("Aguardando finalização para continuar".into());
+            let lang = i18n::UiLanguage::load_atomic(&active_lang);
+            let dl_title = i18n::launch_download_title(lang);
+            let dl_sub = i18n::launch_download_subtitle(lang);
+            post_ui(ui, move |ui| {
+                ui.set_auto_optimize_stage_title(dl_title.into());
+                ui.set_auto_optimize_stage_subtitle(dl_sub.into());
                 ui.set_auto_optimize_progress(0.95);
             });
         }
 
         if !sleep_with_cancellation(std::time::Duration::from_millis(500), &token) {
             rollback_applied_tweaks(&core, applied_tweaks);
-            post_ui(ui, |ui| {
+            let msg = i18n::launch_cancelled_reverted(i18n::UiLanguage::load_atomic(&active_lang));
+            post_ui(ui, move |ui| {
                 ui.set_show_auto_optimize_modal(false);
                 ui.set_is_launching(false);
                 ui.set_auto_optimize_stage_title("".into());
                 ui.set_auto_optimize_stage_subtitle("".into());
-                ui.set_status_message("Inicialização cancelada pelo usuário. Alterações revertidas.".into());
+                ui.set_status_message(msg.into());
             });
             return;
         }
@@ -1184,9 +1125,10 @@ fn run_launch_flow(
         post_ui(ui, move |ui| updated_tweaks.apply_to_ui(ui));
     }
 
-    update_auto_optimize_ui(ui, 0.96, "Inicializando Counter-Strike 2 pela Steam...");
+    let lang = i18n::UiLanguage::load_atomic(&active_lang);
+    update_auto_optimize_ui(ui, 0.96, i18n::launch_starting_steam(lang));
     if let Err(e) = counterrush_core::windows_api::launch_cs2_with_args_slice(&config.launch_args) {
-        let err_msg = format!("Falha ao iniciar CS2: {e}");
+        let err_msg = i18n::launch_failed(lang, &e);
         post_ui(ui, move |ui| {
             ui.set_show_auto_optimize_modal(false);
             ui.set_is_launching(false);
@@ -1207,13 +1149,14 @@ fn run_launch_flow(
     }
 
     // Estado Concluído a 100%
-    post_ui(ui, |ui| {
+    let success_msg = i18n::launch_success(i18n::UiLanguage::load_atomic(&active_lang));
+    post_ui(ui, move |ui| {
         ui.set_auto_optimize_stage_title("".into());
         ui.set_auto_optimize_stage_subtitle("".into());
         ui.set_auto_optimize_progress(1.0);
-        ui.set_auto_optimize_step_name("CS2 OTIMIZADO COM SUCESSO".into());
+        ui.set_auto_optimize_step_name(success_msg.into());
         ui.set_auto_optimize_finished(true);
-        ui.set_status_message("CS2 OTIMIZADO COM SUCESSO".into());
+        ui.set_status_message(success_msg.into());
     });
 
     // Aguarda 5 segundos antes de fechar o modal automaticamente
@@ -1225,10 +1168,11 @@ fn run_launch_flow(
     }
 
     // Fecha o modal automaticamente e garante mensagem de status
-    post_ui(ui, |ui| {
+    let final_msg = i18n::launch_success(i18n::UiLanguage::load_atomic(&active_lang));
+    post_ui(ui, move |ui| {
         ui.set_show_auto_optimize_modal(false);
         ui.set_is_launching(false);
-        ui.set_status_message("CS2 OTIMIZADO COM SUCESSO".into());
+        ui.set_status_message(final_msg.into());
     });
 }
 
@@ -1236,6 +1180,7 @@ fn select_preset(
     ui: &slint::Weak<MainWindow>,
     config_path: &std::sync::Arc<std::sync::RwLock<std::path::PathBuf>>,
     preset_name: String,
+    lang: i18n::UiLanguage,
 ) {
     let target_path = counterrush_core::resolve_optimization_file_path(&preset_name);
 
@@ -1248,10 +1193,7 @@ fn select_preset(
             save_active_preset_setting(Some(preset_name.clone()));
             let tweaks = Tweaks::from_config(&cfg);
             let args_text = cfg.launch_args.join(" ");
-            let msg = format!(
-                "Perfil '{}' selecionado e carregado com sucesso.",
-                preset_name
-            );
+            let msg = i18n::preset_selected_ok(lang, &preset_name);
 
             post_ui(ui, move |ui| {
                 ui.set_launch_args_text(args_text.into());
@@ -1260,11 +1202,10 @@ fn select_preset(
                 ui.set_status_message(msg.into());
             });
         }
-        Err(err) => post_ui(ui, move |ui| {
-            ui.set_status_message(
-                format!("Erro ao carregar perfil '{}': {err}", preset_name).into(),
-            )
-        }),
+        Err(err) => {
+            let msg = i18n::preset_load_err(lang, &preset_name, &err);
+            post_ui(ui, move |ui| ui.set_status_message(msg.into()));
+        }
     }
 }
 
@@ -1274,11 +1215,13 @@ fn create_profile(
     name: String,
     launch_args: String,
     tweaks: Tweaks,
+    lang: i18n::UiLanguage,
 ) {
     let clean_name = match counterrush_core::validate_profile_name(&name) {
         Ok(name) => name,
         Err(err_msg) => {
-            post_ui(ui, move |ui| ui.set_create_modal_error(err_msg.into()));
+            let localized_err = i18n::profile_validation_error(lang, &err_msg);
+            post_ui(ui, move |ui| ui.set_create_modal_error(localized_err.into()));
             return;
         }
     };
@@ -1299,6 +1242,7 @@ fn create_profile(
 
             let updated_presets = scan_presets();
             let args_text = new_config.launch_args.join(" ");
+            let ok_msg = i18n::profile_created_ok(lang, &clean_name);
             post_ui(ui, move |ui| {
                 ui.set_presets(slint::ModelRc::new(slint::VecModel::from(updated_presets)));
                 ui.set_active_preset(clean_name.as_str().into());
@@ -1307,14 +1251,13 @@ fn create_profile(
                 tweaks.apply_to_ui(ui);
                 ui.set_create_modal_error("".into());
                 ui.set_show_create_modal(false);
-                ui.set_status_message(
-                    format!("Perfil '{clean_name}' criado e selecionado com sucesso!").into(),
-                );
+                ui.set_status_message(ok_msg.into());
             });
         }
-        Err(e) => post_ui(ui, move |ui| {
-            ui.set_create_modal_error(format!("Falha ao salvar arquivo: {e}").into())
-        }),
+        Err(e) => {
+            let err_msg = i18n::profile_save_err(lang, &e);
+            post_ui(ui, move |ui| ui.set_create_modal_error(err_msg.into()));
+        }
     }
 }
 
@@ -1322,6 +1265,7 @@ fn save_launch_args(
     ui: &slint::Weak<MainWindow>,
     config_path: &std::sync::Arc<std::sync::RwLock<std::path::PathBuf>>,
     args: String,
+    lang: i18n::UiLanguage,
 ) {
     let target_path = config_path.read().map(|p| p.clone()).unwrap_or_default();
     if target_path.as_os_str().is_empty() {
@@ -1338,19 +1282,19 @@ fn save_launch_args(
             let file_stem = target_path
                 .file_stem()
                 .and_then(|s| s.to_str())
-                .unwrap_or("perfil")
+                .unwrap_or("profile")
                 .to_string();
             let args_text = config.launch_args.join(" ");
+            let msg = i18n::launch_args_saved(lang, &file_stem);
             post_ui(ui, move |ui| {
-                ui.set_status_message(
-                    format!("Parâmetros de inicialização salvos no perfil '{file_stem}'.").into(),
-                );
+                ui.set_status_message(msg.into());
                 ui.set_launch_args_text(args_text.into());
             });
         }
-        Err(err) => post_ui(ui, move |ui| {
-            ui.set_status_message(format!("Falha ao salvar parâmetros: {err}").into())
-        }),
+        Err(err) => {
+            let msg = i18n::launch_args_save_err(lang, &err);
+            post_ui(ui, move |ui| ui.set_status_message(msg.into()));
+        }
     }
 }
 
@@ -1359,6 +1303,7 @@ fn delete_profile(
     config_path: &std::sync::Arc<std::sync::RwLock<std::path::PathBuf>>,
     name: String,
     active: String,
+    lang: i18n::UiLanguage,
 ) {
     match counterrush_core::delete_optimization_profile(&name) {
         Ok(_) => {
@@ -1368,16 +1313,14 @@ fn delete_profile(
                     *cur = std::path::PathBuf::new();
                 }
                 save_active_preset_setting(None);
+                let msg = i18n::profile_deleted_empty(lang, &name);
                 post_ui(ui, move |ui| {
                     ui.set_presets(slint::ModelRc::new(slint::VecModel::from(updated_presets)));
                     ui.set_active_preset("".into());
                     ui.set_launch_args_text("".into());
                     ui.set_is_editing_launch_args(false);
                     Tweaks::default().apply_to_ui(ui);
-                    ui.set_status_message(
-                        format!("Perfil '{name}' excluído com sucesso. Nenhum perfil restante.")
-                            .into(),
-                    );
+                    ui.set_status_message(msg.into());
                 });
             } else if active == name {
                 let first_preset_name = updated_presets[0].name.to_string();
@@ -1390,30 +1333,27 @@ fn delete_profile(
                     .unwrap_or_default();
                 let tweaks = Tweaks::from_config(&cfg);
                 let args_text = cfg.launch_args.join(" ");
+                let msg = i18n::profile_deleted_switched(lang, &name, &first_preset_name);
                 post_ui(ui, move |ui| {
                     ui.set_presets(slint::ModelRc::new(slint::VecModel::from(updated_presets)));
                     ui.set_active_preset(first_preset_name.as_str().into());
                     ui.set_launch_args_text(args_text.into());
                     ui.set_is_editing_launch_args(false);
                     tweaks.apply_to_ui(ui);
-                    ui.set_status_message(
-                        format!(
-                            "Perfil '{name}' excluído. Perfil ativo alternado para '{}'.",
-                            first_preset_name
-                        )
-                        .into(),
-                    );
+                    ui.set_status_message(msg.into());
                 });
             } else {
+                let msg = i18n::profile_deleted_ok(lang, &name);
                 post_ui(ui, move |ui| {
                     ui.set_presets(slint::ModelRc::new(slint::VecModel::from(updated_presets)));
-                    ui.set_status_message(format!("Perfil '{name}' excluído com sucesso.").into());
+                    ui.set_status_message(msg.into());
                 });
             }
         }
-        Err(err) => post_ui(ui, move |ui| {
-            ui.set_status_message(format!("Erro ao excluir perfil '{name}': {err}").into())
-        }),
+        Err(err) => {
+            let msg = i18n::profile_delete_err(lang, &name, &err);
+            post_ui(ui, move |ui| ui.set_status_message(msg.into()));
+        }
     }
 }
 
@@ -1500,12 +1440,10 @@ fn main() -> Result<(), slint::PlatformError> {
         app_settings.minimize_to_tray,
     );
 
-    let target_lang = match app_settings.language.as_str() {
-        "en" | "en_US" | "en-US" | "en-EUA" => "en_US",
-        "ru" | "ru_RU" | "ru-RU" => "ru_RU",
-        "pt" | "pt_BR" | "pt-BR" => "pt_BR",
-        _ => "pt_BR",
-    };
+    let target_lang = i18n::UiLanguage::from_code(&app_settings.language).code();
+    let active_lang = std::sync::Arc::new(std::sync::atomic::AtomicU8::new(
+        i18n::UiLanguage::from_code(target_lang).to_u8(),
+    ));
 
     if let Err(e) = slint::select_bundled_translation(target_lang) {
         eprintln!("Aviso: falha ao carregar tradução embutida para '{}': {:?}", target_lang, e);
@@ -1522,7 +1460,7 @@ fn main() -> Result<(), slint::PlatformError> {
         },
         LanguageItem {
             code: "en_US".into(),
-            display_name: "en-EUA".into(),
+            display_name: "en-US".into(),
         },
     ];
     main_window.set_available_languages(slint::ModelRc::new(slint::VecModel::from(language_items)));
@@ -1533,11 +1471,12 @@ fn main() -> Result<(), slint::PlatformError> {
     main_window.set_presets(slint::ModelRc::new(slint::VecModel::from(initial_presets.clone())));
 
     // Se não existirem perfis salvos no disco, inicia no estado neutro desligado (R1)
+    let initial_lang_enum = i18n::UiLanguage::from_code(target_lang);
     let (resolved_path, _config) = if initial_presets.is_empty() {
         main_window.set_active_preset("".into());
         main_window.set_launch_args_text("".into());
         main_window.set_is_editing_launch_args(false);
-        enforce_neutral_no_profile_state(&main_window, neutral_status_message(target_lang));
+        enforce_neutral_no_profile_state(&main_window, i18n::neutral_status_message(initial_lang_enum));
         (std::path::PathBuf::new(), counterrush_core::config::CustomOptimizationConfig::all_disabled())
     } else {
         let preset_names: Vec<&str> = initial_presets.iter().map(|p| p.name.as_str()).collect();
@@ -1564,7 +1503,7 @@ fn main() -> Result<(), slint::PlatformError> {
         main_window.set_launch_args_text(c.launch_args.join(" ").into());
         main_window.set_is_editing_launch_args(false);
         Tweaks::from_config(&c).apply_to_ui(&main_window);
-        main_window.set_status_message(ready_status_message(target_lang).into());
+        main_window.set_status_message(i18n::ready_status_message(initial_lang_enum).into());
         (p, c)
     };
 
@@ -1577,6 +1516,7 @@ fn main() -> Result<(), slint::PlatformError> {
     let monitor_cfg_path = std::sync::Arc::clone(&active_config_path);
     let monitor_cancel_token = std::sync::Arc::clone(&auto_optimize_cancel_token);
     let monitor_weak = std::sync::Arc::downgrade(&game_monitor);
+    let monitor_lang = std::sync::Arc::clone(&active_lang);
     game_monitor.set_on_launch(move |pid| {
         run_steam_auto_optimize_flow(
             &monitor_ui,
@@ -1584,6 +1524,7 @@ fn main() -> Result<(), slint::PlatformError> {
             pid,
             &monitor_cancel_token,
             &monitor_weak,
+            &monitor_lang,
         );
     });
 
@@ -1592,13 +1533,8 @@ fn main() -> Result<(), slint::PlatformError> {
         let ui_weak = monitor_ui_exit.clone();
         let _ = slint::invoke_from_event_loop(move || {
             if let Some(ui) = ui_weak.upgrade() {
-                let lang = ui.get_active_language();
-                let msg = match lang.as_str() {
-                    "en" | "en_US" | "en-US" | "en-EUA" => format!("CS2 closed (PID: {pid}). Monitoring active."),
-                    "ru" | "ru_RU" | "ru-RU" => format!("CS2 закрыт (PID: {pid}). Мониторинг активен."),
-                    _ => format!("CS2 encerrado (PID: {pid}). Monitoramento ativo."),
-                };
-                ui.set_status_message(msg.into());
+                let lang = i18n::UiLanguage::from_code(ui.get_active_language().as_str());
+                ui.set_status_message(i18n::steam_auto_closed_status(lang, pid).into());
             }
         });
     });
@@ -1637,10 +1573,10 @@ fn main() -> Result<(), slint::PlatformError> {
                                     ui.set_active_preset("".into());
                                     ui.set_launch_args_text("".into());
                                     ui.set_is_editing_launch_args(false);
-                                    let lang = ui.get_active_language();
+                                    let lang = i18n::UiLanguage::from_code(ui.get_active_language().as_str());
                                     enforce_neutral_no_profile_state(
                                         &ui,
-                                        neutral_status_message(lang.as_str()),
+                                        i18n::neutral_status_message(lang),
                                     );
                                     if let Ok(mut cur) = sync_active_ref.write() {
                                         *cur = std::path::PathBuf::new();
@@ -1756,13 +1692,18 @@ fn main() -> Result<(), slint::PlatformError> {
 
     // Thread executora única: leitura/gravação de perfis é serializada nela,
     // deixando a thread da janela apenas no loop de eventos.
-    let command_sender = spawn_command_worker(main_window.as_weak(), active_config_path.clone());
+    let command_sender = spawn_command_worker(
+        main_window.as_weak(),
+        active_config_path.clone(),
+        active_lang.clone(),
+    );
 
     // Callback para Lançamento do CS2 com Otimizações Personalizadas (test_custom_launch)
     let window_handle = main_window.as_weak();
     let launch_config_ref = active_config_path.clone();
     let fallback_path = resolved_path.clone();
     let launch_cancel_token = auto_optimize_cancel_token.clone();
+    let launch_lang = active_lang.clone();
     main_window.on_launch_cs2_clicked(move || {
         let ui = match window_handle.upgrade() {
             Some(ui) => ui,
@@ -1775,27 +1716,35 @@ fn main() -> Result<(), slint::PlatformError> {
             return;
         }
 
+        let lang = i18n::UiLanguage::from_code(ui.get_active_language().as_str());
         ui.set_is_launching(true);
         ui.set_auto_optimize_is_launch(true);
         ui.set_auto_optimize_progress(0.0);
-        ui.set_auto_optimize_step_name("Iniciando otimizações para o CS2...".into());
+        ui.set_auto_optimize_step_name(i18n::launch_initial_step(lang).into());
         ui.set_auto_optimize_finished(false);
         ui.set_show_auto_optimize_modal(true);
-        ui.set_status_message("Otimizando sistema e iniciando CS2...".into());
+        ui.set_status_message(i18n::launch_status_starting(lang).into());
 
         launch_cancel_token.store(false, std::sync::atomic::Ordering::SeqCst);
         let handle_for_thread = window_handle.clone();
         let target_cfg_path = launch_config_ref.clone();
         let fallback_cfg = fallback_path.clone();
         let token = launch_cancel_token.clone();
+        let lang_ref = launch_lang.clone();
         std::thread::spawn(move || {
-            run_launch_flow(&handle_for_thread, &target_cfg_path, fallback_cfg, token);
+            run_launch_flow(
+                &handle_for_thread,
+                &target_cfg_path,
+                fallback_cfg,
+                token,
+                lang_ref,
+            );
         });
     });
 
     // Inicializa controlador da view interna de gerenciamento de binds
     let binds_dirs = counterrush_core::BindDirectories::default();
-    binds::wire_binds_view(&main_window, binds_dirs.clone());
+    let binds_controller = binds::wire_binds_view(&main_window, binds_dirs.clone());
 
     // Callback para clique nos cards de ação
     let window_handle = main_window.as_weak();
@@ -1806,16 +1755,8 @@ fn main() -> Result<(), slint::PlatformError> {
                 binds::refresh_existing_cfg_files(&ui, &binds_dirs_for_card);
                 ui.set_show_binds_view(true);
             }
-            let msg = match module_id.as_str() {
-                "custom_optimization" => "Acessando módulo: Otimização Personalizada",
-                "pro_cfg" => "Acessando módulo: Catálogo de .cfg Profissionais",
-                "binds" => "Acessando módulo: Criador e Gerenciador de Binds",
-                "workshop_maps" => "Acessando módulo: Mapas da Oficina CS2",
-                "benchmark" => "Acessando módulo: Benchmark e Análise de Desempenho",
-                "about" => "Acessando módulo: Sobre o CounterRush",
-                _ => "Módulo selecionado",
-            };
-            ui.set_status_message(msg.into());
+            let lang = i18n::UiLanguage::from_code(ui.get_active_language().as_str());
+            ui.set_status_message(i18n::card_action_status(lang, module_id.as_str()).into());
         }
     });
 
@@ -1831,10 +1772,10 @@ fn main() -> Result<(), slint::PlatformError> {
     let blocked_tweak_ui = main_window.as_weak();
     main_window.on_tweak_requires_profile(move || {
         if let Some(ui) = blocked_tweak_ui.upgrade() {
-            let lang = ui.get_active_language();
+            let lang = i18n::UiLanguage::from_code(ui.get_active_language().as_str());
             enforce_neutral_no_profile_state(
                 &ui,
-                profile_required_status_message(lang.as_str()),
+                i18n::profile_required_status_message(lang),
             );
         }
     });
@@ -1851,11 +1792,13 @@ fn main() -> Result<(), slint::PlatformError> {
     let auto_opt_ui = main_window.as_weak();
     let auto_opt_config_path = active_config_path.clone();
     let auto_opt_cancel = auto_optimize_cancel_token.clone();
+    let auto_opt_lang = active_lang.clone();
     main_window.on_auto_optimize_clicked(move || {
         if let Some(ui) = auto_opt_ui.upgrade() {
+            let lang = i18n::UiLanguage::from_code(ui.get_active_language().as_str());
             ui.set_auto_optimize_is_launch(false);
             ui.set_auto_optimize_progress(0.0);
-            ui.set_auto_optimize_step_name("Iniciando calibração...".into());
+            ui.set_auto_optimize_step_name(i18n::auto_optimize_initial_step(lang).into());
             ui.set_auto_optimize_finished(false);
             ui.set_show_auto_optimize_modal(true);
         }
@@ -1863,8 +1806,9 @@ fn main() -> Result<(), slint::PlatformError> {
         let ui_weak = auto_opt_ui.clone();
         let cfg_path = auto_opt_config_path.clone();
         let token = auto_opt_cancel.clone();
+        let lang_ref = auto_opt_lang.clone();
         std::thread::spawn(move || {
-            run_auto_optimize_flow(&ui_weak, &cfg_path, token);
+            run_auto_optimize_flow(&ui_weak, &cfg_path, token, lang_ref);
         });
     });
 
@@ -1931,33 +1875,29 @@ fn main() -> Result<(), slint::PlatformError> {
     // Callback para seleção dinâmica de idioma na aba de Configurações
     let window_handle = main_window.as_weak();
     let settings_path_for_lang = settings_path.clone();
+    let lang_state_for_select = active_lang.clone();
+    let binds_ctrl_for_lang = binds_controller.clone();
     main_window.on_language_selected(move |code| {
         let ui = match window_handle.upgrade() {
             Some(ui) => ui,
             None => return,
         };
-        let target_code = match code.as_str() {
-            "en" | "en_US" | "en-US" | "en-EUA" => "en_US",
-            "ru" | "ru_RU" | "ru-RU" => "ru_RU",
-            "pt" | "pt_BR" | "pt-BR" => "pt_BR",
-            other => other,
-        };
+        let lang_enum = i18n::UiLanguage::from_code(code.as_str());
+        let target_code = lang_enum.code();
+        lang_enum.store_atomic(&lang_state_for_select);
+
         if let Err(e) = slint::select_bundled_translation(target_code) {
             eprintln!("Erro ao alternar idioma para '{target_code}': {e:?}");
         }
         ui.set_active_language(target_code.into());
+        binds_ctrl_for_lang.refresh_for_language(&ui, lang_enum);
 
         if let Ok(mut settings) = counterrush_core::config::AppSettings::load_or_create(&settings_path_for_lang) {
             settings.language = target_code.to_string();
             let _ = settings.save_to_file(&settings_path_for_lang);
         }
 
-        let msg = match target_code {
-            "en" | "en_US" => format!("Language changed to '{}'.", target_code),
-            "ru" | "ru_RU" => format!("Язык изменен на '{}'.", target_code),
-            _ => format!("Idioma alterado para '{}'.", target_code),
-        };
-        ui.set_status_message(msg.into());
+        ui.set_status_message(i18n::language_changed_status(lang_enum, target_code).into());
     });
 
     // Callback para compartilhamento do projeto (cópia para o clipboard do Windows)
@@ -1967,23 +1907,14 @@ fn main() -> Result<(), slint::PlatformError> {
             Some(ui) => ui,
             None => return,
         };
-        let share_text = "CounterRush - Otimizador de Desempenho e Latência para Counter-Strike 2: https://github.com/ThainanViniciusKatchan/CounterRush";
-        let lang = ui.get_active_language();
+        let lang = i18n::UiLanguage::from_code(ui.get_active_language().as_str());
+        let share_text = i18n::share_project_text(lang);
         if let Err(e) = counterrush_core::set_clipboard(share_text) {
             eprintln!("Erro ao copiar link para o clipboard: {e}");
-            let err_prefix = match lang.as_str() {
-                "en" | "en_US" => "Error accessing clipboard",
-                "ru" | "ru_RU" => "Ошибка доступа к буферу обмена",
-                _ => "Erro ao acessar clipboard",
-            };
+            let err_prefix = i18n::clipboard_err_prefix(lang);
             ui.set_status_message(format!("{err_prefix}: {e}").into());
         } else {
-            let msg = match lang.as_str() {
-                "en" | "en_US" => "Official CounterRush link copied to clipboard!",
-                "ru" | "ru_RU" => "Официальная ссылка CounterRush скопирована в буфер обмена!",
-                _ => "Link oficial do CounterRush copiado para a área de transferência!",
-            };
-            ui.set_status_message(msg.into());
+            ui.set_status_message(i18n::clipboard_copied_ok(lang).into());
         }
     });
 
@@ -1997,12 +1928,8 @@ fn main() -> Result<(), slint::PlatformError> {
                 eprintln!("Erro ao abrir URL '{url_str}': {e}");
                 let _ = slint::invoke_from_event_loop(move || {
                     if let Some(ui) = window_handle_clone.upgrade() {
-                        let lang = ui.get_active_language();
-                        let err_prefix = match lang.as_str() {
-                            "en" | "en_US" => "Error opening link",
-                            "ru" | "ru_RU" => "Ошибка при открытии ссылки",
-                            _ => "Erro ao abrir link",
-                        };
+                        let lang = i18n::UiLanguage::from_code(ui.get_active_language().as_str());
+                        let err_prefix = i18n::open_url_err_prefix(lang);
                         ui.set_status_message(format!("{err_prefix}: {e}").into());
                     }
                 });
@@ -2031,7 +1958,7 @@ fn main() -> Result<(), slint::PlatformError> {
 
             let _ = slint::invoke_from_event_loop(move || {
                 if let Some(ui) = ui_weak.upgrade() {
-                    let lang = ui.get_active_language();
+                    let lang = i18n::UiLanguage::from_code(ui.get_active_language().as_str());
                     match result {
                         Ok(()) => {
                             if let Ok(mut settings) =
@@ -2047,34 +1974,9 @@ fn main() -> Result<(), slint::PlatformError> {
                             if !enabled {
                                 ui.set_optimize_on_steam_launch(false);
                             }
-                            let msg = match (lang.as_str(), enabled, prev_steam_auto) {
-                                ("en" | "en_US" | "en-US" | "en-EUA", true, _) => {
-                                    "Start with Windows enabled (Highest privileges)."
-                                }
-                                ("en" | "en_US" | "en-US" | "en-EUA", false, true) => {
-                                    "Start with Windows and Steam Auto-Optimization disabled."
-                                }
-                                ("en" | "en_US" | "en-US" | "en-EUA", false, false) => {
-                                    "Start with Windows disabled."
-                                }
-                                ("ru" | "ru_RU" | "ru-RU", true, _) => {
-                                    "Автозапуск с Windows включен (Наивысшие права)."
-                                }
-                                ("ru" | "ru_RU" | "ru-RU", false, true) => {
-                                    "Автозапуск с Windows и автооптимизация Steam отключены."
-                                }
-                                ("ru" | "ru_RU" | "ru-RU", false, false) => {
-                                    "Автозапуск с Windows отключен."
-                                }
-                                (_, true, _) => {
-                                    "Inicialização com o Windows ativada com privilégios máximos."
-                                }
-                                (_, false, true) => {
-                                    "Inicialização com o Windows e Auto-Otimização Steam desativadas."
-                                }
-                                (_, false, false) => "Inicialização com o Windows desativada.",
-                            };
-                            ui.set_status_message(msg.into());
+                            ui.set_status_message(
+                                i18n::startup_toggled_status(lang, enabled, prev_steam_auto).into(),
+                            );
                         }
                         Err(err) => {
                             ui.set_start_with_system(!enabled);
@@ -2082,13 +1984,7 @@ fn main() -> Result<(), slint::PlatformError> {
                                 ui.set_optimize_on_steam_launch(true);
                                 monitor.start();
                             }
-                            let err_prefix = match lang.as_str() {
-                                "en" | "en_US" | "en-US" | "en-EUA" => {
-                                    "Failed to configure Windows startup"
-                                }
-                                "ru" | "ru_RU" | "ru-RU" => "Ошибка настройки автозапуска Windows",
-                                _ => "Falha ao configurar inicialização com o Windows",
-                            };
+                            let err_prefix = i18n::startup_toggled_err_prefix(lang);
                             ui.set_status_message(format!("{err_prefix}: {err}").into());
                         }
                     }
@@ -2119,7 +2015,7 @@ fn main() -> Result<(), slint::PlatformError> {
 
             let _ = slint::invoke_from_event_loop(move || {
                 if let Some(ui) = ui_weak.upgrade() {
-                    let lang = ui.get_active_language();
+                    let lang = i18n::UiLanguage::from_code(ui.get_active_language().as_str());
                     match result {
                         Ok(()) => {
                             if let Ok(mut settings) =
@@ -2135,25 +2031,9 @@ fn main() -> Result<(), slint::PlatformError> {
                             if enabled {
                                 ui.set_start_with_system(true);
                             }
-                            let msg = match (lang.as_str(), enabled) {
-                                ("en" | "en_US" | "en-US" | "en-EUA", true) => {
-                                    "Steam Auto-Optimization and Startup enabled."
-                                }
-                                ("en" | "en_US" | "en-US" | "en-EUA", false) => {
-                                    "Steam Auto-Optimization disabled."
-                                }
-                                ("ru" | "ru_RU" | "ru-RU", true) => {
-                                    "Автооптимизация Steam и автозапуск включены."
-                                }
-                                ("ru" | "ru_RU" | "ru-RU", false) => {
-                                    "Автооптимизация Steam отключена."
-                                }
-                                (_, true) => {
-                                    "Auto-Otimização Steam e Inicialização com o Windows ativadas."
-                                }
-                                (_, false) => "Auto-Otimização Steam desativada.",
-                            };
-                            ui.set_status_message(msg.into());
+                            ui.set_status_message(
+                                i18n::steam_auto_toggled_status(lang, enabled).into(),
+                            );
                         }
                         Err(err) => {
                             ui.set_optimize_on_steam_launch(!enabled);
@@ -2162,15 +2042,7 @@ fn main() -> Result<(), slint::PlatformError> {
                                     counterrush_core::is_system_startup_enabled().unwrap_or(false);
                                 ui.set_start_with_system(actual_startup);
                             }
-                            let err_prefix = match lang.as_str() {
-                                "en" | "en_US" | "en-US" | "en-EUA" => {
-                                    "Failed to configure Steam Auto-Optimization"
-                                }
-                                "ru" | "ru_RU" | "ru-RU" => {
-                                    "Ошибка настройки автооптимизации Steam"
-                                }
-                                _ => "Falha ao configurar Auto-Otimização Steam",
-                            };
+                            let err_prefix = i18n::steam_auto_toggled_err_prefix(lang);
                             ui.set_status_message(format!("{err_prefix}: {err}").into());
                         }
                     }

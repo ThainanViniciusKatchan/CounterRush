@@ -45,7 +45,7 @@ export global BindsState {
     in-out property <bool> selector-dropdown-open: false;
     in-out property <string> bound-key: "";
     in-out property <bool> is-listening-key: false;
-    in-out property <string> save-mode-badge: "NOVO ARQUIVO";
+    in-out property <string> save-mode-badge: @tr("NOVO ARQUIVO");
     in-out property <bool> is-creating-new-file: true;
 
     // Estado da listagem, navegação, visualização, pesquisa e prévia
@@ -56,7 +56,7 @@ export global BindsState {
     in-out property <int> filtered-commands-count: 5;
     in-out property <int> selected-commands-count: 0;
     in-out property <string> bind-preview-line: "";
-    in-out property <string> status-message: "Selecione ou digite um arquivo .cfg, capture uma tecla e marque os comandos desejados.";
+    in-out property <string> status-message: @tr("Selecione ou digite um arquivo .cfg, capture uma tecla e marque os comandos desejados.");
     in-out property <string> status-kind: "info";
     in-out property <bool> show-conflict-prompt: false;
     in-out property <string> conflict-message: "";
@@ -303,16 +303,16 @@ export component BindsView inherits Rectangle {
     function sync-local-save-mode() {
         if BindsState.selected-existing-file == "" {
             BindsState.is-creating-new-file = true;
-            BindsState.save-mode-badge = "NOVO ARQUIVO";
+            BindsState.save-mode-badge = @tr("NOVO ARQUIVO");
         } else if BindsState.file-name-input == "" {
             BindsState.is-creating-new-file = true;
-            BindsState.save-mode-badge = "DIGITE O NOME";
+            BindsState.save-mode-badge = @tr("DIGITE O NOME");
         } else if BindsState.file-name-input == BindsState.selected-existing-file {
             BindsState.is-creating-new-file = false;
-            BindsState.save-mode-badge = "ATUALIZAR ATUAL";
+            BindsState.save-mode-badge = @tr("ATUALIZAR ATUAL");
         } else {
             BindsState.is-creating-new-file = true;
-            BindsState.save-mode-badge = "CRIAR NOVO";
+            BindsState.save-mode-badge = @tr("CRIAR NOVO");
         }
     }
 
@@ -379,7 +379,7 @@ export component BindsView inherits Rectangle {
                             }
 
                             Text {
-                                text: "Voltar";
+                                text: @tr("Voltar");
                                 font-size: 11px;
                                 font-weight: 700;
                                 color: back-touch.has-hover ? #ffffff : CS2Theme.text-primary;
@@ -421,7 +421,7 @@ export component BindsView inherits Rectangle {
                         }
 
                         Text {
-                            text: "GERADOR DE BINDS CS2";
+                            text: @tr("GERADOR DE BINDS CS2");
                             font-size: 13px;
                             font-weight: 900;
                             letter-spacing: 0.7px;
@@ -446,7 +446,7 @@ export component BindsView inherits Rectangle {
                             alignment: space-between;
 
                             Text {
-                                text: "1. ARQUIVO .CFG";
+                                text: @tr("1. ARQUIVO .CFG");
                                 font-size: 10px;
                                 font-weight: 800;
                                 letter-spacing: 0.6px;
@@ -540,7 +540,7 @@ export component BindsView inherits Rectangle {
                                     if BindsState.file-name-input == "" : Text {
                                         width: parent.width;
                                         height: parent.height;
-                                        text: "Ex: minhas_binds.cfg";
+                                        text: @tr("Ex: minhas_binds.cfg");
                                         color: CS2Theme.text-muted;
                                         font-size: 11px;
                                         vertical-alignment: center;
@@ -612,8 +612,8 @@ export component BindsView inherits Rectangle {
 
                                         Text {
                                             text: BindsState.existing-cfg-files.length > 0
-                                                ? "Existentes (" + BindsState.existing-cfg-files.length + ")"
-                                                : "Existentes";
+                                                ? @tr("Existentes ({})", BindsState.existing-cfg-files.length)
+                                                : @tr("Existentes");
                                             font-size: 10.5px;
                                             font-weight: 700;
                                             color: BindsState.selector-dropdown-open || BindsState.selected-existing-file != ""
@@ -660,7 +660,7 @@ export component BindsView inherits Rectangle {
                             height: 16px;
 
                             Text {
-                                text: "2. TECLA DE ATALHO";
+                                text: @tr("2. TECLA DE ATALHO");
                                 font-size: 10px;
                                 font-weight: 800;
                                 letter-spacing: 0.6px;
@@ -746,7 +746,7 @@ export component BindsView inherits Rectangle {
                                     }
 
                                     if BindsState.is-listening-key : Text {
-                                        text: "Aguardando tecla/scroll...";
+                                        text: @tr("Aguardando tecla/scroll...");
                                         font-size: 11px;
                                         font-weight: 800;
                                         color: CS2Theme.text-cyan;
@@ -779,7 +779,7 @@ export component BindsView inherits Rectangle {
                                         }
 
                                         Text {
-                                            text: "Alterar";
+                                            text: @tr("Alterar");
                                             font-size: 10px;
                                             font-weight: 600;
                                             color: key-touch.has-hover ? CS2Theme.text-cyan : CS2Theme.text-dim;
@@ -790,7 +790,7 @@ export component BindsView inherits Rectangle {
                                     }
 
                                     if !BindsState.is-listening-key && BindsState.bound-key == "" : Text {
-                                        text: "Clique e pressione...";
+                                        text: @tr("Clique e pressione...");
                                         font-size: 11px;
                                         font-weight: 500;
                                         color: CS2Theme.text-muted;
@@ -858,7 +858,7 @@ export component BindsView inherits Rectangle {
                                 }
 
                                 Text {
-                                    text: "SALVAR BIND";
+                                    text: @tr("SALVAR BIND");
                                     font-size: 11px;
                                     font-weight: 900;
                                     letter-spacing: 0.6px;
@@ -940,7 +940,7 @@ export component BindsView inherits Rectangle {
                                     padding-left: 6px;
                                     padding-right: 6px;
                                     Text {
-                                        text: "PRÉVIA";
+                                        text: @tr("PRÉVIA");
                                         font-size: 8px;
                                         font-weight: 900;
                                         letter-spacing: 0.5px;
@@ -986,7 +986,7 @@ export component BindsView inherits Rectangle {
                                 padding-left: 8px;
                                 padding-right: 8px;
                                 Text {
-                                    text: "Limpar marcados (" + BindsState.selected-commands-count + ")";
+                                    text: @tr("Limpar marcados ({})", BindsState.selected-commands-count);
                                     font-size: 10px;
                                     font-weight: 700;
                                     color: clear-cmds-touch.has-hover ? CS2Theme.text-primary : CS2Theme.text-muted;
@@ -1044,7 +1044,7 @@ export component BindsView inherits Rectangle {
                                     padding-left: 10px;
                                     padding-right: 10px;
                                     Text {
-                                        text: "CANCELAR";
+                                        text: @tr("CANCELAR");
                                         font-size: 10px;
                                         font-weight: 800;
                                         color: CS2Theme.text-primary;
@@ -1070,7 +1070,7 @@ export component BindsView inherits Rectangle {
                                     padding-left: 12px;
                                     padding-right: 12px;
                                     Text {
-                                        text: "SUBSTITUIR TECLA";
+                                        text: @tr("SUBSTITUIR TECLA");
                                         font-size: 10px;
                                         font-weight: 900;
                                         color: #ffffff;
@@ -1183,7 +1183,7 @@ export component BindsView inherits Rectangle {
                                 if BindsState.search-query == "" : Text {
                                     width: parent.width;
                                     height: parent.height;
-                                    text: "Pesquisar por comando ou descrição (ex: smoke, radar, +jump)...";
+                                    text: @tr("Pesquisar por comando ou descrição (ex: smoke, radar, +jump)...");
                                     color: CS2Theme.text-muted;
                                     font-size: 11px;
                                     vertical-alignment: center;
@@ -1201,7 +1201,9 @@ export component BindsView inherits Rectangle {
                                     padding-left: 7px;
                                     padding-right: 7px;
                                     Text {
-                                        text: BindsState.filtered-commands-count + (BindsState.filtered-commands-count == 1 ? " resultado" : " resultados");
+                                        text: BindsState.filtered-commands-count == 1
+                                            ? @tr("{} resultado", BindsState.filtered-commands-count)
+                                            : @tr("{} resultados", BindsState.filtered-commands-count);
                                         font-size: 10px;
                                         font-weight: 700;
                                         color: CS2Theme.text-cyan;
@@ -1282,7 +1284,7 @@ export component BindsView inherits Rectangle {
                                     }
 
                                     Text {
-                                        text: "Lista";
+                                        text: @tr("Lista");
                                         font-size: 11px;
                                         font-weight: !BindsState.is-grid-view ? 800 : 600;
                                         color: !BindsState.is-grid-view ? #ffffff : CS2Theme.text-muted;
@@ -1333,7 +1335,7 @@ export component BindsView inherits Rectangle {
                                     }
 
                                     Text {
-                                        text: "Grade";
+                                        text: @tr("Grade");
                                         font-size: 11px;
                                         font-weight: BindsState.is-grid-view ? 800 : 600;
                                         color: BindsState.is-grid-view ? #ffffff : CS2Theme.text-muted;
@@ -1507,7 +1509,9 @@ export component BindsView inherits Rectangle {
                         alignment: space-between;
 
                         Text {
-                            text: "Exibindo " + BindsState.filtered-commands-count + (BindsState.filtered-commands-count == 1 ? " comando" : " comandos") + " encontrados para \"" + BindsState.search-query + "\" em todas as categorias";
+                            text: BindsState.filtered-commands-count == 1
+                                ? @tr("Exibindo {} comando encontrado para \"{}\" em todas as categorias", BindsState.filtered-commands-count, BindsState.search-query)
+                                : @tr("Exibindo {} comandos encontrados para \"{}\" em todas as categorias", BindsState.filtered-commands-count, BindsState.search-query);
                             font-size: 11px;
                             font-weight: 600;
                             color: CS2Theme.text-muted;
@@ -1527,7 +1531,7 @@ export component BindsView inherits Rectangle {
                                 padding-left: 8px;
                                 padding-right: 8px;
                                 Text {
-                                    text: "Limpar pesquisa";
+                                    text: @tr("Limpar pesquisa");
                                     font-size: 10px;
                                     font-weight: 700;
                                     color: CS2Theme.text-cyan;
@@ -1585,7 +1589,7 @@ export component BindsView inherits Rectangle {
                         }
 
                         Text {
-                            text: "Nenhum comando encontrado para \"" + BindsState.search-query + "\"";
+                            text: @tr("Nenhum comando encontrado para \"{}\"", BindsState.search-query);
                             font-size: 13px;
                             font-weight: 800;
                             color: CS2Theme.text-primary;
@@ -1593,7 +1597,7 @@ export component BindsView inherits Rectangle {
                         }
 
                         Text {
-                            text: "Tente buscar pelo nome do comando (ex: noclip, slot8, buy) ou por palavras da descrição (ex: fumaça, radar, recuo).";
+                            text: @tr("Tente buscar pelo nome do comando (ex: noclip, slot8, buy) ou por palavras da descrição (ex: fumaça, radar, recuo).");
                             font-size: 11px;
                             color: CS2Theme.text-muted;
                             wrap: word-wrap;
@@ -1613,7 +1617,7 @@ export component BindsView inherits Rectangle {
                                     padding-left: 14px;
                                     padding-right: 14px;
                                     Text {
-                                        text: "Limpar pesquisa";
+                                        text: @tr("Limpar pesquisa");
                                         font-size: 11px;
                                         font-weight: 800;
                                         color: #ffffff;
@@ -1847,7 +1851,7 @@ export component BindsView inherits Rectangle {
                     padding-left: 10px;
                     padding-right: 10px;
                     Text {
-                        text: "+ Novo arquivo (limpar seleção)";
+                        text: @tr("+ Novo arquivo (limpar seleção)");
                         font-size: 11px;
                         font-weight: 700;
                         color: CS2Theme.text-gold;
@@ -1874,7 +1878,7 @@ export component BindsView inherits Rectangle {
             if BindsState.existing-cfg-files.length == 0 : Rectangle {
                 height: 32px;
                 Text {
-                    text: "Nenhum arquivo .cfg encontrado";
+                    text: @tr("Nenhum arquivo .cfg encontrado");
                     font-size: 11px;
                     color: CS2Theme.text-muted;
                     horizontal-alignment: center;
@@ -1912,7 +1916,7 @@ export component BindsView inherits Rectangle {
                             }
 
                             if is-current : Text {
-                                text: "ATIVO";
+                                text: @tr("ATIVO");
                                 font-size: 8px;
                                 font-weight: 900;
                                 color: CS2Theme.text-cyan;

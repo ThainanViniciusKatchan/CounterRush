@@ -4,12 +4,19 @@ use std::rc::Rc;
 
 use counterrush_core::{
     cs2_bind_catalog, cs2_bind_categories, determine_bind_save_mode, find_key_conflict_in_content,
-    format_bind_commands, format_bind_line, list_cfg_files_in_dir, matches_bind_search,
+    format_bind_commands, format_bind_line, list_cfg_files_in_dir,
     normalize_captured_key_to_cs2, save_cs2_bind_with_local_fallback, validate_bind_key,
     BindCommandEntry, BindDirectories, BindFlag, BindOperationOutcome,
 };
 use slint::{ComponentHandle, Model, ModelRc, SharedString, VecModel};
 
+use crate::binds_i18n::{
+    localize_category, localize_category_header, localize_description, localize_subcategory,
+    matches_localized_bind_search,
+};
+use crate::i18n::{
+    self, BindSaveModeKind, BindUpdateVerb, UiLanguage,
+};
 use crate::{BindCatalogRow, BindCategoryTab, BindGridCell, BindsState, MainWindow};
 
 struct BindsViewState {
@@ -17,15 +24,64 @@ struct BindsViewState {
     active_category: usize,
     is_grid_view: bool,
     search_query: String,
+    lang: UiLanguage,
 }
 
 impl BindsViewState {
-    fn new() -> Self {
+    fn new(lang: UiLanguage) -> Self {
         Self {
             selected_flags: vec![false; cs2_bind_catalog().len()],
             active_category: 0,
             is_grid_view: false,
             search_query: String::new(),
+            lang,
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct BindsController {
+    state: Rc<RefCell<BindsViewState>>,
+    rows_model: Rc<VecModel<BindCatalogRow>>,
+}
+
+impl BindsController {
+    pub fn refresh_for_language(&self, ui: &MainWindow, lang: UiLanguage) {
+        {
+            let mut st = self.state.borrow_mut();
+            st.lang = lang;
+        }
+        let binds = ui.global::<BindsState>();
+        binds.set_tooltip_visible(false);
+        binds.set_selector_dropdown_open(false);
+        refresh_catalog_view(&binds, &self.state.borrow(), &self.rows_model);
+
+        let current_msg = binds.get_status_message().to_string();
+        if current_msg == i18n::binds_default_status(UiLanguage::PtBr)
+            || current_msg == i18n::binds_default_status(UiLanguage::EnUs)
+            || current_msg == i18n::binds_default_status(UiLanguage::RuRu)
+        {
+            binds.set_status_message(i18n::binds_default_status(lang).into());
+        } else if current_msg == i18n::binds_commands_cleared(UiLanguage::PtBr)
+            || current_msg == i18n::binds_commands_cleared(UiLanguage::EnUs)
+            || current_msg == i18n::binds_commands_cleared(UiLanguage::RuRu)
+        {
+            binds.set_status_message(i18n::binds_commands_cleared(lang).into());
+        } else if current_msg == i18n::binds_selection_cleared(UiLanguage::PtBr)
+            || current_msg == i18n::binds_selection_cleared(UiLanguage::EnUs)
+            || current_msg == i18n::binds_selection_cleared(UiLanguage::RuRu)
+        {
+            binds.set_status_message(i18n::binds_selection_cleared(lang).into());
+        } else if current_msg == i18n::binds_key_removed(UiLanguage::PtBr)
+            || current_msg == i18n::binds_key_removed(UiLanguage::EnUs)
+            || current_msg == i18n::binds_key_removed(UiLanguage::RuRu)
+        {
+            binds.set_status_message(i18n::binds_key_removed(lang).into());
+        } else if current_msg == i18n::binds_overwrite_cancelled(UiLanguage::PtBr)
+            || current_msg == i18n::binds_overwrite_cancelled(UiLanguage::EnUs)
+            || current_msg == i18n::binds_overwrite_cancelled(UiLanguage::RuRu)
+        {
+            binds.set_status_message(i18n::binds_overwrite_cancelled(lang).into());
         }
     }
 }
@@ -42,13 +98,18 @@ fn make_empty_grid_cell() -> BindGridCell {
     }
 }
 
-fn make_grid_cell(idx: usize, entry: &BindCommandEntry, checked: bool) -> BindGridCell {
+fn make_grid_cell(
+    idx: usize,
+    entry: &BindCommandEntry,
+    checked: bool,
+    lang: UiLanguage,
+) -> BindGridCell {
     BindGridCell {
         present: true,
         command_index: idx as i32,
         title: entry.display_command.into(),
-        info: entry.subcategory.into(),
-        description: entry.description.into(),
+        info: localize_subcategory(entry.subcategory, lang).into(),
+        description: localize_description(idx, entry, lang).into(),
         command_value: entry.cfg_command.into(),
         checked,
     }
@@ -69,12 +130,17 @@ fn make_header_row(row_kind: i32, title: &str, subtitle: &str) -> BindCatalogRow
     }
 }
 
-fn make_list_row(cmd_idx: usize, entry: &BindCommandEntry, checked: bool) -> BindCatalogRow {
+fn make_list_row(
+    cmd_idx: usize,
+    entry: &BindCommandEntry,
+    checked: bool,
+    lang: UiLanguage,
+) -> BindCatalogRow {
     BindCatalogRow {
         row_kind: 2,
         command_index: cmd_idx as i32,
         title: entry.display_command.into(),
-        subtitle: entry.description.into(),
+        subtitle: localize_description(cmd_idx, entry, lang).into(),
         command_value: entry.cfg_command.into(),
         checked,
         cell_0: make_empty_grid_cell(),
@@ -84,11 +150,14 @@ fn make_list_row(cmd_idx: usize, entry: &BindCommandEntry, checked: bool) -> Bin
     }
 }
 
-fn make_grid_quad_row(chunk: &[(usize, &BindCommandEntry, bool)]) -> BindCatalogRow {
+fn make_grid_quad_row(
+    chunk: &[(usize, &BindCommandEntry, bool)],
+    lang: UiLanguage,
+) -> BindCatalogRow {
     let cell_for = |slot: usize| -> BindGridCell {
         chunk
             .get(slot)
-            .map(|&(idx, entry, checked)| make_grid_cell(idx, entry, checked))
+            .map(|&(idx, entry, checked)| make_grid_cell(idx, entry, checked, lang))
             .unwrap_or_else(make_empty_grid_cell)
     };
 
@@ -110,6 +179,7 @@ fn flush_subcategory_rows(
     out: &mut Vec<BindCatalogRow>,
     pending: &mut Vec<(usize, &'static BindCommandEntry, bool)>,
     is_grid_view: bool,
+    lang: UiLanguage,
 ) {
     if pending.is_empty() {
         return;
@@ -117,11 +187,11 @@ fn flush_subcategory_rows(
 
     if is_grid_view {
         for chunk in pending.chunks(4) {
-            out.push(make_grid_quad_row(chunk));
+            out.push(make_grid_quad_row(chunk, lang));
         }
     } else {
         for &(idx, entry, checked) in pending.iter() {
-            out.push(make_list_row(idx, entry, checked));
+            out.push(make_list_row(idx, entry, checked, lang));
         }
     }
     pending.clear();
@@ -143,17 +213,20 @@ fn build_category_tabs(state: &BindsViewState) -> Vec<BindCategoryTab> {
                     if state.selected_flags.get(idx).copied().unwrap_or(false) {
                         selected_count += 1;
                     }
-                    if is_searching && matches_bind_search(entry, query) {
+                    if is_searching
+                        && matches_localized_bind_search(idx, entry, query, state.lang)
+                    {
                         match_count += 1;
                     }
                 }
             }
 
+            let localized = localize_category(&cat, state.lang);
             BindCategoryTab {
                 index: cat.index as i32,
-                tab_label: cat.tab_label.into(),
-                title: cat.title.into(),
-                subtitle: cat.subtitle.into(),
+                tab_label: localized.tab_label.into(),
+                title: localized.title.into(),
+                subtitle: localized.subtitle.into(),
                 total_count: cat.command_count as i32,
                 selected_count,
                 match_count,
@@ -181,7 +254,7 @@ fn build_visible_catalog_rows(state: &BindsViewState) -> (Vec<BindCatalogRow>, u
 
     for (idx, entry) in catalog.iter().enumerate() {
         let visible = if is_searching {
-            matches_bind_search(entry, query)
+            matches_localized_bind_search(idx, entry, query, state.lang)
         } else {
             entry.category == active_cat_title
         };
@@ -192,15 +265,20 @@ fn build_visible_catalog_rows(state: &BindsViewState) -> (Vec<BindCatalogRow>, u
         total_matched += 1;
 
         if last_category != Some(entry.category) {
-            flush_subcategory_rows(&mut rows, &mut pending, state.is_grid_view);
-            rows.push(make_header_row(0, entry.category, entry.category_note));
+            flush_subcategory_rows(&mut rows, &mut pending, state.is_grid_view, state.lang);
+            let (cat_title, cat_note) = localize_category_header(entry, state.lang);
+            rows.push(make_header_row(0, cat_title, cat_note));
             last_category = Some(entry.category);
             last_subcategory = None;
         }
 
         if last_subcategory != Some(entry.subcategory) {
-            flush_subcategory_rows(&mut rows, &mut pending, state.is_grid_view);
-            rows.push(make_header_row(1, entry.subcategory, ""));
+            flush_subcategory_rows(&mut rows, &mut pending, state.is_grid_view, state.lang);
+            rows.push(make_header_row(
+                1,
+                localize_subcategory(entry.subcategory, state.lang),
+                "",
+            ));
             last_subcategory = Some(entry.subcategory);
         }
 
@@ -208,7 +286,7 @@ fn build_visible_catalog_rows(state: &BindsViewState) -> (Vec<BindCatalogRow>, u
         pending.push((idx, entry, checked));
     }
 
-    flush_subcategory_rows(&mut rows, &mut pending, state.is_grid_view);
+    flush_subcategory_rows(&mut rows, &mut pending, state.is_grid_view, state.lang);
     (rows, total_matched)
 }
 
@@ -354,29 +432,35 @@ fn load_cfg_names_for_dir(dir: &Path) -> Vec<SharedString> {
         .collect()
 }
 
-fn sync_binds_summary(binds: &BindsState<'_>, selected_flags: &[bool]) {
+fn sync_binds_summary(binds: &BindsState<'_>, selected_flags: &[bool], lang: UiLanguage) {
     let selected_existing = binds.get_selected_existing_file();
     let file_input = binds.get_file_name_input();
 
     if selected_existing.trim().is_empty() {
         binds.set_is_creating_new_file(true);
-        binds.set_save_mode_badge("NOVO ARQUIVO".into());
+        binds.set_save_mode_badge(i18n::binds_save_mode_badge(lang, BindSaveModeKind::NewFile).into());
     } else if file_input.trim().is_empty() {
         binds.set_is_creating_new_file(true);
-        binds.set_save_mode_badge("DIGITE O NOME".into());
+        binds.set_save_mode_badge(i18n::binds_save_mode_badge(lang, BindSaveModeKind::EnterName).into());
     } else {
         match determine_bind_save_mode(selected_existing.as_str(), file_input.as_str()) {
             Ok((_, BindFlag::Default)) => {
                 binds.set_is_creating_new_file(false);
-                binds.set_save_mode_badge("ATUALIZAR ATUAL".into());
+                binds.set_save_mode_badge(
+                    i18n::binds_save_mode_badge(lang, BindSaveModeKind::UpdateCurrent).into(),
+                );
             }
             Ok((_, BindFlag::NewConfig)) => {
                 binds.set_is_creating_new_file(true);
-                binds.set_save_mode_badge("CRIAR NOVO".into());
+                binds.set_save_mode_badge(
+                    i18n::binds_save_mode_badge(lang, BindSaveModeKind::CreateNew).into(),
+                );
             }
             Err(_) | Ok((_, BindFlag::Restore)) => {
                 binds.set_is_creating_new_file(true);
-                binds.set_save_mode_badge("NOME INVÁLIDO".into());
+                binds.set_save_mode_badge(
+                    i18n::binds_save_mode_badge(lang, BindSaveModeKind::InvalidName).into(),
+                );
             }
         }
     }
@@ -435,7 +519,7 @@ fn refresh_catalog_view(
     binds.set_filtered_commands_count(matched_count as i32);
     binds.set_active_category_index(state.active_category as i32);
     binds.set_is_grid_view(state.is_grid_view);
-    sync_binds_summary(binds, &state.selected_flags);
+    sync_binds_summary(binds, &state.selected_flags, state.lang);
 }
 
 fn check_existing_key_conflict(
@@ -462,6 +546,7 @@ fn execute_save_bind(
     dirs: &BindDirectories,
     allow_conflict_overwrite: bool,
 ) {
+    let lang = state.lang;
     let binds = ui.global::<BindsState>();
     let file_input = binds.get_file_name_input().to_string();
     let selected_existing = binds.get_selected_existing_file().to_string();
@@ -470,9 +555,7 @@ fn execute_save_bind(
 
     if file_input.trim().is_empty() {
         binds.set_status_kind("warning".into());
-        binds.set_status_message(
-            "Informe um nome para o arquivo .cfg ou selecione um arquivo existente.".into(),
-        );
+        binds.set_status_message(i18n::binds_err_missing_file(lang).into());
         return;
     }
 
@@ -480,18 +563,14 @@ fn execute_save_bind(
         Ok(k) => k,
         Err(_) => {
             binds.set_status_kind("warning".into());
-            binds.set_status_message(
-                "Clique no campo de tecla e pressione a tecla desejada antes de salvar.".into(),
-            );
+            binds.set_status_message(i18n::binds_err_missing_key(lang).into());
             return;
         }
     };
 
     if selected_cmds.is_empty() {
         binds.set_status_kind("warning".into());
-        binds.set_status_message(
-            "Marque ao menos um comando na listagem abaixo para salvar.".into(),
-        );
+        binds.set_status_message(i18n::binds_err_no_commands(lang).into());
         return;
     }
 
@@ -499,7 +578,7 @@ fn execute_save_bind(
         Ok(res) => res,
         Err(err) => {
             binds.set_status_kind("error".into());
-            binds.set_status_message(format!("Nome de arquivo inválido: {err}").into());
+            binds.set_status_message(i18n::binds_err_invalid_file(lang, &err).into());
             return;
         }
     };
@@ -508,7 +587,7 @@ fn execute_save_bind(
         Ok(c) => c,
         Err(err) => {
             binds.set_status_kind("error".into());
-            binds.set_status_message(format!("Erro nos comandos marcados: {err}").into());
+            binds.set_status_message(i18n::binds_err_invalid_commands(lang, &err).into());
             return;
         }
     };
@@ -518,15 +597,18 @@ fn execute_save_bind(
             check_existing_key_conflict(dirs, &target_file_name, &clean_key)
         {
             binds.set_conflict_message(
-                format!(
-                    "A tecla '{}' já possui a bind \"{}\" em '{}'. Substituir por \"{}\"?",
-                    clean_key, existing_cmd, target_file_name, unified_cmd
+                i18n::binds_conflict_message(
+                    lang,
+                    &clean_key,
+                    &existing_cmd,
+                    &target_file_name,
+                    &unified_cmd,
                 )
                 .into(),
             );
             binds.set_show_conflict_prompt(true);
             binds.set_status_kind("warning".into());
-            binds.set_status_message("Confirme a substituição da tecla conflitante acima.".into());
+            binds.set_status_message(i18n::binds_conflict_status(lang).into());
             return;
         }
     }
@@ -552,7 +634,7 @@ fn execute_save_bind(
             binds.set_selected_existing_file(saved_file.clone().into());
             binds.set_file_name_input(saved_file.into());
             binds.set_show_conflict_prompt(false);
-            sync_binds_summary(&binds, &state.selected_flags);
+            sync_binds_summary(&binds, &state.selected_flags, lang);
 
             let msg = match (&report.outcome, &report.cs2_sync_warning) {
                 (
@@ -561,18 +643,8 @@ fn execute_save_bind(
                         bind_line,
                         ..
                     },
-                    None,
-                ) => format!(
-                    "Novo arquivo '{file_name}' criado com {bind_line} (local + CS2)."
-                ),
-                (
-                    BindOperationOutcome::Created {
-                        file_name,
-                        bind_line,
-                        ..
-                    },
-                    Some(warn),
-                ) => format!("Novo arquivo '{file_name}' criado com {bind_line}. {warn}"),
+                    warn,
+                ) => i18n::binds_saved_created(lang, file_name, bind_line, warn.as_deref()),
                 (
                     BindOperationOutcome::Updated {
                         file_name,
@@ -580,44 +652,22 @@ fn execute_save_bind(
                         replaced_existing_key,
                         ..
                     },
-                    None,
+                    warn,
                 ) => {
                     let verb = if flag == BindFlag::NewConfig {
-                        "Novo arquivo salvo"
+                        BindUpdateVerb::NewFileSaved
                     } else if *replaced_existing_key {
-                        "Bind substituída"
+                        BindUpdateVerb::BindReplaced
                     } else {
-                        "Arquivo atualizado"
+                        BindUpdateVerb::FileUpdated
                     };
-                    format!("{verb} em '{file_name}': {bind_line} (local + CS2).")
-                }
-                (
-                    BindOperationOutcome::Updated {
-                        file_name,
-                        bind_line,
-                        replaced_existing_key,
-                        ..
-                    },
-                    Some(warn),
-                ) => {
-                    let verb = if flag == BindFlag::NewConfig {
-                        "Novo arquivo salvo"
-                    } else if *replaced_existing_key {
-                        "Bind substituída"
-                    } else {
-                        "Arquivo atualizado"
-                    };
-                    format!("{verb} em '{file_name}': {bind_line}. {warn}")
+                    i18n::binds_saved_updated(lang, verb, file_name, bind_line, warn.as_deref())
                 }
                 (BindOperationOutcome::CancelledByUser(conflict), _) => {
-                    format!(
-                        "Operação cancelada para tecla '{}' em '{}'.",
-                        conflict.key,
-                        conflict.file_path.display()
-                    )
+                    i18n::binds_saved_cancelled(lang, &conflict.key, &conflict.file_path.display())
                 }
                 (BindOperationOutcome::Restored { file_name, .. }, _) => {
-                    format!("Backup de '{file_name}' restaurado.")
+                    i18n::binds_saved_restored(lang, file_name)
                 }
             };
 
@@ -630,7 +680,7 @@ fn execute_save_bind(
         }
         Err(err) => {
             binds.set_status_kind("error".into());
-            binds.set_status_message(format!("Erro ao salvar bind: {err}").into());
+            binds.set_status_message(i18n::binds_save_err(lang, &err).into());
         }
     }
 }
@@ -641,13 +691,15 @@ pub fn refresh_existing_cfg_files(ui: &MainWindow, dirs: &BindDirectories) {
     binds.set_existing_cfg_files(ModelRc::new(VecModel::from(cfg_names)));
 }
 
-pub fn wire_binds_view(ui: &MainWindow, dirs: BindDirectories) {
-    let state = Rc::new(RefCell::new(BindsViewState::new()));
+pub fn wire_binds_view(ui: &MainWindow, dirs: BindDirectories) -> BindsController {
+    let initial_lang = UiLanguage::from_code(ui.get_active_language().as_str());
+    let state = Rc::new(RefCell::new(BindsViewState::new(initial_lang)));
     let rows_model = Rc::new(VecModel::default());
     let binds = ui.global::<BindsState>();
 
     binds.set_backend_connected(true);
     binds.set_catalog_rows(ModelRc::from(rows_model.clone()));
+    binds.set_status_message(i18n::binds_default_status(initial_lang).into());
 
     let cfg_names = load_cfg_names_for_dir(&dirs.local_cfg_dir);
     binds.set_existing_cfg_files(ModelRc::new(VecModel::from(cfg_names)));
@@ -664,21 +716,15 @@ pub fn wire_binds_view(ui: &MainWindow, dirs: BindDirectories) {
     binds.on_existing_file_selected(move |selected| {
         if let Some(ui) = ui_weak.upgrade() {
             let binds = ui.global::<BindsState>();
+            let st = state_sel.borrow();
             binds.set_show_conflict_prompt(false);
-            sync_binds_summary(&binds, &state_sel.borrow().selected_flags);
+            sync_binds_summary(&binds, &st.selected_flags, st.lang);
             binds.set_status_kind("info".into());
             if selected.trim().is_empty() {
-                binds.set_status_message(
-                    "Seleção limpa. Digite um nome no campo de arquivo para criar um novo .cfg."
-                        .into(),
-                );
+                binds.set_status_message(i18n::binds_selection_cleared(st.lang).into());
             } else {
                 binds.set_status_message(
-                    format!(
-                        "Arquivo '{}' carregado. Mantenha o nome para atualizar ou altere para criar um novo arquivo.",
-                        selected
-                    )
-                    .into(),
+                    i18n::binds_file_loaded(st.lang, selected.as_str()).into(),
                 );
             }
         }
@@ -689,7 +735,8 @@ pub fn wire_binds_view(ui: &MainWindow, dirs: BindDirectories) {
     binds.on_file_name_edited(move |_| {
         if let Some(ui) = ui_weak.upgrade() {
             let binds = ui.global::<BindsState>();
-            sync_binds_summary(&binds, &state_edit.borrow().selected_flags);
+            let st = state_edit.borrow();
+            sync_binds_summary(&binds, &st.selected_flags, st.lang);
         }
     });
 
@@ -698,20 +745,15 @@ pub fn wire_binds_view(ui: &MainWindow, dirs: BindDirectories) {
     binds.on_key_captured(move |captured| {
         if let Some(ui) = ui_weak.upgrade() {
             let binds = ui.global::<BindsState>();
+            let st = state_key.borrow();
             binds.set_show_conflict_prompt(false);
-            sync_binds_summary(&binds, &state_key.borrow().selected_flags);
+            sync_binds_summary(&binds, &st.selected_flags, st.lang);
             binds.set_status_kind("info".into());
             if captured.trim().is_empty() {
-                binds.set_status_message(
-                    "Tecla removida. Clique no campo para capturar outra.".into(),
-                );
+                binds.set_status_message(i18n::binds_key_removed(st.lang).into());
             } else {
                 binds.set_status_message(
-                    format!(
-                        "Tecla '{}' associada. Marque os comandos e clique em Salvar Bind.",
-                        captured
-                    )
-                    .into(),
+                    i18n::binds_key_captured(st.lang, captured.as_str()).into(),
                 );
             }
         }
@@ -784,7 +826,7 @@ pub fn wire_binds_view(ui: &MainWindow, dirs: BindDirectories) {
             let binds = ui.global::<BindsState>();
             let st = state_toggle.borrow();
             binds.set_category_tabs(ModelRc::new(VecModel::from(build_category_tabs(&st))));
-            sync_binds_summary(&binds, &st.selected_flags);
+            sync_binds_summary(&binds, &st.selected_flags, st.lang);
             binds.set_status_kind("info".into());
         }
     });
@@ -819,9 +861,9 @@ pub fn wire_binds_view(ui: &MainWindow, dirs: BindDirectories) {
             let binds = ui.global::<BindsState>();
             let st = state_clear.borrow();
             binds.set_category_tabs(ModelRc::new(VecModel::from(build_category_tabs(&st))));
-            sync_binds_summary(&binds, &st.selected_flags);
+            sync_binds_summary(&binds, &st.selected_flags, st.lang);
             binds.set_status_kind("info".into());
-            binds.set_status_message("Seleção de comandos limpa.".into());
+            binds.set_status_message(i18n::binds_commands_cleared(st.lang).into());
         }
     });
 
@@ -846,15 +888,17 @@ pub fn wire_binds_view(ui: &MainWindow, dirs: BindDirectories) {
     });
 
     let ui_weak = ui.as_weak();
+    let state_cancel_conflict = state.clone();
     binds.on_cancel_conflict_overwrite(move || {
         if let Some(ui) = ui_weak.upgrade() {
             let binds = ui.global::<BindsState>();
+            let lang = state_cancel_conflict.borrow().lang;
             binds.set_status_kind("info".into());
-            binds.set_status_message(
-                "Substituição cancelada. Nenhuma alteração foi gravada no arquivo.".into(),
-            );
+            binds.set_status_message(i18n::binds_overwrite_cancelled(lang).into());
         }
     });
+
+    BindsController { state, rows_model }
 }
 
 #[cfg(test)]
@@ -908,7 +952,7 @@ mod tests {
         assert!(!ui.get_show_binds_view(), "Painel deve iniciar sem view de binds aberta");
 
         crate::tray::setup_tray(&ui, &app_tray, settings_path, false);
-        wire_binds_view(&ui, dirs.clone());
+        let controller = wire_binds_view(&ui, dirs.clone());
 
         let binds = ui.global::<BindsState>();
 
@@ -1085,6 +1129,102 @@ mod tests {
         assert_eq!(
             std::fs::read_to_string(local_cfg.join("autoexec.cfg")).unwrap(),
             "bind \"f4\" \"slot8\"\n"
+        );
+
+        assert_binds_view_full_localization_switching(&ui, &controller);
+    }
+
+    fn assert_binds_view_full_localization_switching(ui: &MainWindow, controller: &BindsController) {
+        let binds = ui.global::<BindsState>();
+
+        // Resetar estado da BindsView para validar troca limpa de idioma
+        binds.invoke_clear_selected_commands();
+        binds.set_selected_existing_file("".into());
+        binds.set_file_name_input("".into());
+        binds.invoke_file_name_edited("".into());
+        binds.set_bound_key("".into());
+        binds.invoke_key_captured("".into());
+        binds.invoke_category_tab_selected(0);
+        binds.invoke_view_mode_changed(false);
+        binds.set_status_message(i18n::binds_default_status(UiLanguage::PtBr).into());
+
+        // Padrão inicial PT-BR
+        assert_eq!(binds.get_save_mode_badge(), "NOVO ARQUIVO");
+        assert_eq!(
+            binds.get_category_tabs().row_data(0).unwrap().tab_label,
+            "Movimentação"
+        );
+
+        // Alternar para EN-US
+        assert!(slint::select_bundled_translation("en_US").is_ok());
+        controller.refresh_for_language(ui, UiLanguage::EnUs);
+        assert_eq!(binds.get_save_mode_badge(), "NEW FILE");
+        assert_eq!(
+            binds.get_status_message(),
+            i18n::binds_default_status(UiLanguage::EnUs)
+        );
+        let tabs_en = binds.get_category_tabs();
+        assert_eq!(tabs_en.row_data(0).unwrap().tab_label, "Movement");
+        assert_eq!(tabs_en.row_data(0).unwrap().title, "1. Movement");
+        assert_eq!(tabs_en.row_data(1).unwrap().subtitle, "Requires sv_cheats 1");
+
+        // Verificar linha de comando em modo Lista e modo Grade (EN-US)
+        let rows_en = binds.get_catalog_rows();
+        assert_eq!(rows_en.row_data(0).unwrap().title, "1. Movement");
+        assert_eq!(rows_en.row_data(1).unwrap().title, "Core Commands");
+        assert_eq!(rows_en.row_data(2).unwrap().subtitle, "Move forward (W).");
+
+        binds.invoke_view_mode_changed(true);
+        let grid_en = binds.get_catalog_rows();
+        assert_eq!(
+            grid_en.row_data(2).unwrap().cell_0.description,
+            "Move forward (W)."
+        );
+        assert_eq!(grid_en.row_data(2).unwrap().cell_0.info, "Core Commands");
+
+        binds.invoke_search_query_changed("walls".into());
+        assert!(binds.get_filtered_commands_count() >= 1);
+        binds.invoke_category_tab_selected(0);
+
+        // Alternar para RU-RU e validar busca multilíngue em cirílico (incluindo ё -> е)
+        assert!(slint::select_bundled_translation("ru_RU").is_ok());
+        controller.refresh_for_language(ui, UiLanguage::RuRu);
+        assert_eq!(binds.get_save_mode_badge(), "НОВЫЙ ФАЙЛ");
+        assert_eq!(
+            binds.get_status_message(),
+            i18n::binds_default_status(UiLanguage::RuRu)
+        );
+        assert_eq!(
+            binds.get_category_tabs().row_data(0).unwrap().tab_label,
+            "Движение"
+        );
+        binds.invoke_view_mode_changed(false);
+        assert_eq!(
+            binds.get_catalog_rows().row_data(2).unwrap().subtitle,
+            "Движение вперёд (W)."
+        );
+
+        binds.invoke_search_query_changed("сквозь стены".into());
+        assert_eq!(binds.get_filtered_commands_count(), 2);
+        binds.invoke_search_query_changed("свободный полет".into());
+        assert_eq!(binds.get_filtered_commands_count(), 1);
+        binds.invoke_category_tab_selected(0);
+
+        // Validação com arquivo ausente em RU-RU
+        binds.set_file_name_input("".into());
+        binds.invoke_save_bind_clicked();
+        assert_eq!(
+            binds.get_status_message(),
+            i18n::binds_err_missing_file(UiLanguage::RuRu)
+        );
+
+        // Restaurar para PT-BR
+        assert!(slint::select_bundled_translation("pt_BR").is_ok());
+        controller.refresh_for_language(ui, UiLanguage::PtBr);
+        assert_eq!(binds.get_save_mode_badge(), "NOVO ARQUIVO");
+        assert_eq!(
+            binds.get_category_tabs().row_data(0).unwrap().tab_label,
+            "Movimentação"
         );
     }
 }
