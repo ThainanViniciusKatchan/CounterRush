@@ -6,6 +6,7 @@ mod binds;
 mod binds_i18n;
 mod i18n;
 mod tray;
+mod updater;
 
 fn scan_cfg_files() -> Vec<slint::SharedString> {
     counterrush_core::list_cfg_files()
@@ -1839,6 +1840,7 @@ fn main() -> Result<(), slint::PlatformError> {
             eprintln!("Aviso: falha ao iniciar listener de instância única: {err}");
         }
     }
+    let single_instance_guard = std::sync::Arc::new(std::sync::Mutex::new(single_instance_guard));
 
     // Inicialização de AppSettings e seleção dinâmica de idiomas
     let settings_path = counterrush_core::resolve_app_settings_path();
@@ -2664,11 +2666,19 @@ fn main() -> Result<(), slint::PlatformError> {
         });
     });
 
+    let updater_controller = updater::wire_updater(
+        &main_window,
+        active_lang.clone(),
+        single_instance_guard.clone(),
+        game_monitor.clone(),
+    );
+
     // Callback para seleção dinâmica de idioma na aba de Configurações
     let window_handle = main_window.as_weak();
     let settings_path_for_lang = settings_path.clone();
     let lang_state_for_select = active_lang.clone();
     let binds_ctrl_for_lang = binds_controller.clone();
+    let updater_ctrl_for_lang = updater_controller.clone();
     main_window.on_language_selected(move |code| {
         let ui = match window_handle.upgrade() {
             Some(ui) => ui,
@@ -2683,6 +2693,7 @@ fn main() -> Result<(), slint::PlatformError> {
         }
         ui.set_active_language(target_code.into());
         binds_ctrl_for_lang.refresh_for_language(&ui, lang_enum);
+        updater_ctrl_for_lang.refresh_for_language(&ui, lang_enum);
 
         if let Ok(mut settings) = counterrush_core::config::AppSettings::load_or_create(&settings_path_for_lang) {
             settings.language = target_code.to_string();

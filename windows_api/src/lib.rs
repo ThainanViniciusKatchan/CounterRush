@@ -65,3 +65,9 @@ pub use single_instance::{
     acquire_single_instance, notify_existing_instance, SingleInstanceGuard, SingleInstanceOutcome,
     DEFAULT_SINGLE_INSTANCE_ID,
 };
+
+pub mod updater;
+pub use updater::{
+    build_msi_upgrade_powershell_script, is_installed_via_msi, resolve_post_msi_relaunch_exe,
+    spawn_msi_upgrade_and_relaunch,
+};

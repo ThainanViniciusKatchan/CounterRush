@@ -1763,3 +1763,153 @@ pub fn content_view_mode_changed_status(lang: UiLanguage, is_grid: bool) -> &'st
         (UiLanguage::PtBr, false) => "Modo de visualização padrão definido para Lista.",
     }
 }
+
+pub fn update_checking_detail(lang: UiLanguage) -> &'static str {
+    match lang {
+        UiLanguage::EnUs => "Checking GitHub releases...",
+        UiLanguage::RuRu => "Проверка релизов на GitHub...",
+        UiLanguage::PtBr => "Buscando novas versões no GitHub...",
+    }
+}
+
+pub fn update_checking_status(lang: UiLanguage) -> &'static str {
+    match lang {
+        UiLanguage::EnUs => "Checking for CounterRush updates on GitHub...",
+        UiLanguage::RuRu => "Поиск обновлений CounterRush на GitHub...",
+        UiLanguage::PtBr => "Verificando atualizações do CounterRush no GitHub...",
+    }
+}
+
+pub fn update_available_detail(lang: UiLanguage, version: &str) -> String {
+    match lang {
+        UiLanguage::EnUs => format!("New version v{version} is available for download."),
+        UiLanguage::RuRu => format!("Доступна новая версия v{version} для загрузки."),
+        UiLanguage::PtBr => format!("Nova versão v{version} disponível para download."),
+    }
+}
+
+pub fn update_available_status(lang: UiLanguage, version: &str) -> String {
+    match lang {
+        UiLanguage::EnUs => format!("Update v{version} available. Click Download Update."),
+        UiLanguage::RuRu => format!("Доступно обновление v{version}. Нажмите «Загрузить обновление»."),
+        UiLanguage::PtBr => format!("Atualização v{version} disponível. Clique em Baixar Atualização."),
+    }
+}
+
+pub fn update_up_to_date_detail(lang: UiLanguage, version: &str) -> String {
+    match lang {
+        UiLanguage::EnUs => format!("You are already on the latest version (v{version})."),
+        UiLanguage::RuRu => format!("У вас установлена последняя версия (v{version})."),
+        UiLanguage::PtBr => format!("Você já está na versão mais recente (v{version})."),
+    }
+}
+
+pub fn update_up_to_date_status(lang: UiLanguage, version: &str) -> String {
+    match lang {
+        UiLanguage::EnUs => format!("CounterRush v{version} is up to date."),
+        UiLanguage::RuRu => format!("CounterRush v{version} актуален."),
+        UiLanguage::PtBr => format!("O CounterRush v{version} já está atualizado."),
+    }
+}
+
+pub fn update_downloading_detail(
+    lang: UiLanguage,
+    version: &str,
+    percent: Option<u8>,
+) -> String {
+    match (lang, percent) {
+        (UiLanguage::EnUs, Some(p)) => format!("Downloading v{version}... ({p}%)"),
+        (UiLanguage::EnUs, None) => format!("Downloading v{version}..."),
+        (UiLanguage::RuRu, Some(p)) => format!("Загрузка v{version}... ({p}%)"),
+        (UiLanguage::RuRu, None) => format!("Загрузка v{version}..."),
+        (UiLanguage::PtBr, Some(p)) => format!("Baixando versão v{version}... ({p}%)"),
+        (UiLanguage::PtBr, None) => format!("Baixando versão v{version}..."),
+    }
+}
+
+pub fn update_downloading_status(lang: UiLanguage, version: &str) -> String {
+    match lang {
+        UiLanguage::EnUs => format!("Downloading CounterRush v{version} from GitHub..."),
+        UiLanguage::RuRu => format!("Загрузка CounterRush v{version} с GitHub..."),
+        UiLanguage::PtBr => format!("Baixando atualização CounterRush v{version} do GitHub..."),
+    }
+}
+
+pub fn update_ready_detail(lang: UiLanguage, version: &str) -> String {
+    match lang {
+        UiLanguage::EnUs => format!("v{version} downloaded. Restart CounterRush to finish updating."),
+        UiLanguage::RuRu => format!("v{version} загружена. Перезапустите CounterRush для обновления."),
+        UiLanguage::PtBr => format!("v{version} baixada. Reinicie o programa para concluir a atualização."),
+    }
+}
+
+pub fn update_ready_status(lang: UiLanguage, version: &str) -> String {
+    match lang {
+        UiLanguage::EnUs => format!("Update v{version} ready. Click Restart to Update."),
+        UiLanguage::RuRu => format!("Обновление v{version} готово. Нажмите «Перезапустить для обновления»."),
+        UiLanguage::PtBr => format!("Atualização v{version} pronta. Clique em Reiniciar para Atualizar."),
+    }
+}
+
+pub fn update_restarting_status(lang: UiLanguage) -> &'static str {
+    match lang {
+        UiLanguage::EnUs => "Applying update and restarting CounterRush...",
+        UiLanguage::RuRu => "Применение обновления и перезапуск CounterRush...",
+        UiLanguage::PtBr => "Aplicando atualização e reiniciando o CounterRush...",
+    }
+}
+
+pub fn update_error_network(lang: UiLanguage) -> &'static str {
+    match lang {
+        UiLanguage::EnUs => "Unable to reach GitHub. Check your internet connection.",
+        UiLanguage::RuRu => "Не удалось подключиться к GitHub. Проверьте интернет-соединение.",
+        UiLanguage::PtBr => "Não foi possível conectar ao GitHub. Verifique sua internet.",
+    }
+}
+
+pub fn update_error_rate_limited(lang: UiLanguage, retry_after_secs: Option<u64>) -> String {
+    match (lang, retry_after_secs) {
+        (UiLanguage::EnUs, Some(s)) => format!("GitHub API limit reached. Try again in {s}s."),
+        (UiLanguage::EnUs, None) => "GitHub API limit reached. Please try again later.".to_string(),
+        (UiLanguage::RuRu, Some(s)) => format!("Превышен лимит API GitHub. Повторите через {s} с."),
+        (UiLanguage::RuRu, None) => "Превышен лимит API GitHub. Повторите позже.".to_string(),
+        (UiLanguage::PtBr, Some(s)) => {
+            format!("Limite de consultas do GitHub atingido. Tente em {s}s.")
+        }
+        (UiLanguage::PtBr, None) => {
+            "Limite de consultas do GitHub atingido. Tente novamente mais tarde.".to_string()
+        }
+    }
+}
+
+pub fn update_error_no_asset(lang: UiLanguage, version: &str) -> String {
+    match lang {
+        UiLanguage::EnUs => format!("No compatible Windows package found for v{version}."),
+        UiLanguage::RuRu => format!("Не найден совместимый пакет Windows для v{version}."),
+        UiLanguage::PtBr => format!("Nenhum pacote Windows compatível encontrado para v{version}."),
+    }
+}
+
+pub fn update_error_checksum(lang: UiLanguage) -> &'static str {
+    match lang {
+        UiLanguage::EnUs => "Integrity check failed for the downloaded file. Try again.",
+        UiLanguage::RuRu => "Ошибка проверки целостности загруженного файла. Повторите попытку.",
+        UiLanguage::PtBr => "Falha na verificação de integridade do arquivo baixado. Tente novamente.",
+    }
+}
+
+pub fn update_error_restart(lang: UiLanguage, err: &str) -> String {
+    match lang {
+        UiLanguage::EnUs => format!("Failed to restart for update: {err}"),
+        UiLanguage::RuRu => format!("Не удалось перезапустить для обновления: {err}"),
+        UiLanguage::PtBr => format!("Falha ao reiniciar para atualizar: {err}"),
+    }
+}
+
+pub fn update_error_generic(lang: UiLanguage, err: &str) -> String {
+    match lang {
+        UiLanguage::EnUs => format!("Update failed: {err}"),
+        UiLanguage::RuRu => format!("Ошибка обновления: {err}"),
+        UiLanguage::PtBr => format!("Erro na atualização: {err}"),
+    }
+}

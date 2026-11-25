@@ -13,6 +13,7 @@ import { InDevelopmentDialog } from "components/in_development_dialog.slint";
 import { AutoOptimizeDialog } from "components/auto_optimize_dialog.slint";
 import { AppTray } from "components/tray.slint";
 import { BindsView, BindsState, BindCatalogRow, BindCategoryTab, BindGridCell } from "components/binds_view.slint";
+import { UpdateActionButton } from "components/update_action_button.slint";
 
 export struct PresetModel {
     name: string,
@@ -97,6 +98,11 @@ export component MainWindow inherits Window {
     in-out property <bool> optimize-on-steam-launch: false;
     in-out property <bool> content-is-grid-view: false;
     in-out property <bool> is-restoring-defaults: false;
+    in-out property <int> update-state: 0;
+    in-out property <string> update-available-version: "";
+    in-out property <float> update-download-progress: 0.0;
+    in-out property <string> update-status-detail: "";
+    in-out property <bool> show-dashboard-update-banner: false;
 
     // Indica se existe um perfil selecionado pronto para edição de tweaks
     property <bool> has-active-profile: root.presets.length > 0 && root.active-preset != "";
@@ -178,6 +184,7 @@ export component MainWindow inherits Window {
     callback start-with-system-toggled(bool);
     callback optimize-on-steam-launch-toggled(bool);
     callback content-view-mode-changed(bool);
+    callback update-action-clicked();
 
     function handle-tweak-without-profile() {
         if !root.is-restoring-defaults {
@@ -255,13 +262,77 @@ export component MainWindow inherits Window {
             spacing: 16px;
             alignment: space-between;
 
-            // Cabeçalho Minimalista Direto
-            Text {
-                text: @tr("PAINEL DE CONTROLE");
-                font-size: 16px;
-                font-weight: 900;
-                letter-spacing: 0.6px;
-                color: CS2Theme.text-primary;
+            // Cabeçalho Minimalista Direto + Faixa Tática de Atualização (quando aplicável)
+            HorizontalLayout {
+                alignment: space-between;
+                min-height: 36px;
+
+                Text {
+                    text: @tr("PAINEL DE CONTROLE");
+                    font-size: 16px;
+                    font-weight: 900;
+                    letter-spacing: 0.6px;
+                    color: CS2Theme.text-primary;
+                    vertical-alignment: center;
+                }
+
+                if root.show-dashboard-update-banner : Rectangle {
+                    height: 36px;
+                    background: CS2Theme.bg-surface;
+                    border-radius: CS2Theme.radius-sm;
+                    border-width: 1px;
+                    border-color: root.update-state == 4
+                        ? CS2Theme.status-success
+                        : (root.update-state == 5 ? CS2Theme.status-danger : CS2Theme.accent-ct-cyan);
+                    animate border-color { duration: 150ms; }
+
+                    HorizontalLayout {
+                        padding-left: 10px;
+                        padding-right: 4px;
+                        spacing: 10px;
+                        alignment: center;
+
+                        VerticalLayout {
+                            alignment: center;
+                            Rectangle {
+                                width: 6px;
+                                height: 6px;
+                                border-radius: 3px;
+                                background: root.update-state == 4
+                                    ? CS2Theme.status-success-bright
+                                    : (root.update-state == 5 ? CS2Theme.status-danger : CS2Theme.accent-ct-cyan);
+                            }
+                        }
+
+                        Text {
+                            text: root.update-state == 4
+                                ? @tr("v{} pronta para instalar", root.update-available-version)
+                                : (root.update-state == 3
+                                    ? @tr("Baixando v{}...", root.update-available-version)
+                                    : (root.update-state == 5
+                                        ? @tr("Falha na atualização")
+                                        : @tr("Nova versão v{} disponível", root.update-available-version)));
+                            font-size: 10.5px;
+                            font-weight: 700;
+                            color: root.update-state == 4
+                                ? CS2Theme.status-success-bright
+                                : (root.update-state == 5 ? CS2Theme.status-danger : CS2Theme.text-primary);
+                            vertical-alignment: center;
+                        }
+
+                        VerticalLayout {
+                            alignment: center;
+                            UpdateActionButton {
+                                compact: true;
+                                update-state: root.update-state;
+                                download-progress: root.update-download-progress;
+                                clicked => {
+                                    root.update-action-clicked();
+                                }
+                            }
+                        }
+                    }
+                }
             }
 
             // Seção Superior: Ajustes de Hardware (Sem fundo envelopando, botões diretos no canvas com cor sólida)
@@ -1582,7 +1653,7 @@ export component MainWindow inherits Window {
             alignment: space-between;
 
             VerticalLayout {
-                spacing: 14px;
+                spacing: 10px;
 
                 // Cabeçalho da Aba
                 VerticalLayout {
@@ -2044,7 +2115,81 @@ export component MainWindow inherits Window {
                     }
                 }
 
-                // Seção 3: Sobre e Comunidade
+                // Seção 4: Atualizações do Software
+                VerticalLayout {
+                    spacing: 6px;
+
+                    Text {
+                        text: @tr("ATUALIZAÇÕES DO SOFTWARE");
+                        font-size: 12px;
+                        font-weight: 800;
+                        letter-spacing: 0.5px;
+                        color: CS2Theme.text-cyan;
+                    }
+
+                    Rectangle {
+                        height: 44px;
+                        background: CS2Theme.bg-surface;
+                        border-radius: CS2Theme.radius-xs;
+                        border-width: 1px;
+                        border-color: root.update-state == 4
+                            ? CS2Theme.status-success
+                            : (root.update-state == 5
+                                ? CS2Theme.status-danger
+                                : ((root.update-state == 2 || root.update-state == 3)
+                                    ? CS2Theme.accent-ct-cyan
+                                    : CS2Theme.border));
+                        animate border-color { duration: 150ms; }
+
+                        HorizontalLayout {
+                            padding-left: 12px;
+                            padding-right: 8px;
+                            spacing: 12px;
+                            alignment: space-between;
+
+                            VerticalLayout {
+                                alignment: center;
+                                spacing: 2px;
+                                horizontal-stretch: 1;
+
+                                Text {
+                                    text: @tr("Atualizações via GitHub");
+                                    font-size: 11px;
+                                    font-weight: 700;
+                                    color: CS2Theme.text-primary;
+                                }
+
+                                Text {
+                                    text: root.update-status-detail != ""
+                                        ? root.update-status-detail
+                                        : @tr("Versão atual: v{}", root.app-version);
+                                    font-size: 10px;
+                                    overflow: elide;
+                                    color: root.update-state == 4
+                                        ? CS2Theme.status-success-bright
+                                        : (root.update-state == 5
+                                            ? CS2Theme.status-danger
+                                            : (root.update-state == 2 ? CS2Theme.text-cyan : CS2Theme.text-dim));
+                                }
+                            }
+
+                            VerticalLayout {
+                                alignment: center;
+                                horizontal-stretch: 0;
+                                UpdateActionButton {
+                                    compact: false;
+                                    update-state: root.update-state;
+                                    download-progress: root.update-download-progress;
+                                    clicked => {
+                                        root.update-action-clicked();
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Seção 5: Sobre e Comunidade
                 VerticalLayout {
                     spacing: 8px;
 

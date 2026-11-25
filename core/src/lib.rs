@@ -17,6 +17,8 @@ pub enum CoreError {
     Io(#[from] std::io::Error),
     #[error("Falha ao processar arquivo JSON: {0}")]
     Json(#[from] serde_json::Error),
+    #[error("Erro no sistema de atualização: {0}")]
+    Update(#[from] updater::UpdateError),
 }
 
 pub mod classifier;
@@ -50,6 +52,13 @@ pub mod steam_monitor;
 pub use steam_monitor::{
     GameMonitorService, MonitorState, ProcessQuery, SteamLogDetector, SteamRegistryDetector,
     Win32ProcessQuery, Win32SteamLogDetector, Win32SteamRegistryDetector, CS2_STEAM_APP_ID,
+};
+pub mod updater;
+pub use updater::{
+    default_update_staging_dir, select_compatible_asset, verify_file_digest, DownloadProgressFn,
+    DownloadedUpdate, GitHubReleaseCatalog, ReleaseCatalog, SelfUpdateDownloader, UpdateAssetKind,
+    UpdateCheckResult, UpdateDownloader, UpdateError, UpdateInfo, UpdateService,
+    GITHUB_REPO_NAME, GITHUB_REPO_OWNER, UPDATE_BIN_NAME,
 };
 pub use windows_api::{SingleInstanceGuard, SingleInstanceOutcome, DEFAULT_SINGLE_INSTANCE_ID};
 

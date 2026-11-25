@@ -13,6 +13,9 @@ tweaks      = { path = "../tweaks" }
 thiserror.workspace = true
 serde.workspace     = true
 serde_json.workspace = true
+self_update.workspace  = true
+self-replace.workspace = true
+sha2.workspace         = true
 
 [lib]
 doctest = false

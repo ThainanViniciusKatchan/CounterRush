@@ -1,0 +1,101 @@
+import { CS2Theme } from "../theme.slint";
+
+export component UpdateActionButton inherits Rectangle {
+    // 0: Idle / UpToDate, 1: Checking, 2: Available, 3: Downloading, 4: ReadyToRestart, 5: Error
+    in property <int> update-state: 0;
+    in property <float> download-progress: 0.0;
+    in property <bool> compact: false;
+    callback clicked();
+
+    property <bool> is-interactive: root.update-state != 1 && root.update-state != 3;
+    property <color> text-fg: root.update-state == 1
+        ? CS2Theme.text-muted
+        : (root.update-state == 0
+            ? (touch.has-hover ? CS2Theme.text-primary : CS2Theme.text-muted)
+            : #ffffff);
+
+    height: root.compact ? 28px : 32px;
+    border-radius: CS2Theme.radius-xs;
+    clip: true;
+    opacity: root.update-state == 1 ? 0.72 : 1.0;
+    border-width: (root.update-state == 2 || root.update-state == 4) ? 0px : 1px;
+    border-color: root.update-state == 3
+        ? CS2Theme.accent-ct-cyan
+        : (root.update-state == 5
+            ? CS2Theme.status-danger
+            : (root.update-state == 0 && touch.has-hover ? CS2Theme.border-hover : CS2Theme.border));
+    background: root.update-state == 2
+        ? (touch.has-hover ? #0369a1 : #0284c7)
+        : (root.update-state == 3
+            ? CS2Theme.bg-main
+            : (root.update-state == 4
+                ? (touch.has-hover ? #059669 : #047857)
+                : (root.update-state == 5
+                    ? (touch.has-hover ? #991b1b : #7f1d1d)
+                    : (root.update-state == 0 && touch.has-hover ? CS2Theme.bg-card-hover : CS2Theme.bg-card))));
+
+    animate background { duration: 120ms; }
+    animate border-color { duration: 120ms; }
+    animate opacity { duration: 120ms; }
+
+    if root.update-state == 3 : Rectangle {
+        x: 0px;
+        y: 0px;
+        height: parent.height;
+        width: root.download-progress >= 0.0
+            ? Math.clamp(root.download-progress, 0.0, 1.0) * parent.width
+            : parent.width * 0.45;
+        background: rgba(0, 163, 255, 0.36);
+        animate width { duration: 150ms; easing: ease-out; }
+    }
+
+    HorizontalLayout {
+        padding-left: root.compact ? 11px : 14px;
+        padding-right: root.compact ? 11px : 14px;
+        spacing: 6px;
+        alignment: center;
+
+        VerticalLayout {
+            alignment: center;
+            Image {
+                source: (root.update-state == 2 || root.update-state == 3)
+                    ? @image-url("../assets/icons/download.svg")
+                    : @image-url("../assets/icons/refresh.svg");
+                width: 12px;
+                height: 12px;
+                colorize: root.text-fg;
+            }
+        }
+
+        Text {
+            text: root.update-state == 1
+                ? @tr("VERIFICANDO...")
+                : (root.update-state == 2
+                    ? @tr("BAIXAR ATUALIZAÇÃO")
+                    : (root.update-state == 3
+                        ? (root.download-progress >= 0.0
+                            ? @tr("BAIXANDO {}%", Math.round(Math.clamp(root.download-progress, 0.0, 1.0) * 100))
+                            : @tr("BAIXANDO..."))
+                        : (root.update-state == 4
+                            ? @tr("REINICIAR PARA ATUALIZAR")
+                            : (root.update-state == 5
+                                ? @tr("TENTAR NOVAMENTE")
+                                : @tr("VERIFICAR ATUALIZAÇÕES")))));
+            font-size: root.compact ? 9.5px : 10px;
+            font-weight: 900;
+            letter-spacing: 0.5px;
+            color: root.text-fg;
+            vertical-alignment: center;
+        }
+    }
+
+    touch := TouchArea {
+        enabled: root.is-interactive;
+        mouse-cursor: root.is-interactive ? pointer : default;
+        clicked => {
+            if root.is-interactive {
+                root.clicked();
+            }
+        }
+    }
+}

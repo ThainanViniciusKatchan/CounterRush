@@ -22,6 +22,12 @@
 
 - Adicionada mensagem de aviso para aplicativos que podem ser reiniciados ao aplicar as otimizações.
 
+- Adicionada a possíbilidade de visualizar alguns conteúdos em forma de lista ou grade.
+
+  - A mudança de uma única tela reflete nas demais e a opção pode ser alterada nas configurações também.
+
+- Sistema de Auto Atualização adicionado para facilitar o Download de novas versões.
+
 - Novos textos foram traduzidos para Russo e Inglês.
 
 ##### Correção:

@@ -902,3 +902,44 @@ msgstr "VISUALIZAÇÃO DE CONTEÚDO"
 
 msgid "Defina o modo padrão (Lista ou Grade) para exibir conteúdos em todo o CounterRush."
 msgstr "Defina o modo padrão (Lista ou Grade) para exibir conteúdos em todo o CounterRush."
+msgid "VERIFICAR ATUALIZAÇÕES"
+msgstr "VERIFICAR ATUALIZAÇÕES"
+
+msgid "VERIFICANDO..."
+msgstr "VERIFICANDO..."
+
+msgid "BAIXAR ATUALIZAÇÃO"
+msgstr "BAIXAR ATUALIZAÇÃO"
+
+msgid "BAIXANDO {}%"
+msgstr "BAIXANDO {}%"
+
+msgid "BAIXANDO..."
+msgstr "BAIXANDO..."
+
+msgid "REINICIAR PARA ATUALIZAR"
+msgstr "REINICIAR PARA ATUALIZAR"
+
+msgid "TENTAR NOVAMENTE"
+msgstr "TENTAR NOVAMENTE"
+
+msgid "v{} pronta para instalar"
+msgstr "v{} pronta para instalar"
+
+msgid "Baixando v{}..."
+msgstr "Baixando v{}..."
+
+msgid "Falha na atualização"
+msgstr "Falha na atualização"
+
+msgid "Nova versão v{} disponível"
+msgstr "Nova versão v{} disponível"
+
+msgid "ATUALIZAÇÕES DO SOFTWARE"
+msgstr "ATUALIZAÇÕES DO SOFTWARE"
+
+msgid "Atualizações via GitHub"
+msgstr "Atualizações via GitHub"
+
+msgid "Versão atual: v{}"
+msgstr "Versão atual: v{}"

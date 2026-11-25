@@ -902,3 +902,44 @@ msgstr "РЕЖИМ ОТОБРАЖЕНИЯ КОНТЕНТА"
 
 msgid "Defina o modo padrão (Lista ou Grade) para exibir conteúdos em todo o CounterRush."
 msgstr "Выберите режим по умолчанию (Список или Сетка) для отображения контента во всём CounterRush."
+msgid "VERIFICAR ATUALIZAÇÕES"
+msgstr "ПРОВЕРИТЬ ОБНОВЛЕНИЯ"
+
+msgid "VERIFICANDO..."
+msgstr "ПРОВЕРКА..."
+
+msgid "BAIXAR ATUALIZAÇÃO"
+msgstr "ЗАГРУЗИТЬ ОБНОВЛЕНИЕ"
+
+msgid "BAIXANDO {}%"
+msgstr "ЗАГРУЗКА {}%"
+
+msgid "BAIXANDO..."
+msgstr "ЗАГРУЗКА..."
+
+msgid "REINICIAR PARA ATUALIZAR"
+msgstr "ПЕРЕЗАПУСТИТЬ ДЛЯ ОБНОВЛЕНИЯ"
+
+msgid "TENTAR NOVAMENTE"
+msgstr "ПОВТОРИТЬ"
+
+msgid "v{} pronta para instalar"
+msgstr "v{} готова к установке"
+
+msgid "Baixando v{}..."
+msgstr "Загрузка v{}..."
+
+msgid "Falha na atualização"
+msgstr "Ошибка обновления"
+
+msgid "Nova versão v{} disponível"
+msgstr "Доступна новая версия v{}"
+
+msgid "ATUALIZAÇÕES DO SOFTWARE"
+msgstr "ОБНОВЛЕНИЯ ПРОГРАММЫ"
+
+msgid "Atualizações via GitHub"
+msgstr "Обновления через GitHub"
+
+msgid "Versão atual: v{}"
+msgstr "Текущая версия: v{}"

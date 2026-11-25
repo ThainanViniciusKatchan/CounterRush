@@ -902,3 +902,44 @@ msgstr "CONTENT VIEW MODE"
 
 msgid "Defina o modo padrão (Lista ou Grade) para exibir conteúdos em todo o CounterRush."
 msgstr "Set the default layout (List or Grid) used to display content across CounterRush."
+msgid "VERIFICAR ATUALIZAÇÕES"
+msgstr "CHECK FOR UPDATES"
+
+msgid "VERIFICANDO..."
+msgstr "CHECKING..."
+
+msgid "BAIXAR ATUALIZAÇÃO"
+msgstr "DOWNLOAD UPDATE"
+
+msgid "BAIXANDO {}%"
+msgstr "DOWNLOADING {}%"
+
+msgid "BAIXANDO..."
+msgstr "DOWNLOADING..."
+
+msgid "REINICIAR PARA ATUALIZAR"
+msgstr "RESTART TO UPDATE"
+
+msgid "TENTAR NOVAMENTE"
+msgstr "TRY AGAIN"
+
+msgid "v{} pronta para instalar"
+msgstr "v{} ready to install"
+
+msgid "Baixando v{}..."
+msgstr "Downloading v{}..."
+
+msgid "Falha na atualização"
+msgstr "Update failed"
+
+msgid "Nova versão v{} disponível"
+msgstr "New version v{} available"
+
+msgid "ATUALIZAÇÕES DO SOFTWARE"
+msgstr "SOFTWARE UPDATES"
+
+msgid "Atualizações via GitHub"
+msgstr "GitHub Updates"
+
+msgid "Versão atual: v{}"
+msgstr "Current version: v{}"
