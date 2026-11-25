@@ -1,3 +1,0 @@
-@echo off
-echo Iniciando Slint Viewer com Auto-Reload no CounterRush...
-slint-viewer ui/main.slint -I ui --auto-reload %*
