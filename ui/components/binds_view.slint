@@ -2,6 +2,7 @@ import { ScrollView } from "std-widgets.slint";
 import { CS2Theme } from "../theme.slint";
 import { BindCommandCard } from "bind_command_card.slint";
 import { TweakSwitch } from "tweak_switch.slint";
+import { ScrollableTextInput } from "scrollable_text_input.slint";
 
 export struct BindCategoryTab {
     index: int,
@@ -441,6 +442,7 @@ export component BindsView inherits Rectangle {
                         spacing: 4px;
                         horizontal-stretch: 2;
                         min-width: 280px;
+                        preferred-width: 0px;
 
                         HorizontalLayout {
                             height: 16px;
@@ -481,9 +483,12 @@ export component BindsView inherits Rectangle {
                             property <bool> is-highlighted: file-name-field.has-focus || BindsState.selector-dropdown-open;
 
                             height: 36px;
+                            min-width: 0px;
+                            preferred-width: 0px;
+                            clip: true;
                             background: is-highlighted
                                 ? CS2Theme.bg-main
-                                : (file-area-touch.has-hover || selector-touch.has-hover ? CS2Theme.bg-card-hover : CS2Theme.bg-card);
+                                : (file-name-field.has-hover || selector-touch.has-hover ? CS2Theme.bg-card-hover : CS2Theme.bg-card);
                             border-radius: CS2Theme.radius-sm;
                             border-width: 1.5px;
                             border-color: is-highlighted ? CS2Theme.accent-ct-cyan : transparent;
@@ -506,53 +511,34 @@ export component BindsView inherits Rectangle {
                                     }
                                 }
 
-                                Rectangle {
-                                    horizontal-stretch: 1;
-                                    clip: true;
-
-                                    file-area-touch := TouchArea {
-                                        mouse-cursor: text;
-                                        clicked => {
-                                            BindsState.is-listening-key = false;
-                                            BindsState.selector-dropdown-open = false;
-                                            root.hide-grid-tooltip();
-                                            file-name-field.focus();
-                                        }
+                                file-name-field := ScrollableTextInput {
+                                    text <=> BindsState.file-name-input;
+                                    placeholder-text: @tr("Ex: minhas_binds.cfg");
+                                    placeholder-opacity: 0.78;
+                                    font-size: 12px;
+                                    font-weight: 700;
+                                    placeholder-font-size: 11px;
+                                    text-color: CS2Theme.text-primary;
+                                    placeholder-color: CS2Theme.text-muted;
+                                    focused => {
+                                        BindsState.is-listening-key = false;
+                                        BindsState.selector-dropdown-open = false;
+                                        root.hide-grid-tooltip();
                                     }
-
-                                    file-name-field := TextInput {
-                                        width: parent.width;
-                                        height: parent.height;
-                                        text <=> BindsState.file-name-input;
-                                        color: CS2Theme.text-primary;
-                                        font-size: 12px;
-                                        font-weight: 700;
-                                        vertical-alignment: center;
-                                        edited => {
-                                            BindsState.is-listening-key = false;
-                                            BindsState.selector-dropdown-open = false;
-                                            BindsState.show-conflict-prompt = false;
-                                            root.hide-grid-tooltip();
-                                            root.sync-local-save-mode();
-                                            BindsState.file-name-edited(self.text);
-                                        }
-                                    }
-
-                                    if BindsState.file-name-input == "" : Text {
-                                        width: parent.width;
-                                        height: parent.height;
-                                        text: @tr("Ex: minhas_binds.cfg");
-                                        color: CS2Theme.text-muted;
-                                        font-size: 11px;
-                                        vertical-alignment: center;
-                                        overflow: elide;
-                                        opacity: 0.78;
+                                    edited(val) => {
+                                        BindsState.is-listening-key = false;
+                                        BindsState.selector-dropdown-open = false;
+                                        BindsState.show-conflict-prompt = false;
+                                        root.hide-grid-tooltip();
+                                        root.sync-local-save-mode();
+                                        BindsState.file-name-edited(val);
                                     }
                                 }
 
                                 if BindsState.file-name-input != "" : Rectangle {
                                     width: 22px;
                                     height: 22px;
+                                    horizontal-stretch: 0;
                                     y: (parent.height - self.height) / 2;
                                     border-radius: CS2Theme.radius-xs;
                                     background: clear-file-touch.has-hover ? CS2Theme.bg-card-selected : transparent;
@@ -578,6 +564,7 @@ export component BindsView inherits Rectangle {
                                             root.hide-grid-tooltip();
                                             BindsState.file-name-input = "";
                                             BindsState.selected-existing-file = "";
+                                            file-name-field.reset-scroll();
                                             root.sync-local-save-mode();
                                             BindsState.existing-file-selected("");
                                             BindsState.file-name-edited("");
@@ -1120,10 +1107,13 @@ export component BindsView inherits Rectangle {
                         property <bool> is-highlighted: search-field.has-focus || BindsState.search-query != "";
 
                         horizontal-stretch: 1;
+                        min-width: 0px;
+                        preferred-width: 0px;
+                        clip: true;
                         height: 34px;
                         background: is-highlighted
                             ? CS2Theme.bg-main
-                            : (search-area-touch.has-hover ? CS2Theme.bg-card-hover : CS2Theme.bg-card);
+                            : (search-field.has-hover ? CS2Theme.bg-card-hover : CS2Theme.bg-card);
                         border-radius: CS2Theme.radius-sm;
                         border-width: 1.5px;
                         border-color: is-highlighted ? CS2Theme.accent-ct-cyan : transparent;
@@ -1150,50 +1140,32 @@ export component BindsView inherits Rectangle {
                                 }
                             }
 
-                            Rectangle {
-                                horizontal-stretch: 1;
-                                clip: true;
-
-                                search-area-touch := TouchArea {
-                                    mouse-cursor: text;
-                                    clicked => {
-                                        BindsState.is-listening-key = false;
-                                        BindsState.selector-dropdown-open = false;
-                                        root.hide-grid-tooltip();
-                                        search-field.focus();
-                                    }
+                            search-field := ScrollableTextInput {
+                                text <=> BindsState.search-query;
+                                placeholder-text: @tr("Pesquisar por comando ou descrição (ex: smoke, radar, +jump)...");
+                                placeholder-opacity: 1.0;
+                                font-size: 12px;
+                                font-weight: 600;
+                                placeholder-font-size: 11px;
+                                text-color: CS2Theme.text-primary;
+                                placeholder-color: CS2Theme.text-muted;
+                                focused => {
+                                    BindsState.is-listening-key = false;
+                                    BindsState.selector-dropdown-open = false;
+                                    root.hide-grid-tooltip();
                                 }
-
-                                search-field := TextInput {
-                                    width: parent.width;
-                                    height: parent.height;
-                                    text <=> BindsState.search-query;
-                                    color: CS2Theme.text-primary;
-                                    font-size: 12px;
-                                    font-weight: 600;
-                                    vertical-alignment: center;
-                                    edited => {
-                                        BindsState.is-listening-key = false;
-                                        BindsState.selector-dropdown-open = false;
-                                        root.hide-grid-tooltip();
-                                        catalog-scroll.content-y = 0px;
-                                        BindsState.search-query-changed(self.text);
-                                    }
-                                }
-
-                                if BindsState.search-query == "" : Text {
-                                    width: parent.width;
-                                    height: parent.height;
-                                    text: @tr("Pesquisar por comando ou descrição (ex: smoke, radar, +jump)...");
-                                    color: CS2Theme.text-muted;
-                                    font-size: 11px;
-                                    vertical-alignment: center;
-                                    overflow: elide;
+                                edited(val) => {
+                                    BindsState.is-listening-key = false;
+                                    BindsState.selector-dropdown-open = false;
+                                    root.hide-grid-tooltip();
+                                    catalog-scroll.content-y = 0px;
+                                    BindsState.search-query-changed(val);
                                 }
                             }
 
                             if BindsState.search-query != "" : Rectangle {
                                 height: 20px;
+                                horizontal-stretch: 0;
                                 y: (parent.height - self.height) / 2;
                                 border-radius: CS2Theme.radius-xs;
                                 background: CS2Theme.accent-ct-soft;
@@ -1216,6 +1188,7 @@ export component BindsView inherits Rectangle {
                             if BindsState.search-query != "" : Rectangle {
                                 width: 22px;
                                 height: 22px;
+                                horizontal-stretch: 0;
                                 y: (parent.height - self.height) / 2;
                                 border-radius: CS2Theme.radius-xs;
                                 background: search-clear-touch.has-hover ? CS2Theme.bg-card-selected : transparent;
@@ -1239,6 +1212,7 @@ export component BindsView inherits Rectangle {
                                         BindsState.selector-dropdown-open = false;
                                         root.hide-grid-tooltip();
                                         BindsState.search-query = "";
+                                        search-field.reset-scroll();
                                         catalog-scroll.content-y = 0px;
                                         BindsState.search-query-changed("");
                                     }

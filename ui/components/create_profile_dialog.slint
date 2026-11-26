@@ -2,6 +2,7 @@ import { ScrollView } from "std-widgets.slint";
 import { CS2Theme } from "../theme.slint";
 import { BindCommandCard } from "bind_command_card.slint";
 import { TweakSwitch } from "tweak_switch.slint";
+import { ScrollableTextInput } from "scrollable_text_input.slint";
 
 export struct NewProfileData {
     name: string,
@@ -311,6 +312,8 @@ export component CreateProfileDialog inherits Rectangle {
                         VerticalLayout {
                             spacing: 4px;
                             horizontal-stretch: 1;
+                            min-width: 0px;
+                            preferred-width: 0px;
 
                             HorizontalLayout {
                                 height: 16px;
@@ -347,9 +350,12 @@ export component CreateProfileDialog inherits Rectangle {
 
                             Rectangle {
                                 height: 36px;
+                                min-width: 0px;
+                                preferred-width: 0px;
+                                clip: true;
                                 background: name-input.has-focus
                                     ? CS2Theme.bg-main
-                                    : (name-area-touch.has-hover ? CS2Theme.bg-card-hover : CS2Theme.bg-card);
+                                    : (name-input.has-hover ? CS2Theme.bg-card-hover : CS2Theme.bg-card);
                                 border-radius: CS2Theme.radius-sm;
                                 border-width: 1.5px;
                                 border-color: name-input.has-focus ? CS2Theme.accent-ct-cyan : transparent;
@@ -372,47 +378,27 @@ export component CreateProfileDialog inherits Rectangle {
                                         }
                                     }
 
-                                    Rectangle {
-                                        horizontal-stretch: 1;
-                                        clip: true;
-
-                                        name-area-touch := TouchArea {
-                                            mouse-cursor: text;
-                                            clicked => {
-                                                root.hide-grid-tooltip();
-                                                name-input.focus();
-                                            }
+                                    name-input := ScrollableTextInput {
+                                        text <=> root.profile-name;
+                                        placeholder-text: @tr("Ex: competitivo_ultra");
+                                        placeholder-opacity: 0.78;
+                                        font-size: 12px;
+                                        font-weight: 700;
+                                        placeholder-font-size: 11px;
+                                        text-color: CS2Theme.text-primary;
+                                        placeholder-color: CS2Theme.text-muted;
+                                        focused => {
+                                            root.hide-grid-tooltip();
                                         }
-
-                                        name-input := TextInput {
-                                            width: parent.width;
-                                            height: parent.height;
-                                            text <=> root.profile-name;
-                                            color: CS2Theme.text-primary;
-                                            font-size: 12px;
-                                            font-weight: 700;
-                                            single-line: true;
-                                            vertical-alignment: center;
-                                            accepted => {
-                                                root.submit-profile();
-                                            }
-                                        }
-
-                                        if root.profile-name == "" : Text {
-                                            width: parent.width;
-                                            height: parent.height;
-                                            text: @tr("Ex: competitivo_ultra");
-                                            color: CS2Theme.text-muted;
-                                            font-size: 11px;
-                                            vertical-alignment: center;
-                                            overflow: elide;
-                                            opacity: 0.78;
+                                        accepted => {
+                                            root.submit-profile();
                                         }
                                     }
 
                                     if root.profile-name != "" : Rectangle {
                                         width: 22px;
                                         height: 22px;
+                                        horizontal-stretch: 0;
                                         y: (parent.height - self.height) / 2;
                                         border-radius: CS2Theme.radius-xs;
                                         background: clear-name-touch.has-hover ? CS2Theme.bg-card-selected : transparent;
@@ -433,6 +419,7 @@ export component CreateProfileDialog inherits Rectangle {
                                             mouse-cursor: pointer;
                                             clicked => {
                                                 root.profile-name = "";
+                                                name-input.reset-scroll();
                                             }
                                         }
                                     }
@@ -444,6 +431,8 @@ export component CreateProfileDialog inherits Rectangle {
                         VerticalLayout {
                             spacing: 4px;
                             horizontal-stretch: 1;
+                            min-width: 0px;
+                            preferred-width: 0px;
 
                             HorizontalLayout {
                                 height: 16px;
@@ -460,9 +449,12 @@ export component CreateProfileDialog inherits Rectangle {
 
                             Rectangle {
                                 height: 36px;
+                                min-width: 0px;
+                                preferred-width: 0px;
+                                clip: true;
                                 background: args-input.has-focus
                                     ? CS2Theme.bg-main
-                                    : (args-area-touch.has-hover ? CS2Theme.bg-card-hover : CS2Theme.bg-card);
+                                    : (args-input.has-hover ? CS2Theme.bg-card-hover : CS2Theme.bg-card);
                                 border-radius: CS2Theme.radius-sm;
                                 border-width: 1.5px;
                                 border-color: args-input.has-focus ? CS2Theme.accent-ct-cyan : transparent;
@@ -488,47 +480,27 @@ export component CreateProfileDialog inherits Rectangle {
                                         }
                                     }
 
-                                    Rectangle {
-                                        horizontal-stretch: 1;
-                                        clip: true;
-
-                                        args-area-touch := TouchArea {
-                                            mouse-cursor: text;
-                                            clicked => {
-                                                root.hide-grid-tooltip();
-                                                args-input.focus();
-                                            }
+                                    args-input := ScrollableTextInput {
+                                        text <=> root.launch-args;
+                                        placeholder-text: @tr("Ex: -novid -high +fps_max 0");
+                                        placeholder-opacity: 0.78;
+                                        font-size: 12px;
+                                        font-weight: 600;
+                                        placeholder-font-size: 11px;
+                                        text-color: CS2Theme.text-primary;
+                                        placeholder-color: CS2Theme.text-muted;
+                                        focused => {
+                                            root.hide-grid-tooltip();
                                         }
-
-                                        args-input := TextInput {
-                                            width: parent.width;
-                                            height: parent.height;
-                                            text <=> root.launch-args;
-                                            color: CS2Theme.text-primary;
-                                            font-size: 12px;
-                                            font-weight: 600;
-                                            single-line: true;
-                                            vertical-alignment: center;
-                                            accepted => {
-                                                root.submit-profile();
-                                            }
-                                        }
-
-                                        if root.launch-args == "" : Text {
-                                            width: parent.width;
-                                            height: parent.height;
-                                            text: @tr("Ex: -novid -high +fps_max 0");
-                                            color: CS2Theme.text-muted;
-                                            font-size: 11px;
-                                            vertical-alignment: center;
-                                            overflow: elide;
-                                            opacity: 0.78;
+                                        accepted => {
+                                            root.submit-profile();
                                         }
                                     }
 
                                     if root.launch-args != "" : Rectangle {
                                         width: 22px;
                                         height: 22px;
+                                        horizontal-stretch: 0;
                                         y: (parent.height - self.height) / 2;
                                         border-radius: CS2Theme.radius-xs;
                                         background: clear-args-touch.has-hover ? CS2Theme.bg-card-selected : transparent;
@@ -549,6 +521,7 @@ export component CreateProfileDialog inherits Rectangle {
                                             mouse-cursor: pointer;
                                             clicked => {
                                                 root.launch-args = "";
+                                                args-input.reset-scroll();
                                             }
                                         }
                                     }

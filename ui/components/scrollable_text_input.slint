@@ -1,0 +1,192 @@
+import { CS2Theme } from "../theme.slint";
+
+export component ScrollableTextInput inherits Rectangle {
+    in-out property <string> text: "";
+    in property <string> placeholder-text: "";
+    in property <float> placeholder-opacity: 1.0;
+    in property <length> font-size: 12px;
+    in property <int> font-weight: 600;
+    in property <length> placeholder-font-size: 11px;
+    in property <color> text-color: CS2Theme.text-primary;
+    in property <color> placeholder-color: CS2Theme.text-muted;
+    in property <color> accent-color: CS2Theme.accent-ct-blue;
+    in property <color> accent-hover-color: CS2Theme.accent-ct-cyan;
+    in property <bool> read-only: false;
+    out property <bool> has-focus: text-input.has-focus;
+    out property <bool> has-hover: wheel-touch.has-hover;
+
+    callback edited(string);
+    callback accepted();
+    callback focused();
+
+    public function reset-scroll() {
+        scroll.content-x = 0px;
+    }
+
+    public function clear-selection() {
+        text-input.clear-selection();
+    }
+
+    property <bool> scroll-active: !root.read-only && text-input.has-focus;
+    property <length> max-scroll-x: max(0px, scroll.content-width - scroll.width);
+    property <bool> show-hscroll: root.scroll-active && self.max-scroll-x > 0px;
+
+    horizontal-stretch: 1;
+    min-width: 0px;
+    preferred-width: 0px;
+    clip: true;
+    forward-focus: text-input;
+
+    wheel-touch := TouchArea {
+        mouse-cursor: root.read-only ? MouseCursor.default : MouseCursor.text;
+        scroll-event(event) => {
+            if !root.scroll-active || root.max-scroll-x <= 0px {
+                return reject;
+            }
+            let delta = event.delta-x != 0px ? event.delta-x : event.delta-y;
+            scroll.content-x = clamp(scroll.content-x + delta, -root.max-scroll-x, 0px);
+            accept
+        }
+        clicked => {
+            if !root.read-only {
+                text-input.focus();
+                root.focused();
+            }
+        }
+    }
+
+    if root.text == "" && text-input.preedit-text == "" : Text {
+        x: 0px;
+        y: scroll.y;
+        width: parent.width;
+        height: scroll.height;
+        text: root.placeholder-text;
+        color: root.placeholder-color;
+        font-size: root.placeholder-font-size;
+        vertical-alignment: center;
+        overflow: elide;
+        opacity: root.placeholder-opacity;
+    }
+
+    scroll := Flickable {
+        x: 0px;
+        y: root.show-hscroll ? 1px : 0px;
+        width: parent.width;
+        height: root.show-hscroll ? parent.height - 9px : parent.height;
+        interactive: root.scroll-active;
+        mouse-drag-pan-enabled: false;
+        content-width: root.scroll-active ? max(self.width, text-input.preferred-width + 16px) : self.width;
+        content-height: self.height;
+
+        text-input := TextInput {
+            x: 0px;
+            y: 0px;
+            width: max(scroll.width, self.preferred-width + 16px);
+            height: scroll.height;
+            text <=> root.text;
+            read-only: root.read-only;
+            color: root.text-color;
+            font-size: root.font-size;
+            font-weight: root.font-weight;
+            single-line: true;
+            vertical-alignment: center;
+            changed has-focus => {
+                if self.has-focus {
+                    root.focused();
+                } else {
+                    self.clear-selection();
+                    scroll.content-x = 0px;
+                }
+            }
+            cursor-position-changed(cpos) => {
+                if root.scroll-active {
+                    let margin = 12px;
+                    let max-x = max(0px, scroll.content-width - scroll.width);
+                    if cpos.x + scroll.content-x < margin {
+                        scroll.content-x = clamp(-cpos.x + margin, -max-x, 0px);
+                    } else if cpos.x + scroll.content-x > scroll.width - margin - self.text-cursor-width {
+                        scroll.content-x = clamp(scroll.width - cpos.x - margin - self.text-cursor-width, -max-x, 0px);
+                    }
+                }
+            }
+            edited => {
+                root.edited(self.text);
+            }
+            accepted => {
+                root.accepted();
+            }
+        }
+    }
+
+    if root.show-hscroll : Rectangle {
+        x: 0px;
+        y: parent.height - 9px;
+        width: parent.width;
+        height: 8px;
+        background: transparent;
+
+        Rectangle {
+            x: 0px;
+            y: 2px;
+            width: parent.width;
+            height: 4px;
+            border-radius: 2px;
+            background: rgba(36, 51, 74, 0.72);
+
+            hscroll-thumb := Rectangle {
+                property <length> thumb-w: max(28px, parent.width * (scroll.width / max(1px, scroll.content-width)));
+                property <length> max-track: max(1px, parent.width - self.thumb-w);
+
+                width: self.thumb-w;
+                height: parent.height;
+                x: self.max-track * clamp(-scroll.content-x / max(1px, root.max-scroll-x), 0.0, 1.0);
+                border-radius: 2px;
+                background: (hscroll-touch.pressed || hscroll-touch.has-hover) ? root.accent-hover-color : root.accent-color;
+                animate background { duration: 100ms; }
+            }
+        }
+
+        hscroll-touch := TouchArea {
+            property <bool> dragging: false;
+            property <length> drag-start-mouse-x: 0px;
+            property <length> drag-start-content-x: 0px;
+
+            mouse-cursor: pointer;
+            pointer-event(event) => {
+                if event.button == PointerEventButton.left && event.kind == PointerEventKind.down {
+                    text-input.focus();
+                    if root.max-scroll-x > 0px {
+                        if self.mouse-x >= hscroll-thumb.x && self.mouse-x <= hscroll-thumb.x + hscroll-thumb.width {
+                            self.dragging = true;
+                            self.drag-start-mouse-x = self.mouse-x;
+                            self.drag-start-content-x = scroll.content-x;
+                        } else {
+                            let ratio = clamp((self.mouse-x - hscroll-thumb.thumb-w / 2) / hscroll-thumb.max-track, 0.0, 1.0);
+                            scroll.content-x = -root.max-scroll-x * ratio;
+                            self.dragging = true;
+                            self.drag-start-mouse-x = self.mouse-x;
+                            self.drag-start-content-x = scroll.content-x;
+                        }
+                    }
+                } else if event.button == PointerEventButton.left && (event.kind == PointerEventKind.up || event.kind == PointerEventKind.cancel) {
+                    self.dragging = false;
+                }
+            }
+            moved => {
+                if self.pressed && self.dragging && root.max-scroll-x > 0px {
+                    let dx = self.mouse-x - self.drag-start-mouse-x;
+                    let next-x = self.drag-start-content-x - dx * (root.max-scroll-x / hscroll-thumb.max-track);
+                    scroll.content-x = clamp(next-x, -root.max-scroll-x, 0px);
+                }
+            }
+            scroll-event(event) => {
+                if root.max-scroll-x <= 0px {
+                    return reject;
+                }
+                let delta = event.delta-x != 0px ? event.delta-x : event.delta-y;
+                scroll.content-x = clamp(scroll.content-x + delta, -root.max-scroll-x, 0px);
+                accept
+            }
+        }
+    }
+}

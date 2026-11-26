@@ -1391,6 +1391,7 @@ export component MainWindow inherits Window {
                     border-color: root.is-editing-launch-args 
                         ? (launch-input.has-focus ? CS2Theme.accent-orange : CS2Theme.border-hover) 
                         : CS2Theme.border;
+                    clip: true;
                     animate background { duration: 120ms; }
                     animate border-color { duration: 120ms; }
 
@@ -1402,6 +1403,7 @@ export component MainWindow inherits Window {
                         Rectangle {
                             width: 88px;
                             height: 20px;
+                            horizontal-stretch: 0;
                             border-radius: CS2Theme.radius-xs;
                             background: root.is-editing-launch-args 
                                 ? CS2Theme.accent-orange-soft 
@@ -1425,32 +1427,162 @@ export component MainWindow inherits Window {
                             }
                         }
 
-                        launch-input := TextInput {
-                            text <=> root.launch-args-text;
-                            read-only: !root.is-editing-launch-args;
-                            color: root.is-editing-launch-args ? CS2Theme.text-primary : CS2Theme.text-muted;
-                            font-size: 11px;
-                            font-weight: 600;
-                            single-line: true;
-                            vertical-alignment: center;
-                            accepted => {
-                                if root.is-editing-launch-args {
-                                    root.is-editing-launch-args = false;
-                                    root.status-message = @tr("Salvando parâmetros no perfil '{}'...", root.active-preset);
-                                    root.save-launch-args-clicked(root.launch-args-text);
+                        launch-viewport := Rectangle {
+                            property <length> max-scroll-x: max(0px, launch-scroll.content-width - launch-scroll.width);
+                            property <bool> show-hscroll: root.is-editing-launch-args && self.max-scroll-x > 0px;
+
+                            horizontal-stretch: 1;
+                            min-width: 0px;
+                            clip: true;
+
+                            launch-wheel-touch := TouchArea {
+                                enabled: root.is-editing-launch-args;
+                                mouse-cursor: text;
+                                scroll-event(event) => {
+                                    if !root.is-editing-launch-args || launch-viewport.max-scroll-x <= 0px {
+                                        return reject;
+                                    }
+                                    let delta = event.delta-x != 0px ? event.delta-x : event.delta-y;
+                                    launch-scroll.content-x = clamp(launch-scroll.content-x + delta, -launch-viewport.max-scroll-x, 0px);
+                                    accept
+                                }
+                                clicked => {
+                                    if root.is-editing-launch-args {
+                                        launch-input.focus();
+                                    }
+                                }
+                            }
+
+                            if root.launch-args-text == "" && launch-input.preedit-text == "" : Text {
+                                x: 0px;
+                                y: launch-scroll.y;
+                                width: parent.width;
+                                height: launch-scroll.height;
+                                text: root.is-editing-launch-args ? @tr("Ex: -novid -high +fps_max 0") : @tr("Nenhum parâmetro de inicialização configurado");
+                                color: CS2Theme.text-dim;
+                                font-size: 11px;
+                                font-weight: 500;
+                                vertical-alignment: center;
+                                overflow: elide;
+                            }
+
+                            launch-scroll := Flickable {
+                                x: 0px;
+                                y: launch-viewport.show-hscroll ? 2px : 0px;
+                                width: parent.width;
+                                height: launch-viewport.show-hscroll ? parent.height - 11px : parent.height;
+                                interactive: root.is-editing-launch-args;
+                                mouse-drag-pan-enabled: false;
+                                content-width: root.is-editing-launch-args ? max(self.width, launch-input.preferred-width + 16px) : self.width;
+                                content-height: self.height;
+
+                                launch-input := TextInput {
+                                    x: 0px;
+                                    y: 0px;
+                                    width: max(launch-scroll.width, self.preferred-width + 16px);
+                                    height: launch-scroll.height;
+                                    text <=> root.launch-args-text;
+                                    read-only: !root.is-editing-launch-args;
+                                    color: root.is-editing-launch-args ? CS2Theme.text-primary : CS2Theme.text-muted;
+                                    font-size: 11px;
+                                    font-weight: 600;
+                                    single-line: true;
+                                    vertical-alignment: center;
+                                    cursor-position-changed(cpos) => {
+                                        if root.is-editing-launch-args {
+                                            let margin = 12px;
+                                            let max-x = max(0px, launch-scroll.content-width - launch-scroll.width);
+                                            if cpos.x + launch-scroll.content-x < margin {
+                                                launch-scroll.content-x = clamp(-cpos.x + margin, -max-x, 0px);
+                                            } else if cpos.x + launch-scroll.content-x > launch-scroll.width - margin - self.text-cursor-width {
+                                                launch-scroll.content-x = clamp(launch-scroll.width - cpos.x - margin - self.text-cursor-width, -max-x, 0px);
+                                            }
+                                        }
+                                    }
+                                    accepted => {
+                                        if root.is-editing-launch-args {
+                                            root.is-editing-launch-args = false;
+                                            launch-input.clear-selection();
+                                            launch-scroll.content-x = 0px;
+                                            root.status-message = @tr("Salvando parâmetros no perfil '{}'...", root.active-preset);
+                                            root.save-launch-args-clicked(root.launch-args-text);
+                                        }
+                                    }
+                                }
+                            }
+
+                            if launch-viewport.show-hscroll : Rectangle {
+                                x: 0px;
+                                y: parent.height - 10px;
+                                width: parent.width;
+                                height: 8px;
+                                background: transparent;
+
+                                Rectangle {
+                                    x: 0px;
+                                    y: 2px;
+                                    width: parent.width;
+                                    height: 4px;
+                                    border-radius: 2px;
+                                    background: rgba(36, 51, 74, 0.72);
+
+                                    hscroll-thumb := Rectangle {
+                                        property <length> thumb-w: max(32px, parent.width * (launch-scroll.width / max(1px, launch-scroll.content-width)));
+                                        property <length> max-track: max(1px, parent.width - self.thumb-w);
+
+                                        width: self.thumb-w;
+                                        height: parent.height;
+                                        x: self.max-track * clamp(-launch-scroll.content-x / max(1px, launch-viewport.max-scroll-x), 0.0, 1.0);
+                                        border-radius: 2px;
+                                        background: (hscroll-touch.pressed || hscroll-touch.has-hover) ? CS2Theme.accent-orange-bright : CS2Theme.accent-orange;
+                                        animate background { duration: 100ms; }
+                                    }
+                                }
+
+                                hscroll-touch := TouchArea {
+                                    property <bool> dragging: false;
+                                    property <length> drag-start-mouse-x: 0px;
+                                    property <length> drag-start-content-x: 0px;
+
+                                    mouse-cursor: pointer;
+                                    pointer-event(event) => {
+                                        if event.button == PointerEventButton.left && event.kind == PointerEventKind.down {
+                                            launch-input.focus();
+                                            if launch-viewport.max-scroll-x > 0px {
+                                                if self.mouse-x >= hscroll-thumb.x && self.mouse-x <= hscroll-thumb.x + hscroll-thumb.width {
+                                                    self.dragging = true;
+                                                    self.drag-start-mouse-x = self.mouse-x;
+                                                    self.drag-start-content-x = launch-scroll.content-x;
+                                                } else {
+                                                    let ratio = clamp((self.mouse-x - hscroll-thumb.thumb-w / 2) / hscroll-thumb.max-track, 0.0, 1.0);
+                                                    launch-scroll.content-x = -launch-viewport.max-scroll-x * ratio;
+                                                    self.dragging = true;
+                                                    self.drag-start-mouse-x = self.mouse-x;
+                                                    self.drag-start-content-x = launch-scroll.content-x;
+                                                }
+                                            }
+                                        } else if event.button == PointerEventButton.left && (event.kind == PointerEventKind.up || event.kind == PointerEventKind.cancel) {
+                                            self.dragging = false;
+                                        }
+                                    }
+                                    moved => {
+                                        if self.pressed && self.dragging && launch-viewport.max-scroll-x > 0px {
+                                            let dx = self.mouse-x - self.drag-start-mouse-x;
+                                            let next-x = self.drag-start-content-x - dx * (launch-viewport.max-scroll-x / hscroll-thumb.max-track);
+                                            launch-scroll.content-x = clamp(next-x, -launch-viewport.max-scroll-x, 0px);
+                                        }
+                                    }
+                                    scroll-event(event) => {
+                                        if launch-viewport.max-scroll-x <= 0px {
+                                            return reject;
+                                        }
+                                        let delta = event.delta-x != 0px ? event.delta-x : event.delta-y;
+                                        launch-scroll.content-x = clamp(launch-scroll.content-x + delta, -launch-viewport.max-scroll-x, 0px);
+                                        accept
+                                    }
                                 }
                             }
                         }
-                    }
-
-                    if root.launch-args-text == "" : Text {
-                        x: 114px;
-                        y: (parent.height - self.height) / 2;
-                        text: root.is-editing-launch-args ? @tr("Ex: -novid -high +fps_max 0") : @tr("Nenhum parâmetro de inicialização configurado");
-                        color: CS2Theme.text-dim;
-                        font-size: 11px;
-                        font-weight: 500;
-                        vertical-alignment: center;
                     }
                 }
 
@@ -1488,8 +1620,11 @@ export component MainWindow inherits Window {
                                 root.is-editing-launch-args = true;
                                 root.status-message = @tr("Edição de parâmetros desbloqueada para o perfil '{}'.", root.active-preset);
                                 launch-input.focus();
+                                launch-input.set-selection-offsets(1000000, 1000000);
                             } else {
                                 root.is-editing-launch-args = false;
+                                launch-input.clear-selection();
+                                launch-scroll.content-x = 0px;
                                 root.status-message = @tr("Salvando parâmetros no perfil '{}'...", root.active-preset);
                                 root.save-launch-args-clicked(root.launch-args-text);
                             }
