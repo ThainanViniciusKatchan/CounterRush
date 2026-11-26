@@ -4,18 +4,37 @@ export component BindCommandCard inherits Rectangle {
     in property <string> command-title;
     in property <string> description;
     in property <bool> checked: false;
+    in property <bool> featured: false;
     callback toggled(bool);
 
     height: max(50px, card-layout.preferred-height);
     background: root.checked
-        ? (card-touch.has-hover ? #0284c7 : CS2Theme.accent-ct-blue)
-        : (card-touch.has-hover ? CS2Theme.bg-card-hover : CS2Theme.bg-card);
+        ? (root.featured
+            ? (card-touch.has-hover ? #ff771a : CS2Theme.accent-orange)
+            : (card-touch.has-hover ? #0284c7 : CS2Theme.accent-ct-blue))
+        : (root.featured
+            ? (card-touch.has-hover ? #1e293b : CS2Theme.bg-surface-elevated)
+            : (card-touch.has-hover ? CS2Theme.bg-card-hover : CS2Theme.bg-card));
     border-radius: CS2Theme.radius-sm;
+    border-width: root.featured ? 1.5px : 0px;
+    border-color: root.featured
+        ? (root.checked ? CS2Theme.accent-t-amber : CS2Theme.accent-t-gold)
+        : transparent;
+    clip: true;
     animate background { duration: 120ms; }
+    animate border-color { duration: 120ms; }
+
+    if root.featured : Rectangle {
+        x: 0px;
+        y: 0px;
+        width: 4px;
+        height: parent.height;
+        background: root.checked ? #ffffff : CS2Theme.accent-t-amber;
+    }
 
     card-layout := HorizontalLayout {
         width: parent.width;
-        padding-left: 14px;
+        padding-left: root.featured ? 16px : 14px;
         padding-right: 14px;
         padding-top: 10px;
         padding-bottom: 10px;
@@ -30,7 +49,7 @@ export component BindCommandCard inherits Rectangle {
                 text: root.command-title;
                 font-size: 12px;
                 font-weight: 800;
-                color: root.checked ? #ffffff : CS2Theme.text-primary;
+                color: root.checked ? #ffffff : (root.featured ? CS2Theme.accent-t-amber : CS2Theme.text-primary);
                 wrap: word-wrap;
             }
 
@@ -39,7 +58,7 @@ export component BindCommandCard inherits Rectangle {
                 text: root.description;
                 font-size: 12px;
                 font-weight: 400;
-                color: root.checked ? rgba(255, 255, 255, 0.90) : CS2Theme.text-muted;
+                color: root.checked ? rgba(255, 255, 255, 0.92) : CS2Theme.text-muted;
                 wrap: word-wrap;
             }
         }
@@ -63,7 +82,9 @@ export component BindCommandCard inherits Rectangle {
                         width: 5px;
                         height: 5px;
                         border-radius: 2.5px;
-                        background: root.checked ? CS2Theme.accent-ct-blue : CS2Theme.text-dim;
+                        background: root.checked
+                            ? (root.featured ? CS2Theme.accent-orange : CS2Theme.accent-ct-blue)
+                            : (root.featured ? CS2Theme.accent-t-amber : CS2Theme.text-dim);
                         y: (parent.height - self.height) / 2;
                     }
 

@@ -115,6 +115,9 @@ pub fn localize_category_header(entry: &BindCommandEntry, lang: UiLanguage) -> (
 
 pub fn localize_subcategory(sub: &'static str, lang: UiLanguage) -> &'static str {
     match (lang, sub) {
+        (UiLanguage::EnUs, "Pré-requisito de Treino (sv_cheats)") => {
+            "Training Prerequisite (sv_cheats)"
+        }
         (UiLanguage::EnUs, "Comandos Principais") => "Core Commands",
         (UiLanguage::EnUs, "Movimentação Livre e Teleporte de Precisão") => {
             "Free Movement & Precision Teleport"
@@ -157,6 +160,9 @@ pub fn localize_subcategory(sub: &'static str, lang: UiLanguage) -> &'static str
             "Console, System & Bind Management"
         }
 
+        (UiLanguage::RuRu, "Pré-requisito de Treino (sv_cheats)") => {
+            "Условие тренировки (sv_cheats)"
+        }
         (UiLanguage::RuRu, "Comandos Principais") => "Основные команды",
         (UiLanguage::RuRu, "Movimentação Livre e Teleporte de Precisão") => {
             "Свободный полёт и точный телепорт"
@@ -203,9 +209,25 @@ pub fn localize_subcategory(sub: &'static str, lang: UiLanguage) -> &'static str
     }
 }
 
-/// Tabela 1:1 com `CS2_BIND_CATALOG` (186 itens): (cfg_command, descrição EN, descrição RU).
-pub const CATALOG_TRANSLATIONS: [(&str, &str, &str); 186] = [
-    // 1. Movimentação (0..=12)
+pub fn localize_featured_subcategory_note(lang: UiLanguage) -> &'static str {
+    match lang {
+        UiLanguage::PtBr => "Obrigatório ativar (1) antes de usar os comandos de treino abaixo",
+        UiLanguage::EnUs => "Must be enabled (1) before using the training commands below",
+        UiLanguage::RuRu => "Необходимо включить (1) перед использованием команд тренировки ниже",
+    }
+}
+
+pub fn localize_featured_badge(lang: UiLanguage) -> &'static str {
+    match lang {
+        UiLanguage::PtBr => "ESSENCIAL",
+        UiLanguage::EnUs => "ESSENTIAL",
+        UiLanguage::RuRu => "ВАЖНО",
+    }
+}
+
+/// Tabela 1:1 com `CS2_BIND_CATALOG` (238 itens): (cfg_command, descrição EN, descrição RU).
+pub const CATALOG_TRANSLATIONS: [(&str, &str, &str); 238] = [
+    // 1. Movimentação (15)
     ("+forward", "Move forward (W).", "Движение вперёд (W)."),
     ("+back", "Move backward (S).", "Движение назад (S)."),
     ("+left", "Strafe left (A).", "Движение боком / стрейф влево (A)."),
@@ -213,39 +235,55 @@ pub const CATALOG_TRANSLATIONS: [(&str, &str, &str); 186] = [
     ("+jump", "Perform a jump (commonly bound to mouse wheel for easier Bunnyhopping).", "Прыжок (часто ставится на колесо мыши для удобного распрыга / Bunnyhop)."),
     ("+duck", "Crouch character (CTRL).", "Приседание (CTRL)."),
     ("+sprint", "Walk slowly without emitting footstep sounds (SHIFT).", "Медленный шаг без звука шагов (SHIFT)."),
-    ("toggle option_duck_method 0 1", "Toggle crouch mode between hold (0) and toggle (1).", "Переключает режим приседания между удержанием (0) и нажатием (1)."),
-    ("toggle option_speed_method 0 1", "Toggle silent walk between hold (0) and toggle (1).", "Переключает тихий шаг между удержанием (0) и переключением по нажатию (1)."),
+    ("option_duck_method 0", "Hold-to-crouch mode (0): keeps the character crouched only while the key is held.", "Приседание по удержанию (0): персонаж остаётся в приседе только пока клавиша нажата."),
+    ("option_duck_method 1", "Toggle-to-crouch mode (1): press once to crouch and press again to stand up.", "Приседание по переключению (1): одно нажатие — присесть, повторное — встать."),
+    ("option_speed_method 0", "Hold-to-walk mode (0): walks silently only while the key is held.", "Тихий шаг по удержанию (0): медленная ходьба только пока клавиша нажата."),
+    ("option_speed_method 1", "Toggle-to-walk mode (1): press once to enable silent walk and again to disable.", "Тихий шаг по переключению (1): одно нажатие включает тихий шаг, повторное отключает."),
     ("+turnleft", "Turn camera horizontally to the left (Surf, KZ, and Bhop).", "Плавный поворот камеры влево (Surf, KZ и Bhop)."),
     ("+turnright", "Turn camera horizontally to the right (Surf, KZ, and Bhop).", "Плавный поворот камеры вправо (Surf, KZ и Bhop)."),
     ("+lookup", "Pitch view angle vertically upward via keyboard.", "Поднимает угол обзора вверх с клавиатуры."),
     ("+lookdown", "Pitch view angle vertically downward via keyboard.", "Опускает угол обзора вниз с клавиатуры."),
 
-    // 2. Treinamento (13..=35)
+    // 2. Treinamento (37)
+    ("sv_cheats 0", "Disable cheats on local server (0): locks training commands and restores standard match rules.", "Отключает читы на локальном сервере (0): блокирует команды тренировки и возвращает обычные правила матча."),
+    ("sv_cheats 1", "Enable cheats on local server (1): unlocks all training commands below (noclip, infinite ammo, grenades, and bots).", "Включает читы на локальном сервере (1): открывает доступ ко всем командам тренировки ниже (noclip, патроны, гранаты и боты)."),
     ("noclip", "Toggle free flight passing through walls and objects.", "Включает/отключает свободный полёт сквозь стены и объекты."),
     ("getpos", "Print exact coordinates (setpos and setang) of current position and aim in console.", "Выводит в консоль точные координаты (setpos и setang) текущей позиции и прицела."),
-    ("toggle host_timescale 1 0.5 2", "Cycle server speed between normal (1), slow motion (0.5), and fast-forward (2).", "Переключает скорость сервера между обычной (1), замедленной (0.5) и ускоренной (2)."),
+    ("host_timescale 0.5", "Server speed 0.5x (slow motion): slows time by half to inspect movement and trajectories.", "Скорость сервера 0.5x (замедление): замедляет время вдвое для анализа движений и траекторий."),
+    ("host_timescale 1", "Server speed 1x (normal): restores standard match time speed.", "Скорость сервера 1x (обычная): восстанавливает стандартную скорость времени матча."),
+    ("host_timescale 2", "Server speed 2x (fast-forward): doubles time speed to advance quickly during practice.", "Скорость сервера 2x (ускорение): удваивает скорость времени для быстрой перемотки тренировки."),
     ("sv_rethrow_last_grenade", "Rethrow the last grenade thrown on the server.", "Повторно бросает последнюю брошенную на сервере гранату."),
-    ("toggle sv_grenade_trajectory_prac_pipreview 0 1", "Open or close the Picture-in-Picture window showing where your grenade will land.", "Открывает или закрывает окно «картинка в картинке», показывающее место падения гранаты."),
+    ("sv_grenade_trajectory_prac_pipreview 0", "Disable Picture-in-Picture preview (0): closes the grenade landing preview window.", "Отключает окно предпросмотра (0): закрывает мини-окно с точкой падения гранаты."),
+    ("sv_grenade_trajectory_prac_pipreview 1", "Enable Picture-in-Picture preview (1): opens a live window showing where your grenade will land.", "Включает окно предпросмотра (1): открывает мини-окно, показывающее место падения гранаты в реальном времени."),
     ("cl_sim_grenade_trajectory", "Freeze the current trajectory line of the grenade in your hand for a few seconds.", "Фиксирует линию траектории текущей гранаты в руке на несколько секунд."),
     ("ent_fire smokegrenade_projectile kill; ent_fire molotov_projectile kill; ent_fire inferno kill; ent_fire flashbang_projectile kill; ent_fire hegrenade_projectile kill; ent_fire decoy_projectile kill; stopsound", "Instantly clear all active smokes, Molotovs, mid-air grenades, and stop active sound effects.", "Мгновенно удаляет все дымы, Молотовы, летящие гранаты и останавливает активные звуки."),
     ("bot_place", "Place a bot immediately at the spot you are aiming at.", "Мгновенно размещает бота в точке, куда направлен прицел."),
     ("bot_add_ct", "Add a bot to the Counter-Terrorist (CT) side.", "Добавляет бота за сторону спецназа (CT)."),
     ("bot_add_t", "Add a bot to the Terrorist (T) side.", "Добавляет бота за сторону террористов (T)."),
     ("bot_kick", "Remove all bots from the match.", "Удаляет всех ботов из матча."),
-    ("toggle bot_crouch 0 1", "Make all bots crouch or stand up.", "Заставляет всех ботов присесть или встать."),
-    ("toggle bot_stop 0 1", "Freeze or unfreeze bot movement.", "Замораживает или освобождает движение ботов."),
-    ("toggle bot_mimic 0 1", "Make bots mirror all your movements and shots in real time.", "Заставляет ботов повторять все ваши движения и выстрелы в реальном времени."),
-    ("toggle bot_dont_shoot 0 1", "Prevent or allow bots to shoot.", "Запрещает или разрешает ботам стрелять."),
-    ("toggle sv_showimpacts 0 1 2", "Show colored bullet impact boxes (1 = client + server, 2 = client only).", "Показывает цветные квадраты попаданий пуль (1 = клиент + сервер, 2 = только клиент)."),
-    ("toggle sv_infinite_ammo 0 1 2", "Cycle infinite ammo and grenades (1 = no reload, 2 = infinite reserve).", "Переключает бесконечные патроны и гранаты (1 = без перезарядки, 2 = бесконечный запас)."),
+    ("bot_crouch 0", "Bots standing (0): disables forced crouching and makes all bots stand up.", "Боты стоят (0): отключает принудительный присед и поднимает всех ботов."),
+    ("bot_crouch 1", "Bots crouching (1): forces all bots to stay crouched.", "Боты в приседе (1): заставляет всех ботов постоянно сидеть на корточках."),
+    ("bot_stop 0", "Unfreeze bots (0): allows bots to move around normally again.", "Разморозить ботов (0): разрешает ботам снова свободно передвигаться."),
+    ("bot_stop 1", "Freeze bots (1): locks all bots in place for aim practice.", "Заморозить ботов (1): фиксирует всех ботов на месте для тренировки стрельбы."),
+    ("bot_mimic 0", "Disable bot mimic (0): bots stop mirroring your movements and shots.", "Отключить повторение ботов (0): боты перестают копировать ваши движения и выстрелы."),
+    ("bot_mimic 1", "Enable bot mimic (1): makes bots mirror all your movements and shots in real time.", "Включить повторение ботов (1): заставляет ботов повторять все ваши движения и выстрелы в реальном времени."),
+    ("bot_dont_shoot 0", "Allow bot shooting (0): bots resume firing normally.", "Разрешить стрельбу ботам (0): боты снова начинают стрелять как обычно."),
+    ("bot_dont_shoot 1", "Prevent bot shooting (1): makes bots peaceful so they will not shoot you.", "Запретить стрельбу ботам (1): боты становятся мирными и не стреляют по вам."),
+    ("sv_showimpacts 0", "Hide bullet impacts (0): disables colored bullet impact boxes.", "Скрыть попадания пуль (0): отключает цветные квадраты регистрации выстрелов."),
+    ("sv_showimpacts 1", "Client + server impacts (1): shows red (client) and blue (server) boxes where bullets hit.", "Попадания клиент + сервер (1): показывает красные (клиент) и синие (сервер) квадраты попаданий."),
+    ("sv_showimpacts 2", "Client-only impacts (2): shows only the red boxes registered locally by the client.", "Попадания только клиент (2): показывает только красные квадраты попаданий со стороны клиента."),
+    ("sv_infinite_ammo 0", "Standard ammo (0): disables infinite ammo and restores normal bullet and grenade consumption.", "Обычные патроны (0): отключает бесконечный боезапас и возвращает стандартный расход патронов и гранат."),
+    ("sv_infinite_ammo 1", "Infinite ammo without reload (1): magazine bullets and grenades never run out.", "Бесконечные патроны без перезарядки (1): патроны в магазине и гранаты никогда не заканчиваются."),
+    ("sv_infinite_ammo 2", "Infinite reserve ammo (2): requires reloading your weapon, but reserve ammo and grenades never run out.", "Бесконечный запас патронов (2): требует перезарядки оружия, но запас патронов и гранаты бесконечны."),
     ("god", "Enable full invincibility.", "Включает полную неуязвимость."),
     ("buddha", "Take damage down to 1 HP without ever dying.", "Позволяет получать урон до 1 HP без смерти."),
     ("cl_ent_hitbox", "Display the hitboxes of the model you are aiming at.", "Отображает хитбоксы модели, на которую вы смотрите."),
-    ("toggle r_drawothermodels 1 2", "Toggle character rendering between normal (1) and wireframe through walls (2).", "Переключает отрисовку моделей игроков между обычной (1) и каркасом сквозь стены (2)."),
+    ("r_drawothermodels 1", "Normal player models (1): restores standard solid character rendering.", "Обычные модели игроков (1): возвращает стандартную сплошную отрисовку персонажей."),
+    ("r_drawothermodels 2", "Wireframe player models (2): displays player skeletons visible through walls.", "Каркасные модели игроков (2): отображает каркас персонажей сквозь стены."),
     ("impulse 101", "Instantly grant maximum money.", "Мгновенно выдаёт максимальное количество денег."),
     ("mp_restartgame 1", "Restart the map/match in 1 second.", "Перезапускает карту/матч через 1 секунду."),
 
-    // 3. Jogabilidade (36..=53)
+    // 3. Jogabilidade (29)
     ("+attack", "Primary fire (MOUSE1).", "Основная стрельба (MOUSE1)."),
     ("+attack2", "Secondary action such as scope zoom, silencer, or underhand throw (MOUSE2).", "Вторичное действие: зум, глушитель или ближний бросок гранаты (MOUSE2)."),
     ("+reload", "Reload weapon (R).", "Перезарядка оружия (R)."),
@@ -255,20 +293,32 @@ pub const CATALOG_TRANSLATIONS: [(&str, &str, &str); 186] = [
     ("+spray_menu", "Open the graffiti spray menu (T).", "Открывает меню нанесения граффити (T)."),
     ("slot5; drop", "Quickly equip and drop the C4.", "Быстро выбирает и выбрасывает бомбу C4."),
     ("incrementvar cl_radar_scale 0.25 1.0 0.15", "Step up minimap zoom and wrap back to minimum after reaching the limit.", "Пошагово увеличивает масштаб радара и сбрасывает к минимуму после предела."),
-    ("toggle cl_radar_scale 0.35 0.75", "Toggle between panoramic map view (0.35) and zoomed-in bombsite view (0.75).", "Переключает радар между обзорным видом всей карты (0.35) и приближением плента (0.75)."),
-    ("toggle cl_radar_always_centered 0 1", "Toggle between keeping player centered on radar or using full radar space.", "Переключает центрирование игрока на радаре или отображение всей площади карты."),
-    ("toggle cl_radar_rotate 0 1", "Toggle between rotating radar and fixed radar.", "Переключает вращающийся и фиксированный режим радара."),
-    ("toggle cl_crosshair_recoil 0 1", "Enable or disable the crosshair following weapon recoil (Follow Recoil).", "Включает или отключает прицел, следующий за отдачей (Follow Recoil)."),
-    ("toggle cl_crosshairsize 2 1000", "Extend crosshair lines to screen edges (1000) to line up smokes and toggle back to 2.", "Растягивает линии прицела до краёв экрана (1000) для раскидок дымов и возвращает размер 2."),
-    ("toggle cl_crosshaircolor 1 2 4 5", "Cycle crosshair color on the fly (Green, Yellow, Cyan, Custom).", "Мгновенно меняет цвет прицела (Зелёный, Жёлтый, Голубой, Пользовательский)."),
-    ("toggle cl_crosshairdot 0 1", "Enable or disable the center crosshair dot.", "Включает или отключает центральную точку прицела."),
-    ("toggle crosshair 0 1", "Hide or show the entire crosshair.", "Полностью скрывает или показывает прицел."),
-    ("toggle cl_grenadecrosshair_keepusercrosshair 0 1", "Keep your standard crosshair visible when the grenade lineup reticle appears.", "Оставляет стандартный прицел видимым при появлении сетки для броска гранат."),
+    ("cl_radar_scale 0.35", "Panoramic radar (0.35): zooms out the minimap to see almost the entire map.", "Обзорный радар (0.35): отдаляет масштаб мини-карты, показывая почти всю карту."),
+    ("cl_radar_scale 0.75", "Zoomed-in radar (0.75): zooms in the minimap for detailed focus on the bombsite.", "Приближённый радар (0.75): приближает мини-карту с фокусом на пленте и ближайших зонах."),
+    ("cl_radar_always_centered 0", "Uncentered radar (0): unlocks minimap camera to use the full radar area.", "Радар без центрирования (0): освобождает камеру мини-карты для обзора всей площади карты."),
+    ("cl_radar_always_centered 1", "Player-centered radar (1): keeps your character locked at the center of the minimap.", "Радар по центру игрока (1): всегда удерживает вашего персонажа в центре мини-карты."),
+    ("cl_radar_rotate 0", "Fixed radar (0): locks minimap orientation instead of rotating with your view.", "Фиксированный радар (0): закрепляет ориентацию мини-карты без поворота за обзором."),
+    ("cl_radar_rotate 1", "Rotating radar (1): rotates the minimap to match the direction you are aiming.", "Вращающийся радар (1): поворачивает мини-карту вслед за направлением вашего взгляда."),
+    ("cl_crosshair_recoil 0", "Disable Follow Recoil (0): keeps the crosshair fixed at screen center without tracking recoil.", "Отключить Follow Recoil (0): оставляет прицел неподвижным в центре экрана без слежения за отдачей."),
+    ("cl_crosshair_recoil 1", "Enable Follow Recoil (1): makes the crosshair dynamically follow your weapon's recoil pattern.", "Включить Follow Recoil (1): прицел динамически следует за отдачей (спреем) оружия."),
+    ("cl_crosshairsize 2", "Standard compact crosshair (size 2): sets normal crosshair size for combat.", "Стандартный компактный прицел (размер 2): устанавливает обычный размер прицела для боя."),
+    ("cl_crosshairsize 1000", "Smoke lineup crosshair (size 1000): extends lines to screen edges for utility lineups.", "Прицел для раскидок (размер 1000): растягивает линии до краёв экрана для точных гранат."),
+    ("cl_crosshaircolor 1", "Green crosshair color (1): applies standard green color to your crosshair.", "Зелёный цвет прицела (1): устанавливает стандартный зелёный цвет перекрестия."),
+    ("cl_crosshaircolor 2", "Yellow crosshair color (2): applies yellow color to your crosshair.", "Жёлтый цвет прицела (2): устанавливает жёлтый цвет перекрестия."),
+    ("cl_crosshaircolor 4", "Cyan crosshair color (4): applies cyan color to your crosshair.", "Голубой цвет прицела (4): устанавливает голубой цвет перекрестия."),
+    ("cl_crosshaircolor 5", "Custom crosshair color (5): applies your custom RGB color values.", "Пользовательский цвет прицела (5): применяет ваш собственный RGB-цвет перекрестия."),
+    ("cl_crosshairdot 0", "Disable center crosshair dot (0): removes the dot in the middle of the crosshair.", "Отключить центральную точку прицела (0): убирает точку в середине перекрестия."),
+    ("cl_crosshairdot 1", "Enable center crosshair dot (1): displays a fixed dot in the center of the crosshair.", "Включить центральную точку прицела (1): отображает фиксированную точку в центре перекрестия."),
+    ("crosshair 0", "Hide crosshair (0): completely hides the crosshair from the screen.", "Скрыть прицел (0): полностью убирает прицел с экрана."),
+    ("crosshair 1", "Show crosshair (1): makes the crosshair visible on screen again.", "Показать прицел (1): снова делает прицел видимым на экране."),
+    ("cl_grenadecrosshair_keepusercrosshair 0", "Hide standard crosshair on grenades (0): shows only the grenade lineup reticle.", "Скрыть обычный прицел при гранатах (0): показывает только сетку наведения гранаты."),
+    ("cl_grenadecrosshair_keepusercrosshair 1", "Keep standard crosshair on grenades (1): keeps your normal crosshair visible with the grenade reticle.", "Оставить обычный прицел при гранатах (1): сохраняет видимость основного прицела вместе с сеткой гранаты."),
 
-    // 4. Comunicação (54..=86)
+    // 4. Comunicação (34)
     ("+voicerecord", "Activate microphone (Push-to-Talk).", "Активирует микрофон (Push-to-Talk)."),
     ("voice_modenable_toggle", "Mute or unmute all team voice communication in one click.", "Одним нажатием отключает или включает голосовой чат команды."),
-    ("toggle snd_voipvolume 0.08 1.0", "Lower teammate voice volume to 8% (0.08) during clutches and restore to 100% (1.0).", "Снижает громкость голосов команды до 8% (0.08) в клатче и возвращает 100% (1.0)."),
+    ("snd_voipvolume 0.08", "Lower team voice / clutch volume (0.08): reduces teammate voices to 8% during clutch situations.", "Тихий голос команды / клатч (0.08): снижает громкость союзников до 8% во время клатчей."),
+    ("snd_voipvolume 1.0", "Normal team voice volume (1.0): restores teammate voice volume to 100%.", "Обычный голос команды (1.0): восстанавливает громкость голосов союзников на 100%."),
     ("voice_toggle_open_mic", "Toggle between open mic and Push-to-Talk.", "Переключает между открытым микрофоном и Push-to-Talk."),
     ("player_ping", "Place a 3D visual marker (ping) exactly where you are aiming.", "Ставит 3D-метку (пинг) точно в точку, куда направлен прицел."),
     ("+radialradio", "Hold open Communication Wheel 1.", "Удерживает открытым колесо общения 1."),
@@ -300,7 +350,7 @@ pub const CATALOG_TRANSLATIONS: [(&str, &str, &str); 186] = [
     ("say GGWP!", "Instantly send a phrase in global chat (saved without inner quotes).", "Мгновенно отправляет фразу в общий чат (записывается без внутренних кавычек)."),
     ("say_team Preciso de drop, por favor!", "Instantly send a phrase to your team only (saved without inner quotes).", "Мгновенно отправляет фразу только команде (записывается без внутренних кавычек)."),
 
-    // 5. Armas e Granadas (87..=150)
+    // 5. Armas e Granadas (64)
     ("slot1", "Primary weapon (Rifles, SMGs, Shotguns, Machine guns).", "Основное оружие (винтовки, ПП, дробовики, пулемёты)."),
     ("slot2", "Secondary weapon (Pistols).", "Вторичное оружие (пистолеты)."),
     ("slot3", "Knife (or Zeus x27 if knife is already equipped).", "Нож (или Zeus x27, если нож уже в руках)."),
@@ -366,32 +416,56 @@ pub const CATALOG_TRANSLATIONS: [(&str, &str, &str); 186] = [
     ("buy rifle3", "Buy rifle from CS2 Loadout slot 3.", "Купить винтовку из слота 3 снаряжения CS2."),
     ("buy rifle4", "Buy rifle from CS2 Loadout slot 4.", "Купить винтовку из слота 4 снаряжения CS2."),
 
-    // 6. Monitoramento (151..=160)
-    ("toggle cl_hud_telemetry_frametime_show 0 1 2", "Show FPS counter and frame time (ms) in the top-right corner.", "Показывает счётчик FPS и время кадра (мс) в правом верхнем углу."),
-    ("toggle cl_hud_telemetry_ping_show 0 1 2", "Display your real-time Ping (ms).", "Отображает ваш пинг (мс) в реальном времени."),
-    ("toggle cl_hud_telemetry_net_misdelivery_show 0 1 2", "Show alerts and percentage for packet loss or delivery jitter.", "Показывает предупреждения и процент потери/задержки пакетов (packet loss / jitter)."),
-    ("toggle cl_hud_telemetry_serverrecvmargin_graph_show 0 1 2", "Show a real-time micro-graph of server send stability.", "Показывает микрографик стабильности отправки данных на сервер в реальном времени."),
-    ("toggle cq_netgraph 0 1", "Toggle the Command Queue (sub-tick) graph bar in the top-right corner.", "Включает/отключает график очереди команд (sub-tick) в правом верхнем углу."),
-    ("toggle cl_showfps 0 1 2 3 4", "Engine direct FPS counter (1 = simple, 2–4 = detailed latency).", "Прямой счётчик FPS движка (1 = простой, 2–4 = подробная задержка)."),
-    ("toggle cl_showpos 0 1", "Display coordinates (pos), angle (ang), and horizontal velocity (vel).", "Показывает координаты (pos), угол обзора (ang) и горизонтальную скорость (vel)."),
+    // 6. Monitoramento (24)
+    ("cl_hud_telemetry_frametime_show 0", "Hide FPS/Frametime (0 = Never): disables the top-right telemetry indicator.", "Скрыть FPS/Frametime (0 = Никогда): отключает индикатор в правом верхнем углу."),
+    ("cl_hud_telemetry_frametime_show 1", "FPS/Frametime on issues (1): shows automatically only during FPS drops or frametime spikes.", "FPS/Frametime при проблемах (1): появляется только при просадках FPS или скачках времени кадра."),
+    ("cl_hud_telemetry_frametime_show 2", "Always show FPS/Frametime (2): continuously displays FPS and frame time (ms) in the top-right corner.", "Всегда показывать FPS/Frametime (2): постоянно отображает FPS и время кадра (мс) в правом верхнем углу."),
+    ("cl_hud_telemetry_ping_show 0", "Hide Ping (0 = Never): disables the HUD ping indicator.", "Скрыть пинг (0 = Никогда): отключает индикатор задержки в HUD."),
+    ("cl_hud_telemetry_ping_show 1", "Ping on issues (1): shows ping only when latency is high or unstable.", "Пинг при проблемах (1): показывает пинг только при высокой или нестабильной задержке."),
+    ("cl_hud_telemetry_ping_show 2", "Always show Ping (2): continuously displays your real-time Ping (ms).", "Всегда показывать пинг (2): постоянно отображает ваш пинг (мс) в реальном времени."),
+    ("cl_hud_telemetry_net_misdelivery_show 0", "Hide packet loss/jitter (0 = Never): disables network misdelivery alerts in the HUD.", "Скрыть потери/джиттер пакетов (0 = Никогда): отключает сетевые предупреждения в HUD."),
+    ("cl_hud_telemetry_net_misdelivery_show 1", "Packet loss/jitter on issues (1): shows alerts only when packet loss or delay occurs.", "Потери/джиттер при проблемах (1): показывает предупреждение только при потере или задержке пакетов."),
+    ("cl_hud_telemetry_net_misdelivery_show 2", "Always show packet loss/jitter (2): continuously displays packet loss and jitter percentage.", "Всегда показывать потери/джиттер (2): постоянно отображает процент потерь пакетов и джиттера."),
+    ("cl_hud_telemetry_serverrecvmargin_graph_show 0", "Hide server stability graph (0 = Never): disables the server send micro-graph.", "Скрыть график стабильности сервера (0 = Никогда): отключает микрографик отправки данных."),
+    ("cl_hud_telemetry_serverrecvmargin_graph_show 1", "Server graph on issues (1): shows the micro-graph only during server send instability.", "График сервера при проблемах (1): показывает микрографик только при нестабильной отправке данных."),
+    ("cl_hud_telemetry_serverrecvmargin_graph_show 2", "Always show server stability graph (2): continuously displays the real-time server send micro-graph.", "Всегда показывать график сервера (2): постоянно отображает микрографик стабильности отправки данных на сервер."),
+    ("cq_netgraph 0", "Disable Command Queue graph (0): hides the sub-tick graph bar in the top-right corner.", "Отключить график Command Queue (0): скрывает полосу очереди команд (sub-tick) в правом верхнем углу."),
+    ("cq_netgraph 1", "Enable Command Queue graph (1): displays the sub-tick Command Queue graph bar in the top-right corner.", "Включить график Command Queue (1): показывает полосу очереди команд (sub-tick) в правом верхнем углу."),
+    ("cl_showfps 0", "Hide engine FPS (0): disables the direct engine FPS counter.", "Скрыть FPS движка (0): отключает прямой счётчик FPS."),
+    ("cl_showfps 1", "Simple engine FPS (1): displays the basic real-time FPS counter.", "Простой FPS движка (1): отображает базовый счётчик FPS в реальном времени."),
+    ("cl_showfps 2", "Engine FPS with frametime (2): displays FPS along with min, avg, and max frame times.", "FPS движка со временем кадра (2): отображает FPS и мин./сред./макс. время кадра."),
+    ("cl_showfps 3", "Engine FPS with server ticks (3): displays FPS along with server tick and latency metrics.", "FPS движка с тиками сервера (3): отображает FPS, задержку и данные тиков сервера."),
+    ("cl_showfps 4", "Full engine FPS diagnostics (4): displays detailed frame and engine latency diagnostics.", "Полная диагностика FPS движка (4): отображает подробную статистику кадров и задержек движка."),
+    ("cl_showpos 0", "Hide position and velocity (0): removes coordinates, angle, and velocity from screen.", "Скрыть позицию и скорость (0): убирает координаты, угол и скорость с экрана."),
+    ("cl_showpos 1", "Show position and velocity (1): displays coordinates (pos), angle (ang), and horizontal velocity (vel).", "Показать позицию и скорость (1): отображает координаты (pos), угол (ang) и горизонтальную скорость (vel)."),
     ("+showscores", "Open the scoreboard (TAB).", "Открывает таблицу счёта (TAB)."),
     ("status", "Print current server info, map, ping, and connected players to console.", "Выводит в консоль данные текущего сервера, карту, пинг и список игроков."),
     ("sys_info", "Print a full hardware, driver, and active configuration report to console.", "Выводит в консоль полный отчёт об оборудовании, драйверах и активных настройках."),
 
-    // 7. Outros (161..=185)
+    // 7. Outros (35)
     ("incrementvar volume 0 1 0.05", "Increase master game volume in 5% steps.", "Увеличивает общую громкость игры с шагом 5%."),
     ("incrementvar volume 0 1 -0.05", "Decrease master game volume in 5% steps.", "Уменьшает общую громкость игры с шагом 5%."),
-    ("toggle volume 0.08 0.55", "Toggle between Warmup/DM mode (0.08) and Competitive mode (0.55).", "Переключает между режимом разминки/DM (0.08) и соревновательным режимом (0.55)."),
-    ("toggle snd_mute_losefocus 0 1", "Control whether audio mutes or keeps playing when you Alt+Tab.", "Определяет, отключается ли звук при сворачивании игры (Alt+Tab)."),
+    ("volume 0.08", "Warmup/DM volume mode (0.08): lowers master game volume to 8%.", "Громкость разминки/DM (0.08): снижает общую громкость игры до 8%."),
+    ("volume 0.55", "Competitive volume mode (0.55): sets master game volume to 55%.", "Соревновательная громкость (0.55): устанавливает общую громкость игры на 55%."),
+    ("snd_mute_losefocus 0", "Keep audio on Alt+Tab (0): game sound continues playing in the background when minimized.", "Не отключать звук при Alt+Tab (0): звук игры продолжает работать в фоне при сворачивании."),
+    ("snd_mute_losefocus 1", "Mute audio on Alt+Tab (1): automatically mutes the game when the window loses focus.", "Отключать звук при Alt+Tab (1): автоматически заглушает игру при потере фокуса окна."),
     ("demoui", "Open or close the Demo playback control bar (Shift+F2).", "Открывает или закрывает панель управления воспроизведением демки (Shift+F2)."),
     ("demo_togglepause", "Instantly pause or resume Demo playback.", "Мгновенно ставит демку на паузу или возобновляет воспроизведение."),
-    ("toggle demo_timescale 0.25 0.5 1 2 4 8", "Cycle replay speed between 0.25x and 8x.", "Переключает скорость воспроизведения повтора от 0.25x до 8x."),
+    ("demo_timescale 0.25", "Demo speed 0.25x: ultra-slow playback for detailed play inspection.", "Скорость демки 0.25x: сверхмедленный просмотр для детального разбора моментов."),
+    ("demo_timescale 0.5", "Demo speed 0.5x: half-speed slow motion to review aim and movement.", "Скорость демки 0.5x: замедление вдвое для анализа аима и передвижения."),
+    ("demo_timescale 1", "Demo speed 1x (normal): restores original replay playback speed.", "Скорость демки 1x (обычная): восстанавливает стандартную скорость воспроизведения повтора."),
+    ("demo_timescale 2", "Demo speed 2x: plays back the replay at double speed.", "Скорость демки 2x: воспроизведение повтора на удвоенной скорости."),
+    ("demo_timescale 4", "Demo speed 4x: fast-forwards the replay at 4x speed.", "Скорость демки 4x: быстрая перемотка повтора в 4 раза."),
+    ("demo_timescale 8", "Demo speed 8x: ultra-fast replay playback to skip rounds quickly.", "Скорость демки 8x: сверхбыстрое воспроизведение для быстрого пропуска раундов."),
     ("demo_goto -960 1 0", "Rewind approximately 15 seconds on the Demo timeline.", "Перематывает демку примерно на 15 секунд назад."),
     ("demo_goto 960 1 0", "Fast-forward approximately 15 seconds on the Demo timeline.", "Перематывает демку примерно на 15 секунд вперёд."),
-    ("toggle spec_show_xray 0 1", "Toggle X-Ray during replay analysis or spectator mode.", "Включает или отключает рентген (X-Ray) при просмотре демок или в режиме наблюдателя."),
+    ("spec_show_xray 0", "Disable X-Ray (0): hides player outlines through walls in Demos/spectator mode.", "Отключить рентген X-Ray (0): скрывает силуэты игроков через стены в демках и режиме наблюдателя."),
+    ("spec_show_xray 1", "Enable X-Ray (1): highlights player outlines through walls in Demos/spectator mode.", "Включить рентген X-Ray (1): подсвечивает силуэты игроков через стены в демках и режиме наблюдателя."),
     ("incrementvar cl_hud_color 0 11 1", "Cycle the entire HUD color across all 12 available colors.", "Циклически меняет цвет всего интерфейса (HUD) среди 12 доступных цветов."),
-    ("toggle cl_draw_only_deathnotices 0 1", "Hide HUD and radar leaving only crosshair and killfeed.", "Скрывает HUD и радар, оставляя только прицел и ленту убийств (killfeed)."),
-    ("toggle cl_drawhud 0 1", "Hide absolutely all HUD elements on screen (requires sv_cheats 1).", "Полностью скрывает весь интерфейс с экрана (требуется sv_cheats 1)."),
+    ("cl_draw_only_deathnotices 0", "Restore full HUD (0): shows radar, health, ammo, and standard UI elements again.", "Вернуть полный HUD (0): снова отображает радар, здоровье, патроны и обычный интерфейс."),
+    ("cl_draw_only_deathnotices 1", "Killfeed-only mode (1): hides HUD and radar leaving only crosshair and deathnotices.", "Режим только killfeed (1): скрывает HUD и радар, оставляя только прицел и ленту убийств."),
+    ("cl_drawhud 0", "Hide entire HUD (0, requires sv_cheats 1): removes absolutely all HUD elements from screen.", "Скрыть весь HUD (0, требуется sv_cheats 1): полностью убирает все элементы интерфейса с экрана."),
+    ("cl_drawhud 1", "Show entire HUD (1): restores full display of all HUD elements.", "Показать весь HUD (1): восстанавливает полное отображение всех элементов интерфейса."),
     ("screenshot", "Take an immediate screenshot.", "Делает мгновенный снимок экрана (скриншот)."),
     ("jpeg", "Take an immediate screenshot in JPEG format.", "Делает мгновенный снимок экрана в формате JPEG."),
     ("toggleconsole", "Open or close the Developer Console (' or ~).", "Открывает или закрывает консоль разработчика (' или ~)."),
@@ -477,7 +551,7 @@ mod tests {
     fn test_catalog_translations_align_1_to_1_with_core_catalog() {
         let catalog = cs2_bind_catalog();
         assert_eq!(CATALOG_TRANSLATIONS.len(), catalog.len());
-        assert_eq!(catalog.len(), 186);
+        assert_eq!(catalog.len(), 238);
 
         for (idx, entry) in catalog.iter().enumerate() {
             let (cfg, en_desc, ru_desc) = CATALOG_TRANSLATIONS[idx];
@@ -510,7 +584,7 @@ mod tests {
 
         let subs: BTreeSet<&'static str> =
             cs2_bind_catalog().iter().map(|e| e.subcategory).collect();
-        assert_eq!(subs.len(), 21);
+        assert_eq!(subs.len(), 22);
         for sub in subs {
             let en = localize_subcategory(sub, UiLanguage::EnUs);
             let ru = localize_subcategory(sub, UiLanguage::RuRu);

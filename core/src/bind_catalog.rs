@@ -6,6 +6,7 @@ pub struct BindCommandEntry {
     pub display_command: &'static str,
     pub cfg_command: &'static str,
     pub description: &'static str,
+    pub featured: bool,
 }
 
 macro_rules! cmd {
@@ -17,6 +18,7 @@ macro_rules! cmd {
             display_command: $cmd,
             cfg_command: $cmd,
             description: $desc,
+            featured: false,
         }
     };
     ($cat:expr, $note:expr, $sub:expr, $disp:expr => $cfg:expr, $desc:expr) => {
@@ -27,6 +29,21 @@ macro_rules! cmd {
             display_command: $disp,
             cfg_command: $cfg,
             description: $desc,
+            featured: false,
+        }
+    };
+}
+
+macro_rules! featured_cmd {
+    ($cat:expr, $note:expr, $sub:expr, $cmd:expr, $desc:expr) => {
+        BindCommandEntry {
+            category: $cat,
+            category_note: $note,
+            subcategory: $sub,
+            display_command: $cmd,
+            cfg_command: $cmd,
+            description: $desc,
+            featured: true,
         }
     };
 }
@@ -37,6 +54,7 @@ const SUB_1_1: &str = "Comandos Principais";
 
 const CAT_2: &str = "2. Treinamento";
 const NOTE_2: &str = "Exigem sv_cheats 1";
+const SUB_2_0: &str = "Pré-requisito de Treino (sv_cheats)";
 const SUB_2_1: &str = "Movimentação Livre e Teleporte de Precisão";
 const SUB_2_2: &str = "Treino Avançado de Granadas";
 const SUB_2_3: &str = "Controle de Bots";
@@ -74,7 +92,7 @@ const SUB_7_3: &str = "Personalização de HUD e Capturas";
 const SUB_7_4: &str = "Console, Sistema e Gerenciamento de Binds";
 
 static CS2_BIND_CATALOG: &[BindCommandEntry] = &[
-    // 1. Movimentação
+    // 1. Movimentação (15)
     cmd!(CAT_1, NOTE_1, SUB_1_1, "+forward", "Move para frente (W)."),
     cmd!(CAT_1, NOTE_1, SUB_1_1, "+back", "Move para trás (S)."),
     cmd!(CAT_1, NOTE_1, SUB_1_1, "+left", "Move lateralmente / strafe para a esquerda (A)."),
@@ -82,39 +100,55 @@ static CS2_BIND_CATALOG: &[BindCommandEntry] = &[
     cmd!(CAT_1, NOTE_1, SUB_1_1, "+jump", "Executa o pulo (muito utilizado no scroll do mouse para facilitar o Bunnyhop)."),
     cmd!(CAT_1, NOTE_1, SUB_1_1, "+duck", "Agacha o personagem (CTRL)."),
     cmd!(CAT_1, NOTE_1, SUB_1_1, "+sprint", "Caminha devagar e sem emitir som de passos (SHIFT)."),
-    cmd!(CAT_1, NOTE_1, SUB_1_1, "toggle option_duck_method 0 1", "Alterna o modo de agachar entre segurar a tecla (0) e manter agachado (1)."),
-    cmd!(CAT_1, NOTE_1, SUB_1_1, "toggle option_speed_method 0 1", "Alterna o caminhar silencioso entre segurar (0) e alternar com um toque (1)."),
+    cmd!(CAT_1, NOTE_1, SUB_1_1, "option_duck_method 0", "Agachar segurando a tecla (0): mantém o personagem agachado apenas enquanto a tecla estiver pressionada."),
+    cmd!(CAT_1, NOTE_1, SUB_1_1, "option_duck_method 1", "Agachar alternando com um toque (1): pressiona uma vez para agachar e novamente para levantar."),
+    cmd!(CAT_1, NOTE_1, SUB_1_1, "option_speed_method 0", "Caminhar silencioso segurando a tecla (0): anda devagar apenas enquanto a tecla estiver pressionada."),
+    cmd!(CAT_1, NOTE_1, SUB_1_1, "option_speed_method 1", "Caminhar silencioso alternando com um toque (1): pressiona uma vez para ativar e novamente para desativar."),
     cmd!(CAT_1, NOTE_1, SUB_1_1, "+turnleft", "Gira a câmera horizontalmente para a esquerda (Surf, KZ e Bhop)."),
     cmd!(CAT_1, NOTE_1, SUB_1_1, "+turnright", "Gira a câmera horizontalmente para a direita (Surf, KZ e Bhop)."),
     cmd!(CAT_1, NOTE_1, SUB_1_1, "+lookup", "Move o ângulo de visão verticalmente para cima via teclado."),
     cmd!(CAT_1, NOTE_1, SUB_1_1, "+lookdown", "Move o ângulo de visão verticalmente para baixo via teclado."),
 
-    // 2. Treinamento (Exigem sv_cheats 1)
+    // 2. Treinamento (37) — Pré-requisito destacado + comandos de treino
+    featured_cmd!(CAT_2, NOTE_2, SUB_2_0, "sv_cheats 0", "Desativa os cheats no servidor local (0): bloqueia comandos de treinamento e restaura o modo padrão da partida."),
+    featured_cmd!(CAT_2, NOTE_2, SUB_2_0, "sv_cheats 1", "Ativa os cheats no servidor local (1): libera o uso de todos os comandos de treinamento abaixo (noclip, munição infinita, granadas e bots)."),
     cmd!(CAT_2, NOTE_2, SUB_2_1, "noclip", "Liga/desliga o voo livre atravessando paredes e objetos."),
     cmd!(CAT_2, NOTE_2, SUB_2_1, "getpos", "Imprime no console as coordenadas exatas (setpos e setang) da posição e mira atuais."),
-    cmd!(CAT_2, NOTE_2, SUB_2_1, "toggle host_timescale 1 0.5 2", "Alterna a velocidade do servidor entre normal (1), câmera lenta (0.5) e acelerada (2)."),
+    cmd!(CAT_2, NOTE_2, SUB_2_1, "host_timescale 0.5", "Velocidade do servidor 0.5x (câmera lenta): reduz o tempo pela metade para analisar movimentos e trajetórias."),
+    cmd!(CAT_2, NOTE_2, SUB_2_1, "host_timescale 1", "Velocidade do servidor 1x (normal): restaura a velocidade padrão do tempo da partida."),
+    cmd!(CAT_2, NOTE_2, SUB_2_1, "host_timescale 2", "Velocidade do servidor 2x (acelerada): dobra a velocidade do tempo para avançar rapidamente no treino."),
     cmd!(CAT_2, NOTE_2, SUB_2_2, "sv_rethrow_last_grenade", "Arremessa novamente a última granada jogada no servidor."),
-    cmd!(CAT_2, NOTE_2, SUB_2_2, "toggle sv_grenade_trajectory_prac_pipreview 0 1", "Abre ou fecha a janelinha Picture-in-Picture mostrando onde sua granada vai cair."),
+    cmd!(CAT_2, NOTE_2, SUB_2_2, "sv_grenade_trajectory_prac_pipreview 0", "Desativa a prévia Picture-in-Picture (0): fecha a janelinha de visualização do ponto de queda da granada."),
+    cmd!(CAT_2, NOTE_2, SUB_2_2, "sv_grenade_trajectory_prac_pipreview 1", "Ativa a prévia Picture-in-Picture (1): abre a janelinha mostrando em tempo real onde sua granada vai cair."),
     cmd!(CAT_2, NOTE_2, SUB_2_2, "cl_sim_grenade_trajectory", "Congela a linha de trajetória atual da granada na sua mão por alguns segundos."),
     cmd!(CAT_2, NOTE_2, SUB_2_2, "ent_fire smokegrenade_projectile kill; ent_fire molotov_projectile kill; ent_fire inferno kill; ent_fire flashbang_projectile kill; ent_fire hegrenade_projectile kill; ent_fire decoy_projectile kill; stopsound", "Apaga instantaneamente todas as smokes, Molotovs, granadas no ar e corta efeitos sonoros ativos."),
     cmd!(CAT_2, NOTE_2, SUB_2_3, "bot_place", "Posiciona um bot imediatamente no local onde sua mira aponta."),
     cmd!(CAT_2, NOTE_2, SUB_2_3, "bot_add_ct", "Adiciona um bot ao lado Contraterrorista (CT)."),
     cmd!(CAT_2, NOTE_2, SUB_2_3, "bot_add_t", "Adiciona um bot ao lado Terrorista (TR)."),
     cmd!(CAT_2, NOTE_2, SUB_2_3, "bot_kick", "Remove todos os bots da partida."),
-    cmd!(CAT_2, NOTE_2, SUB_2_3, "toggle bot_crouch 0 1", "Faz todos os bots ficarem agachados ou em pé."),
-    cmd!(CAT_2, NOTE_2, SUB_2_3, "toggle bot_stop 0 1", "Congela ou libera a movimentação dos bots."),
-    cmd!(CAT_2, NOTE_2, SUB_2_3, "toggle bot_mimic 0 1", "Faz os bots copiarem todos os seus movimentos e disparos em tempo real."),
-    cmd!(CAT_2, NOTE_2, SUB_2_3, "toggle bot_dont_shoot 0 1", "Impede ou permite que os bots atirem."),
-    cmd!(CAT_2, NOTE_2, SUB_2_4, "toggle sv_showimpacts 0 1 2", "Mostra quadrados coloridos de impacto dos tiros (1 = cliente + servidor, 2 = apenas cliente)."),
-    cmd!(CAT_2, NOTE_2, SUB_2_4, "toggle sv_infinite_ammo 0 1 2", "Alterna munição e granadas infinitas (1 = sem recarregar, 2 = reserva infinita)."),
+    cmd!(CAT_2, NOTE_2, SUB_2_3, "bot_crouch 0", "Bots em pé (0): desativa o agachamento forçado e faz todos os bots ficarem de pé."),
+    cmd!(CAT_2, NOTE_2, SUB_2_3, "bot_crouch 1", "Bots agachados (1): força todos os bots a permanecerem agachados."),
+    cmd!(CAT_2, NOTE_2, SUB_2_3, "bot_stop 0", "Liberar movimento dos bots (0): permite que os bots voltem a andar normalmente."),
+    cmd!(CAT_2, NOTE_2, SUB_2_3, "bot_stop 1", "Congelar bots (1): trava todos os bots parados no lugar para treino de mira."),
+    cmd!(CAT_2, NOTE_2, SUB_2_3, "bot_mimic 0", "Desativar imitação dos bots (0): bots param de copiar seus movimentos e disparos."),
+    cmd!(CAT_2, NOTE_2, SUB_2_3, "bot_mimic 1", "Ativar imitação dos bots (1): faz os bots copiarem todos os seus movimentos e disparos em tempo real."),
+    cmd!(CAT_2, NOTE_2, SUB_2_3, "bot_dont_shoot 0", "Permitir disparos dos bots (0): bots voltam a atirar normalmente."),
+    cmd!(CAT_2, NOTE_2, SUB_2_3, "bot_dont_shoot 1", "Impedir disparos dos bots (1): bots ficam pacíficos e não atiram em você."),
+    cmd!(CAT_2, NOTE_2, SUB_2_4, "sv_showimpacts 0", "Ocultar impactos de tiro (0): desativa os quadrados coloridos de registro de balas."),
+    cmd!(CAT_2, NOTE_2, SUB_2_4, "sv_showimpacts 1", "Impactos cliente + servidor (1): exibe quadrados vermelhos (cliente) e azuis (servidor) onde os tiros atingem."),
+    cmd!(CAT_2, NOTE_2, SUB_2_4, "sv_showimpacts 2", "Impactos apenas cliente (2): exibe somente os quadrados vermelhos registrados localmente pelo cliente."),
+    cmd!(CAT_2, NOTE_2, SUB_2_4, "sv_infinite_ammo 0", "Munição padrão (0): desativa munição infinita e restaura o consumo normal de balas e granadas."),
+    cmd!(CAT_2, NOTE_2, SUB_2_4, "sv_infinite_ammo 1", "Munição infinita sem recarregar (1): balas no carregador e granadas nunca acabam."),
+    cmd!(CAT_2, NOTE_2, SUB_2_4, "sv_infinite_ammo 2", "Munição reserva infinita (2): exige recarregar a arma, mas a munição reserva e granadas nunca acabam."),
     cmd!(CAT_2, NOTE_2, SUB_2_4, "god", "Ativa invencibilidade total."),
     cmd!(CAT_2, NOTE_2, SUB_2_4, "buddha", "Permite sofrer dano até ficar com 1 de HP sem nunca morrer."),
     cmd!(CAT_2, NOTE_2, SUB_2_4, "cl_ent_hitbox", "Exibe as hitboxes do modelo para o qual você está apontando."),
-    cmd!(CAT_2, NOTE_2, SUB_2_4, "toggle r_drawothermodels 1 2", "Alterna renderização de personagens entre normal (1) e modo wireframe através das paredes (2)."),
+    cmd!(CAT_2, NOTE_2, SUB_2_4, "r_drawothermodels 1", "Modelos de jogadores normais (1): restaura a renderização sólida padrão dos personagens."),
+    cmd!(CAT_2, NOTE_2, SUB_2_4, "r_drawothermodels 2", "Modelos em modo wireframe (2): exibe o esqueleto dos jogadores visível através das paredes."),
     cmd!(CAT_2, NOTE_2, SUB_2_4, "impulse 101", "Concede dinheiro máximo instantaneamente."),
     cmd!(CAT_2, NOTE_2, SUB_2_4, "mp_restartgame 1", "Reinicia o mapa/partida em 1 segundo."),
 
-    // 3. Jogabilidade
+    // 3. Jogabilidade (29)
     cmd!(CAT_3, NOTE_3, SUB_3_1, "+attack", "Disparo primário (MOUSE1)."),
     cmd!(CAT_3, NOTE_3, SUB_3_1, "+attack2", "Ação secundária como zoom, silenciador ou arremesso curto (MOUSE2)."),
     cmd!(CAT_3, NOTE_3, SUB_3_1, "+reload", "Recarregar a arma (R)."),
@@ -124,20 +158,32 @@ static CS2_BIND_CATALOG: &[BindCommandEntry] = &[
     cmd!(CAT_3, NOTE_3, SUB_3_1, "+spray_menu", "Abre o menu para aplicar grafite nas superfícies (T)."),
     cmd!(CAT_3, NOTE_3, SUB_3_1, "slot5; drop", "Equipa e larga a C4 rapidamente."),
     cmd!(CAT_3, NOTE_3, SUB_3_2, "incrementvar cl_radar_scale 0.25 1.0 0.15", "Aumenta o zoom do minimapa em etapas e volta ao mínimo ao atingir o limite."),
-    cmd!(CAT_3, NOTE_3, SUB_3_2, "toggle cl_radar_scale 0.35 0.75", "Alterna entre visão panorâmica do mapa (0.35) e aproximada no bombsite (0.75)."),
-    cmd!(CAT_3, NOTE_3, SUB_3_2, "toggle cl_radar_always_centered 0 1", "Alterna entre manter o personagem sempre no centro do radar ou usar todo o espaço."),
-    cmd!(CAT_3, NOTE_3, SUB_3_2, "toggle cl_radar_rotate 0 1", "Alterna entre radar giratório e radar fixo."),
-    cmd!(CAT_3, NOTE_3, SUB_3_3, "toggle cl_crosshair_recoil 0 1", "Ativa ou desativa a mira que segue o padrão de recuo (Follow Recoil)."),
-    cmd!(CAT_3, NOTE_3, SUB_3_3, "toggle cl_crosshairsize 2 1000", "Estende as linhas da mira até as bordas do monitor (1000) para alinhar smokes e volta a 2."),
-    cmd!(CAT_3, NOTE_3, SUB_3_3, "toggle cl_crosshaircolor 1 2 4 5", "Troca a cor da mira na hora (Verde, Amarelo, Ciano, Personalizada)."),
-    cmd!(CAT_3, NOTE_3, SUB_3_3, "toggle cl_crosshairdot 0 1", "Liga ou desliga o ponto central da mira."),
-    cmd!(CAT_3, NOTE_3, SUB_3_3, "toggle crosshair 0 1", "Oculta ou exibe completamente a mira."),
-    cmd!(CAT_3, NOTE_3, SUB_3_3, "toggle cl_grenadecrosshair_keepusercrosshair 0 1", "Define se sua mira padrão permanece visível quando a retícula de granada entra na tela."),
+    cmd!(CAT_3, NOTE_3, SUB_3_2, "cl_radar_scale 0.35", "Radar panorâmico (0.35): afasta o zoom do minimapa para visualizar praticamente toda a área do mapa."),
+    cmd!(CAT_3, NOTE_3, SUB_3_2, "cl_radar_scale 0.75", "Radar aproximado (0.75): aproxima o zoom do minimapa com foco detalhado no bombsite e arredores."),
+    cmd!(CAT_3, NOTE_3, SUB_3_2, "cl_radar_always_centered 0", "Radar sem centralização fixa (0): libera a câmera do minimapa para aproveitar melhor toda a área do mapa."),
+    cmd!(CAT_3, NOTE_3, SUB_3_2, "cl_radar_always_centered 1", "Radar centralizado no jogador (1): mantém seu personagem sempre fixo no centro do minimapa."),
+    cmd!(CAT_3, NOTE_3, SUB_3_2, "cl_radar_rotate 0", "Radar fixo (0): trava a orientação do minimapa sem girar com a sua visão."),
+    cmd!(CAT_3, NOTE_3, SUB_3_2, "cl_radar_rotate 1", "Radar giratório (1): gira o minimapa acompanhando a direção para onde você aponta."),
+    cmd!(CAT_3, NOTE_3, SUB_3_3, "cl_crosshair_recoil 0", "Desativar Follow Recoil (0): mantém a mira fixa no centro da tela sem acompanhar o recuo."),
+    cmd!(CAT_3, NOTE_3, SUB_3_3, "cl_crosshair_recoil 1", "Ativar Follow Recoil (1): faz a mira acompanhar dinamicamente o padrão de recuo (spray) da arma."),
+    cmd!(CAT_3, NOTE_3, SUB_3_3, "cl_crosshairsize 2", "Mira compacta padrão (tamanho 2): define o tamanho normal da mira para combate."),
+    cmd!(CAT_3, NOTE_3, SUB_3_3, "cl_crosshairsize 1000", "Mira de alinhamento de smokes (tamanho 1000): estende as linhas até as bordas do monitor para alinhar utilitários."),
+    cmd!(CAT_3, NOTE_3, SUB_3_3, "cl_crosshaircolor 1", "Cor da mira Verde (1): aplica a cor verde padrão ao crosshair."),
+    cmd!(CAT_3, NOTE_3, SUB_3_3, "cl_crosshaircolor 2", "Cor da mira Amarela (2): aplica a cor amarela ao crosshair."),
+    cmd!(CAT_3, NOTE_3, SUB_3_3, "cl_crosshaircolor 4", "Cor da mira Ciano (4): aplica a cor ciano ao crosshair."),
+    cmd!(CAT_3, NOTE_3, SUB_3_3, "cl_crosshaircolor 5", "Cor da mira Personalizada (5): aplica a cor RGB personalizada configurada pelo jogador."),
+    cmd!(CAT_3, NOTE_3, SUB_3_3, "cl_crosshairdot 0", "Desativar ponto central da mira (0): remove o ponto no meio do crosshair."),
+    cmd!(CAT_3, NOTE_3, SUB_3_3, "cl_crosshairdot 1", "Ativar ponto central da mira (1): exibe um ponto fixo no centro do crosshair."),
+    cmd!(CAT_3, NOTE_3, SUB_3_3, "crosshair 0", "Ocultar mira (0): esconde completamente a mira da tela."),
+    cmd!(CAT_3, NOTE_3, SUB_3_3, "crosshair 1", "Exibir mira (1): torna a mira visível novamente na tela."),
+    cmd!(CAT_3, NOTE_3, SUB_3_3, "cl_grenadecrosshair_keepusercrosshair 0", "Ocultar mira padrão nas granadas (0): exibe apenas a retícula de alinhamento de granada."),
+    cmd!(CAT_3, NOTE_3, SUB_3_3, "cl_grenadecrosshair_keepusercrosshair 1", "Manter mira padrão nas granadas (1): mantém sua mira normal visível junto à retícula de granada."),
 
-    // 4. Comunicação
+    // 4. Comunicação (34)
     cmd!(CAT_4, NOTE_4, SUB_4_1, "+voicerecord", "Aciona o microfone (Push-to-Talk)."),
     cmd!(CAT_4, NOTE_4, SUB_4_1, "voice_modenable_toggle", "Muta ou desmuta completamente a comunicação de voz da equipe com um clique."),
-    cmd!(CAT_4, NOTE_4, SUB_4_1, "toggle snd_voipvolume 0.08 1.0", "Reduz o volume das vozes do time para 8% (0.08) em clutch e retorna a 100% (1.0)."),
+    cmd!(CAT_4, NOTE_4, SUB_4_1, "snd_voipvolume 0.08", "Volume da equipe reduzido / clutch (0.08): abaixa as vozes dos aliados para 8% durante situações de clutch."),
+    cmd!(CAT_4, NOTE_4, SUB_4_1, "snd_voipvolume 1.0", "Volume da equipe normal (1.0): restaura o volume das vozes dos aliados para 100%."),
     cmd!(CAT_4, NOTE_4, SUB_4_1, "voice_toggle_open_mic", "Alterna entre microfone aberto e Push-to-Talk."),
     cmd!(CAT_4, NOTE_4, SUB_4_2, "player_ping", "Cria um marcador visual 3D (ping) exatamente onde sua mira aponta."),
     cmd!(CAT_4, NOTE_4, SUB_4_2, "+radialradio", "Mantém aberta a Roda de Comunicação 1."),
@@ -169,7 +215,7 @@ static CS2_BIND_CATALOG: &[BindCommandEntry] = &[
     cmd!(CAT_4, NOTE_4, SUB_4_4, "say \"texto\"" => "say GGWP!", "Envia instantaneamente uma frase no chat geral (gravado sem aspas internas)."),
     cmd!(CAT_4, NOTE_4, SUB_4_4, "say_team \"texto\"" => "say_team Preciso de drop, por favor!", "Envia instantaneamente uma frase apenas para o seu time (gravado sem aspas internas)."),
 
-    // 5. Armas e Granadas
+    // 5. Armas e Granadas (64)
     cmd!(CAT_5, NOTE_5, SUB_5_1, "slot1", "Arma primária (Rifles, SMGs, Escopetas, Metralhadoras)."),
     cmd!(CAT_5, NOTE_5, SUB_5_1, "slot2", "Arma secundária (Pistolas)."),
     cmd!(CAT_5, NOTE_5, SUB_5_1, "slot3", "Faca (ou Zeus x27, se já estiver com a faca na mão)."),
@@ -235,32 +281,56 @@ static CS2_BIND_CATALOG: &[BindCommandEntry] = &[
     cmd!(CAT_5, NOTE_5, SUB_5_3, "buy rifle3", "Compra rifle do espaço 3 do Loadout CS2."),
     cmd!(CAT_5, NOTE_5, SUB_5_3, "buy rifle4", "Compra rifle do espaço 4 do Loadout CS2."),
 
-    // 6. Monitoramento (FPS, Telemetria e Rede)
-    cmd!(CAT_6, NOTE_6, SUB_6_1, "toggle cl_hud_telemetry_frametime_show 0 1 2", "Exibe o contador de FPS e o tempo de quadro (Frametime em ms) no canto superior direito."),
-    cmd!(CAT_6, NOTE_6, SUB_6_1, "toggle cl_hud_telemetry_ping_show 0 1 2", "Exibe o seu Ping (ms) em tempo real."),
-    cmd!(CAT_6, NOTE_6, SUB_6_1, "toggle cl_hud_telemetry_net_misdelivery_show 0 1 2", "Exibe alertas e porcentagem de perda ou atraso de pacotes (packet loss / jitter)."),
-    cmd!(CAT_6, NOTE_6, SUB_6_1, "toggle cl_hud_telemetry_serverrecvmargin_graph_show 0 1 2", "Mostra um micrográfico em tempo real da estabilidade de envio ao servidor."),
-    cmd!(CAT_6, NOTE_6, SUB_6_2, "toggle cq_netgraph 0 1", "Liga/desliga a barra gráfica de Command Queue (sub-tick) no canto superior direito."),
-    cmd!(CAT_6, NOTE_6, SUB_6_2, "toggle cl_showfps 0 1 2 3 4", "Contador direto de FPS da engine (1 = simples, 2 a 4 = latência detalhada)."),
-    cmd!(CAT_6, NOTE_6, SUB_6_2, "toggle cl_showpos 0 1", "Mostra coordenadas (pos), ângulo (ang) e velocidade horizontal (vel)."),
+    // 6. Monitoramento (24)
+    cmd!(CAT_6, NOTE_6, SUB_6_1, "cl_hud_telemetry_frametime_show 0", "Ocultar FPS/Frametime (0 = Nunca): desativa o indicador no canto superior direito."),
+    cmd!(CAT_6, NOTE_6, SUB_6_1, "cl_hud_telemetry_frametime_show 1", "FPS/Frametime em problemas (1): exibe automaticamente apenas durante quedas de FPS ou picos de frametime."),
+    cmd!(CAT_6, NOTE_6, SUB_6_1, "cl_hud_telemetry_frametime_show 2", "FPS/Frametime sempre visível (2): exibe continuamente FPS e tempo de quadro (ms) no canto superior direito."),
+    cmd!(CAT_6, NOTE_6, SUB_6_1, "cl_hud_telemetry_ping_show 0", "Ocultar Ping (0 = Nunca): desativa o indicador de latência no HUD."),
+    cmd!(CAT_6, NOTE_6, SUB_6_1, "cl_hud_telemetry_ping_show 1", "Ping em problemas (1): exibe o ping apenas quando houver latência alta ou instável."),
+    cmd!(CAT_6, NOTE_6, SUB_6_1, "cl_hud_telemetry_ping_show 2", "Ping sempre visível (2): exibe continuamente o seu Ping (ms) em tempo real."),
+    cmd!(CAT_6, NOTE_6, SUB_6_1, "cl_hud_telemetry_net_misdelivery_show 0", "Ocultar perda de pacotes/jitter (0 = Nunca): desativa alertas de rede no HUD."),
+    cmd!(CAT_6, NOTE_6, SUB_6_1, "cl_hud_telemetry_net_misdelivery_show 1", "Perda de pacotes/jitter em problemas (1): exibe alerta apenas quando houver perda ou atraso de pacotes."),
+    cmd!(CAT_6, NOTE_6, SUB_6_1, "cl_hud_telemetry_net_misdelivery_show 2", "Perda de pacotes/jitter sempre visível (2): exibe continuamente a porcentagem de packet loss e jitter."),
+    cmd!(CAT_6, NOTE_6, SUB_6_1, "cl_hud_telemetry_serverrecvmargin_graph_show 0", "Ocultar gráfico de estabilidade do servidor (0 = Nunca): desativa o micrográfico de envio."),
+    cmd!(CAT_6, NOTE_6, SUB_6_1, "cl_hud_telemetry_serverrecvmargin_graph_show 1", "Gráfico do servidor em problemas (1): exibe o micrográfico apenas durante instabilidades de envio."),
+    cmd!(CAT_6, NOTE_6, SUB_6_1, "cl_hud_telemetry_serverrecvmargin_graph_show 2", "Gráfico do servidor sempre visível (2): exibe continuamente o micrográfico de estabilidade de envio ao servidor."),
+    cmd!(CAT_6, NOTE_6, SUB_6_2, "cq_netgraph 0", "Desativar gráfico Command Queue (0): oculta a barra gráfica de sub-tick no canto superior direito."),
+    cmd!(CAT_6, NOTE_6, SUB_6_2, "cq_netgraph 1", "Ativar gráfico Command Queue (1): exibe a barra gráfica de fila de comandos (sub-tick) no canto superior direito."),
+    cmd!(CAT_6, NOTE_6, SUB_6_2, "cl_showfps 0", "Ocultar FPS da engine (0): desativa o contador direto de FPS."),
+    cmd!(CAT_6, NOTE_6, SUB_6_2, "cl_showfps 1", "FPS da engine simples (1): exibe o contador básico de FPS em tempo real."),
+    cmd!(CAT_6, NOTE_6, SUB_6_2, "cl_showfps 2", "FPS da engine com frametime (2): exibe FPS com métricas de tempo mínimo, médio e máximo de quadro."),
+    cmd!(CAT_6, NOTE_6, SUB_6_2, "cl_showfps 3", "FPS da engine com ticks do servidor (3): exibe FPS junto com latência e ticks do servidor."),
+    cmd!(CAT_6, NOTE_6, SUB_6_2, "cl_showfps 4", "FPS da engine completo (4): exibe diagnóstico detalhado de frame e latência da engine."),
+    cmd!(CAT_6, NOTE_6, SUB_6_2, "cl_showpos 0", "Ocultar posição e velocidade (0): remove coordenadas, ângulo e velocidade da tela."),
+    cmd!(CAT_6, NOTE_6, SUB_6_2, "cl_showpos 1", "Exibir posição e velocidade (1): mostra coordenadas (pos), ângulo (ang) e velocidade horizontal (vel) na tela."),
     cmd!(CAT_6, NOTE_6, SUB_6_2, "+showscores", "Abre a tabela de pontuação / Placar (TAB)."),
     cmd!(CAT_6, NOTE_6, SUB_6_2, "status", "Imprime no console dados do servidor atual, mapa, ping e jogadores conectados."),
     cmd!(CAT_6, NOTE_6, SUB_6_2, "sys_info", "Gera no console um relatório completo de hardware, drivers e configurações ativas."),
 
-    // 7. Outros (Áudio, Demos/Replays, HUD e Sistema)
+    // 7. Outros (35)
     cmd!(CAT_7, NOTE_7, SUB_7_1, "incrementvar volume 0 1 0.05", "Aumenta o volume geral do jogo em passos de 5%."),
     cmd!(CAT_7, NOTE_7, SUB_7_1, "incrementvar volume 0 1 -0.05", "Diminui o volume geral do jogo em passos de 5%."),
-    cmd!(CAT_7, NOTE_7, SUB_7_1, "toggle volume 0.08 0.55", "Alterna entre Modo Aquecimento/DM (0.08) e Modo Competitivo (0.55)."),
-    cmd!(CAT_7, NOTE_7, SUB_7_1, "toggle snd_mute_losefocus 0 1", "Define se o áudio fica mudo ou continua tocando quando você dá Alt+Tab."),
+    cmd!(CAT_7, NOTE_7, SUB_7_1, "volume 0.08", "Volume Modo Aquecimento/DM (0.08): reduz o volume geral do jogo para 8%."),
+    cmd!(CAT_7, NOTE_7, SUB_7_1, "volume 0.55", "Volume Modo Competitivo (0.55): define o volume geral do jogo para 55%."),
+    cmd!(CAT_7, NOTE_7, SUB_7_1, "snd_mute_losefocus 0", "Manter som no Alt+Tab (0): o áudio do jogo continua tocando em segundo plano ao minimizar."),
+    cmd!(CAT_7, NOTE_7, SUB_7_1, "snd_mute_losefocus 1", "Mutar som no Alt+Tab (1): silencia automaticamente o jogo quando a janela perde o foco."),
     cmd!(CAT_7, NOTE_7, SUB_7_2, "demoui", "Abre ou fecha a barra de controle de reprodução de Demo (Shift+F2)."),
     cmd!(CAT_7, NOTE_7, SUB_7_2, "demo_togglepause", "Pausa ou retoma a reprodução da Demo instantaneamente."),
-    cmd!(CAT_7, NOTE_7, SUB_7_2, "toggle demo_timescale 0.25 0.5 1 2 4 8", "Alterna a velocidade do replay entre 0.25x e 8x."),
+    cmd!(CAT_7, NOTE_7, SUB_7_2, "demo_timescale 0.25", "Velocidade da Demo 0.25x: reprodução super lenta para análise minuciosa de jogadas."),
+    cmd!(CAT_7, NOTE_7, SUB_7_2, "demo_timescale 0.5", "Velocidade da Demo 0.5x: câmera lenta pela metade para revisar mira e movimentação."),
+    cmd!(CAT_7, NOTE_7, SUB_7_2, "demo_timescale 1", "Velocidade da Demo 1x (normal): restaura a velocidade original do replay."),
+    cmd!(CAT_7, NOTE_7, SUB_7_2, "demo_timescale 2", "Velocidade da Demo 2x: avança o replay no dobro da velocidade."),
+    cmd!(CAT_7, NOTE_7, SUB_7_2, "demo_timescale 4", "Velocidade da Demo 4x: avança rapidamente o replay em 4 vezes."),
+    cmd!(CAT_7, NOTE_7, SUB_7_2, "demo_timescale 8", "Velocidade da Demo 8x: avanço ultrarrápido do replay para pular rounds."),
     cmd!(CAT_7, NOTE_7, SUB_7_2, "demo_goto -960 1 0", "Volta aproximadamente 15 segundos na linha do tempo da Demo."),
     cmd!(CAT_7, NOTE_7, SUB_7_2, "demo_goto 960 1 0", "Avança aproximadamente 15 segundos na linha do tempo da Demo."),
-    cmd!(CAT_7, NOTE_7, SUB_7_2, "toggle spec_show_xray 0 1", "Liga ou desliga o Raio-X (X-Ray) durante análise do replay ou modo espectador."),
+    cmd!(CAT_7, NOTE_7, SUB_7_2, "spec_show_xray 0", "Desativar Raio-X (0): oculta a silhueta dos jogadores através das paredes em Demos/espectador."),
+    cmd!(CAT_7, NOTE_7, SUB_7_2, "spec_show_xray 1", "Ativar Raio-X (1): destaca a silhueta dos jogadores através das paredes em Demos/espectador."),
     cmd!(CAT_7, NOTE_7, SUB_7_3, "incrementvar cl_hud_color 0 11 1", "Troca ciclicamente a cor de toda a interface (HUD) entre as 12 cores disponíveis."),
-    cmd!(CAT_7, NOTE_7, SUB_7_3, "toggle cl_draw_only_deathnotices 0 1", "Esconde HUD e radar deixando apenas a mira e o registro de abates (killfeed)."),
-    cmd!(CAT_7, NOTE_7, SUB_7_3, "toggle cl_drawhud 0 1", "Oculta absolutamente toda a interface da tela (exige sv_cheats 1)."),
+    cmd!(CAT_7, NOTE_7, SUB_7_3, "cl_draw_only_deathnotices 0", "Restaurar HUD completo (0): volta a exibir radar, vida, munição e elementos normais da interface."),
+    cmd!(CAT_7, NOTE_7, SUB_7_3, "cl_draw_only_deathnotices 1", "Modo apenas killfeed (1): oculta HUD e radar deixando somente a mira e o registro de abates."),
+    cmd!(CAT_7, NOTE_7, SUB_7_3, "cl_drawhud 0", "Ocultar toda a interface (0, exige sv_cheats 1): remove absolutamente todos os elementos do HUD da tela."),
+    cmd!(CAT_7, NOTE_7, SUB_7_3, "cl_drawhud 1", "Exibir toda a interface (1): restaura a exibição completa dos elementos do HUD."),
     cmd!(CAT_7, NOTE_7, SUB_7_3, "screenshot", "Captura uma foto imediata da tela."),
     cmd!(CAT_7, NOTE_7, SUB_7_3, "jpeg", "Captura uma foto imediata da tela em formato JPEG."),
     cmd!(CAT_7, NOTE_7, SUB_7_4, "toggleconsole", "Abre ou fecha o Console de Desenvolvedor (' ou ~)."),
@@ -297,7 +367,7 @@ fn category_tab_label(title: &'static str) -> &'static str {
     }
 }
 
-/// Retorna o catálogo completo de binds do CS2 na ordem exata de `guia_completo_de_binds_no_cs2.md`.
+/// Retorna o catálogo completo de binds do CS2.
 pub fn cs2_bind_catalog() -> &'static [BindCommandEntry] {
     CS2_BIND_CATALOG
 }
@@ -441,11 +511,12 @@ pub fn normalize_captured_key_to_cs2(raw_input: &str) -> Option<String> {
 mod tests {
     use super::*;
     use crate::binds::format_bind_commands;
+    use std::collections::HashSet;
 
     #[test]
     fn test_catalog_count_and_exact_category_order() {
         let catalog = cs2_bind_catalog();
-        assert_eq!(catalog.len(), 186);
+        assert_eq!(catalog.len(), 238);
 
         let mut categories = Vec::new();
         for entry in catalog {
@@ -466,6 +537,39 @@ mod tests {
                 "7. Outros (Áudio, Demos/Replays, HUD e Sistema)",
             ]
         );
+    }
+
+    #[test]
+    fn test_training_starts_with_featured_sv_cheats_and_no_grouped_toggle_modes() {
+        let catalog = cs2_bind_catalog();
+        let training: Vec<&BindCommandEntry> = catalog
+            .iter()
+            .filter(|e| e.category == CAT_2)
+            .collect();
+
+        assert_eq!(training.len(), 37);
+        assert_eq!(training[0].cfg_command, "sv_cheats 0");
+        assert!(training[0].featured);
+        assert_eq!(training[0].subcategory, SUB_2_0);
+        assert_eq!(training[1].cfg_command, "sv_cheats 1");
+        assert!(training[1].featured);
+        assert_eq!(training[1].subcategory, SUB_2_0);
+        assert!(training[2..].iter().all(|e| !e.featured));
+        assert!(catalog.iter().filter(|e| e.featured).count() == 2);
+
+        let mut seen = HashSet::new();
+        for entry in catalog {
+            assert!(
+                !entry.cfg_command.starts_with("toggle "),
+                "Comando agrupado com toggle não deveria existir: {}",
+                entry.cfg_command
+            );
+            assert!(
+                seen.insert(entry.cfg_command),
+                "Comando duplicado no catálogo: {}",
+                entry.cfg_command
+            );
+        }
     }
 
     #[test]
@@ -527,12 +631,19 @@ mod tests {
         );
         assert!(categories.iter().all(|c| !c.subtitle.is_empty()));
         let total: usize = categories.iter().map(|c| c.command_count).sum();
-        assert_eq!(total, 186);
+        assert_eq!(total, 238);
     }
 
     #[test]
     fn test_matches_bind_search_command_and_description() {
         let catalog = cs2_bind_catalog();
+
+        let cheats_on = catalog
+            .iter()
+            .find(|e| e.cfg_command == "sv_cheats 1")
+            .unwrap();
+        assert!(matches_bind_search(cheats_on, "sv_cheats"));
+        assert!(matches_bind_search(cheats_on, "cheats 1"));
 
         let noclip = catalog.iter().find(|e| e.cfg_command == "noclip").unwrap();
         assert!(matches_bind_search(noclip, ""));
@@ -548,7 +659,7 @@ mod tests {
 
         let infinite_ammo = catalog
             .iter()
-            .find(|e| e.cfg_command == "toggle sv_infinite_ammo 0 1 2")
+            .find(|e| e.cfg_command == "sv_infinite_ammo 1")
             .unwrap();
         assert!(matches_bind_search(infinite_ammo, "munição"));
         assert!(matches_bind_search(infinite_ammo, "municao granadas"));

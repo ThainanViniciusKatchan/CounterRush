@@ -11,8 +11,8 @@ use counterrush_core::{
 use slint::{ComponentHandle, Model, ModelRc, SharedString, VecModel};
 
 use crate::binds_i18n::{
-    localize_category, localize_category_header, localize_description, localize_subcategory,
-    matches_localized_bind_search,
+    localize_category, localize_category_header, localize_description, localize_featured_badge,
+    localize_featured_subcategory_note, localize_subcategory, matches_localized_bind_search,
 };
 use crate::i18n::{
     self, BindSaveModeKind, BindUpdateVerb, UiLanguage,
@@ -108,6 +108,7 @@ fn make_empty_grid_cell() -> BindGridCell {
         description: SharedString::default(),
         command_value: SharedString::default(),
         checked: false,
+        featured: false,
     }
 }
 
@@ -125,22 +126,34 @@ fn make_grid_cell(
         description: localize_description(idx, entry, lang).into(),
         command_value: entry.cfg_command.into(),
         checked,
+        featured: entry.featured,
     }
 }
 
-fn make_header_row(row_kind: i32, title: &str, subtitle: &str) -> BindCatalogRow {
+fn make_header_row(
+    row_kind: i32,
+    title: &str,
+    subtitle: &str,
+    badge: &str,
+    featured: bool,
+) -> BindCatalogRow {
     BindCatalogRow {
         row_kind,
         command_index: -1,
         title: title.into(),
         subtitle: subtitle.into(),
-        command_value: SharedString::default(),
+        command_value: badge.into(),
         checked: false,
+        featured,
         cell_0: make_empty_grid_cell(),
         cell_1: make_empty_grid_cell(),
         cell_2: make_empty_grid_cell(),
         cell_3: make_empty_grid_cell(),
     }
+}
+
+fn make_separator_row() -> BindCatalogRow {
+    make_header_row(4, "", "", "", false)
 }
 
 fn make_list_row(
@@ -156,6 +169,7 @@ fn make_list_row(
         subtitle: localize_description(cmd_idx, entry, lang).into(),
         command_value: entry.cfg_command.into(),
         checked,
+        featured: entry.featured,
         cell_0: make_empty_grid_cell(),
         cell_1: make_empty_grid_cell(),
         cell_2: make_empty_grid_cell(),
@@ -181,6 +195,7 @@ fn make_grid_quad_row(
         subtitle: SharedString::default(),
         command_value: SharedString::default(),
         checked: false,
+        featured: false,
         cell_0: cell_for(0),
         cell_1: cell_for(1),
         cell_2: cell_for(2),
@@ -263,6 +278,7 @@ fn build_visible_catalog_rows(state: &BindsViewState) -> (Vec<BindCatalogRow>, u
     let mut pending: Vec<(usize, &'static BindCommandEntry, bool)> = Vec::new();
     let mut last_category: Option<&str> = None;
     let mut last_subcategory: Option<&str> = None;
+    let mut last_subcategory_featured = false;
     let mut total_matched = 0usize;
 
     for (idx, entry) in catalog.iter().enumerate() {
@@ -280,19 +296,34 @@ fn build_visible_catalog_rows(state: &BindsViewState) -> (Vec<BindCatalogRow>, u
         if last_category != Some(entry.category) {
             flush_subcategory_rows(&mut rows, &mut pending, state.is_grid_view, state.lang);
             let (cat_title, cat_note) = localize_category_header(entry, state.lang);
-            rows.push(make_header_row(0, cat_title, cat_note));
+            rows.push(make_header_row(0, cat_title, cat_note, "", false));
             last_category = Some(entry.category);
             last_subcategory = None;
+            last_subcategory_featured = false;
         }
 
         if last_subcategory != Some(entry.subcategory) {
             flush_subcategory_rows(&mut rows, &mut pending, state.is_grid_view, state.lang);
+            if last_subcategory_featured {
+                rows.push(make_separator_row());
+            }
+            let (sub_note, sub_badge) = if entry.featured {
+                (
+                    localize_featured_subcategory_note(state.lang),
+                    localize_featured_badge(state.lang),
+                )
+            } else {
+                ("", "")
+            };
             rows.push(make_header_row(
                 1,
                 localize_subcategory(entry.subcategory, state.lang),
-                "",
+                sub_note,
+                sub_badge,
+                entry.featured,
             ));
             last_subcategory = Some(entry.subcategory);
+            last_subcategory_featured = entry.featured;
         }
 
         let checked = state.selected_flags.get(idx).copied().unwrap_or(false);
@@ -994,7 +1025,7 @@ mod tests {
         ui.invoke_card_action_clicked("binds".into());
         assert!(ui.get_show_binds_view(), "Clique em Gerenciar Binds deve abrir BindsView");
 
-        // 1. Validar 7 abas de categorias e soma total de 186 comandos
+        // 1. Validar 7 abas de categorias e soma total de 238 comandos
         let tabs = binds.get_category_tabs();
         assert_eq!(tabs.row_count(), 7);
         assert_eq!(tabs.row_data(0).unwrap().title, "1. Movimentação");
@@ -1013,10 +1044,21 @@ mod tests {
             );
             total_across_tabs += tab_cmd_count;
         }
-        assert_eq!(total_across_tabs, 186);
+        assert_eq!(total_across_tabs, 238);
 
-        // 2. Alternância Lista <-> Grade mantendo contagem, descrições e persistência em settings.json
+        // 2. Alternância Lista <-> Grade mantendo contagem, destaque de sv_cheats e separador
         binds.invoke_category_tab_selected(1);
+        let list_training_rows = binds.get_catalog_rows();
+        assert_eq!(list_training_rows.row_data(1).unwrap().row_kind, 1);
+        assert!(list_training_rows.row_data(1).unwrap().featured);
+        assert_eq!(list_training_rows.row_data(2).unwrap().row_kind, 2);
+        assert_eq!(list_training_rows.row_data(2).unwrap().command_value, "sv_cheats 0");
+        assert!(list_training_rows.row_data(2).unwrap().featured);
+        assert_eq!(list_training_rows.row_data(3).unwrap().row_kind, 2);
+        assert_eq!(list_training_rows.row_data(3).unwrap().command_value, "sv_cheats 1");
+        assert!(list_training_rows.row_data(3).unwrap().featured);
+        assert_eq!(list_training_rows.row_data(4).unwrap().row_kind, 4);
+
         binds.invoke_view_mode_changed(true);
         assert!(ui.get_content_is_grid_view());
         assert_eq!(
@@ -1026,6 +1068,16 @@ mod tests {
             counterrush_core::config::ContentViewMode::Grid
         );
         let grid_rows = binds.get_catalog_rows();
+        assert_eq!(grid_rows.row_data(1).unwrap().row_kind, 1);
+        assert!(grid_rows.row_data(1).unwrap().featured);
+        assert_eq!(grid_rows.row_data(2).unwrap().row_kind, 3);
+        assert_eq!(grid_rows.row_data(2).unwrap().cell_0.command_value, "sv_cheats 0");
+        assert!(grid_rows.row_data(2).unwrap().cell_0.featured);
+        assert_eq!(grid_rows.row_data(2).unwrap().cell_1.command_value, "sv_cheats 1");
+        assert!(grid_rows.row_data(2).unwrap().cell_1.featured);
+        assert!(!grid_rows.row_data(2).unwrap().cell_2.present);
+        assert_eq!(grid_rows.row_data(3).unwrap().row_kind, 4);
+
         let mut has_grid_row = false;
         for i in 0..grid_rows.row_count() {
             let row = grid_rows.row_data(i).unwrap();
@@ -1040,7 +1092,7 @@ mod tests {
             }
         }
         assert!(has_grid_row);
-        assert_eq!(count_visible_commands_in_model(&grid_rows), 23);
+        assert_eq!(count_visible_commands_in_model(&grid_rows), 37);
 
         binds.invoke_view_mode_changed(false);
         assert!(!ui.get_content_is_grid_view());
@@ -1050,7 +1102,7 @@ mod tests {
                 .content_view_mode,
             counterrush_core::config::ContentViewMode::List
         );
-        assert_eq!(count_visible_commands_in_model(&binds.get_catalog_rows()), 23);
+        assert_eq!(count_visible_commands_in_model(&binds.get_catalog_rows()), 37);
 
         // 3. Pesquisa global por comando e descrição (sem acento)
         binds.invoke_search_query_changed("noclip".into());
