@@ -224,6 +224,7 @@ impl UpdaterController {
             let staging_dir = default_update_staging_dir();
             let last_emit = Arc::new(Mutex::new((Instant::now(), -1i32)));
             let ui_for_progress = ctrl.ui.clone();
+            let runtime_for_progress = Arc::clone(&ctrl.runtime);
             let lang_for_progress = Arc::clone(&ctrl.active_lang);
             let version_for_progress = info.latest_version.clone();
 
@@ -254,6 +255,10 @@ impl UpdaterController {
 
                     if !should_emit {
                         return;
+                    }
+
+                    if let Ok(mut rt) = runtime_for_progress.lock() {
+                        rt.download_progress = ratio;
                     }
 
                     let pct_u8 = pct_opt.map(|p| p.clamp(0, 100) as u8);
