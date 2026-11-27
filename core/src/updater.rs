@@ -364,8 +364,6 @@ where
     where
         F: FnOnce(),
     {
-        before_restart();
-
         if downloaded.asset_kind == UpdateAssetKind::MsiInstaller
             && !downloaded.already_replaced_in_place
         {
@@ -377,9 +375,11 @@ where
                 &relaunch_exe,
             )
             .map_err(|e| UpdateError::RestartFailed(e.to_string()))?;
+            before_restart();
             return Ok(());
         }
 
+        before_restart();
         self_update::restart::restart().map_err(|e| UpdateError::RestartFailed(e.to_string()))?;
         Ok(())
     }
@@ -838,6 +838,42 @@ mod tests {
         assert_eq!(
             progress_calls.lock().unwrap().as_slice(),
             &[(14, Some(14))]
+        );
+    }
+
+    #[test]
+    fn test_apply_and_restart_missing_msi_does_not_invoke_before_restart() {
+        let tmp = tempfile::tempdir().unwrap();
+        let missing_msi = tmp.path().join("missing-installer.msi");
+        let downloaded = DownloadedUpdate {
+            version: "0.24.5".to_string(),
+            staged_path: missing_msi,
+            asset_kind: UpdateAssetKind::MsiInstaller,
+            already_replaced_in_place: false,
+        };
+
+        let service = UpdateService::new(
+            MockCatalog {
+                releases: Releases::from_releases(vec![], "0.24.4"),
+            },
+            MockDownloader {
+                payload: vec![],
+                recorded_dir: Mutex::new(None),
+            },
+        );
+
+        let callback_called = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let callback_ref = Arc::clone(&callback_called);
+        let err = service
+            .apply_and_restart(&downloaded, move || {
+                callback_ref.store(true, std::sync::atomic::Ordering::SeqCst);
+            })
+            .unwrap_err();
+
+        assert!(matches!(err, UpdateError::RestartFailed(_)));
+        assert!(
+            !callback_called.load(std::sync::atomic::Ordering::SeqCst),
+            "before_restart não deve ser chamado quando o spawn do instalador MSI falha"
         );
     }
 }
