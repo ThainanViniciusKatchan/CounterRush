@@ -9,11 +9,11 @@ members = [
 ]
 
 [workspace.package]
-version      = "0.24.4"
+version      = "0.24.5"
 edition      = "2021"
 rust-version = "1.88"
 description = "CounterRush"
-repository = "https://github.com/ThainanViniciusKatchan/DesktopORZ"
+repository = "https://github.com/ThainanViniciusKatchan/CounterRush.git"
 authors = ["ThainanViniciusKatchan"]
 license      = "GPL-3.0"
 
