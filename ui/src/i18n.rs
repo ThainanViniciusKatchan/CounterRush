@@ -1753,6 +1753,141 @@ pub fn binds_overwrite_cancelled(lang: UiLanguage) -> &'static str {
     }
 }
 
+pub fn binds_unbind_hint_both(lang: UiLanguage) -> &'static str {
+    match lang {
+        UiLanguage::EnUs => "Select the .cfg file (1) and capture the desired key (2) to remove the bind.",
+        UiLanguage::RuRu => "Выберите файл .cfg (1) и задайте нужную клавишу (2), чтобы удалить бинд.",
+        UiLanguage::PtBr => "Selecione o arquivo .cfg (1) e capture a tecla desejada (2) para remover a bind.",
+    }
+}
+
+pub fn binds_unbind_hint_missing_file(lang: UiLanguage, key: &str) -> String {
+    match lang {
+        UiLanguage::EnUs => format!("Key '{key}' selected. Select or type the .cfg file (1) to apply unbind."),
+        UiLanguage::RuRu => format!("Клавиша '{key}' выбрана. Выберите или введите файл .cfg (1) для unbind."),
+        UiLanguage::PtBr => format!("Tecla '{key}' selecionada. Selecione ou digite o arquivo .cfg (1) para aplicar o unbind."),
+    }
+}
+
+pub fn binds_unbind_hint_missing_key(lang: UiLanguage, file_name: &str) -> String {
+    match lang {
+        UiLanguage::EnUs => format!("File '{file_name}' ready. Capture the key (2) whose bind will be removed."),
+        UiLanguage::RuRu => format!("Файл '{file_name}' готов. Задайте клавишу (2), бинд которой нужно удалить."),
+        UiLanguage::PtBr => format!("Arquivo '{file_name}' pronto. Capture a tecla (2) cuja bind será removida."),
+    }
+}
+
+pub fn binds_unbind_hint_found_existing(
+    lang: UiLanguage,
+    file_name: &str,
+    existing_cmd: &str,
+    key: &str,
+) -> String {
+    match lang {
+        UiLanguage::EnUs => format!(
+            "Active bind found in '{file_name}': \"{existing_cmd}\" on key '{key}'. Click Remove Bind to save unbind."
+        ),
+        UiLanguage::RuRu => format!(
+            "Найден активный бинд в '{file_name}': \"{existing_cmd}\" на клавише '{key}'. Нажмите «Удалить бинд» для сохранения unbind."
+        ),
+        UiLanguage::PtBr => format!(
+            "Bind ativa encontrada em '{file_name}': \"{existing_cmd}\" na tecla '{key}'. Clique em Remover Bind para gravar unbind."
+        ),
+    }
+}
+
+pub fn binds_unbind_hint_ready(lang: UiLanguage, file_name: &str, key: &str) -> String {
+    match lang {
+        UiLanguage::EnUs => format!(
+            "Ready to write unbind \"{key}\" in '{file_name}' (local + CS2) to clear the key in CS2."
+        ),
+        UiLanguage::RuRu => format!(
+            "Готово к записи unbind \"{key}\" в '{file_name}' (локально + CS2) для очистки клавиши в CS2."
+        ),
+        UiLanguage::PtBr => format!(
+            "Pronto para gravar unbind \"{key}\" em '{file_name}' (local + CS2) e limpar a tecla no CS2."
+        ),
+    }
+}
+
+pub fn binds_unbind_saved_created(
+    lang: UiLanguage,
+    file_name: &str,
+    unbind_line: &str,
+    cs2_warning: Option<&str>,
+) -> String {
+    match (lang, cs2_warning) {
+        (UiLanguage::EnUs, None) => {
+            format!("New file '{file_name}' created with {unbind_line} (local + CS2).")
+        }
+        (UiLanguage::EnUs, Some(warn)) => {
+            let w = translate_cs2_sync_warning(lang, warn);
+            format!("New file '{file_name}' created with {unbind_line}. {w}")
+        }
+        (UiLanguage::RuRu, None) => {
+            format!("Создан новый файл '{file_name}': {unbind_line} (локально + CS2).")
+        }
+        (UiLanguage::RuRu, Some(warn)) => {
+            let w = translate_cs2_sync_warning(lang, warn);
+            format!("Создан новый файл '{file_name}': {unbind_line}. {w}")
+        }
+        (UiLanguage::PtBr, None) => {
+            format!("Novo arquivo '{file_name}' criado com {unbind_line} (local + CS2).")
+        }
+        (UiLanguage::PtBr, Some(warn)) => {
+            format!("Novo arquivo '{file_name}' criado com {unbind_line}. {warn}")
+        }
+    }
+}
+
+pub fn binds_unbind_saved_updated(
+    lang: UiLanguage,
+    removed_existing_bind: bool,
+    file_name: &str,
+    unbind_line: &str,
+    cs2_warning: Option<&str>,
+) -> String {
+    let verb_str = match (lang, removed_existing_bind) {
+        (UiLanguage::EnUs, true) => "Bind removed and unbind applied",
+        (UiLanguage::EnUs, false) => "Unbind applied",
+        (UiLanguage::RuRu, true) => "Бинд удалён и применён unbind",
+        (UiLanguage::RuRu, false) => "Применён unbind",
+        (UiLanguage::PtBr, true) => "Bind removida e unbind aplicado",
+        (UiLanguage::PtBr, false) => "Unbind aplicado",
+    };
+
+    match (lang, cs2_warning) {
+        (UiLanguage::EnUs, None) => {
+            format!("{verb_str} in '{file_name}': {unbind_line} (local + CS2).")
+        }
+        (UiLanguage::EnUs, Some(warn)) => {
+            let w = translate_cs2_sync_warning(lang, warn);
+            format!("{verb_str} in '{file_name}': {unbind_line}. {w}")
+        }
+        (UiLanguage::RuRu, None) => {
+            format!("{verb_str} в '{file_name}': {unbind_line} (локально + CS2).")
+        }
+        (UiLanguage::RuRu, Some(warn)) => {
+            let w = translate_cs2_sync_warning(lang, warn);
+            format!("{verb_str} в '{file_name}': {unbind_line}. {w}")
+        }
+        (UiLanguage::PtBr, None) => {
+            format!("{verb_str} em '{file_name}': {unbind_line} (local + CS2).")
+        }
+        (UiLanguage::PtBr, Some(warn)) => {
+            format!("{verb_str} em '{file_name}': {unbind_line}. {warn}")
+        }
+    }
+}
+
+pub fn binds_unbind_err(lang: UiLanguage, err: &dyn std::fmt::Display) -> String {
+    match lang {
+        UiLanguage::EnUs => format!("Error removing bind: {err}"),
+        UiLanguage::RuRu => format!("Ошибка удаления бинда: {err}"),
+        UiLanguage::PtBr => format!("Erro ao remover bind: {err}"),
+    }
+}
+
 pub fn content_view_mode_changed_status(lang: UiLanguage, is_grid: bool) -> &'static str {
     match (lang, is_grid) {
         (UiLanguage::EnUs, true) => "Default content view mode set to Grid.",

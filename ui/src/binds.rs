@@ -4,9 +4,10 @@ use std::rc::Rc;
 
 use counterrush_core::{
     cs2_bind_catalog, cs2_bind_categories, determine_bind_save_mode, find_key_conflict_in_content,
-    format_bind_commands, format_bind_line, list_cfg_files_in_dir,
-    normalize_captured_key_to_cs2, save_cs2_bind_with_local_fallback, validate_bind_key,
-    BindCommandEntry, BindDirectories, BindFlag, BindOperationOutcome,
+    format_bind_commands, format_bind_line, format_unbind_line, list_cfg_files_in_dir,
+    normalize_captured_key_to_cs2, remove_cs2_bind_with_local_fallback,
+    save_cs2_bind_with_local_fallback, validate_bind_key, BindCommandEntry, BindDirectories,
+    BindFlag, BindOperationOutcome,
 };
 use slint::{ComponentHandle, Model, ModelRc, SharedString, VecModel};
 
@@ -43,6 +44,7 @@ impl BindsViewState {
 pub struct BindsController {
     state: Rc<RefCell<BindsViewState>>,
     rows_model: Rc<VecModel<BindCatalogRow>>,
+    dirs: Rc<RefCell<BindDirectories>>,
 }
 
 impl BindsController {
@@ -68,6 +70,7 @@ impl BindsController {
         binds.set_tooltip_visible(false);
         binds.set_selector_dropdown_open(false);
         refresh_catalog_view(&binds, &self.state.borrow(), &self.rows_model);
+        sync_unbind_preview(&binds, &self.dirs.borrow(), lang);
 
         let current_msg = binds.get_status_message().to_string();
         if current_msg == i18n::binds_default_status(UiLanguage::PtBr)
@@ -566,6 +569,53 @@ fn refresh_catalog_view(
     sync_binds_summary(binds, &state.selected_flags, state.lang);
 }
 
+fn sync_unbind_preview(binds: &BindsState<'_>, dirs: &BindDirectories, lang: UiLanguage) {
+    let file_input = binds.get_file_name_input().to_string();
+    let selected_existing = binds.get_selected_existing_file().to_string();
+    let raw_key = binds.get_bound_key().to_string();
+
+    let valid_key = validate_bind_key(&raw_key).ok();
+    let valid_file = if !file_input.trim().is_empty() {
+        determine_bind_save_mode(&selected_existing, &file_input).ok()
+    } else {
+        None
+    };
+
+    if let Some(ref clean_key) = valid_key {
+        binds.set_unbind_preview_line(format_unbind_line(clean_key).into());
+    } else {
+        binds.set_unbind_preview_line("".into());
+    }
+
+    let info = match (&valid_file, &valid_key) {
+        (None, None) => i18n::binds_unbind_hint_both(lang).into(),
+        (None, Some(clean_key)) => i18n::binds_unbind_hint_missing_file(lang, clean_key).into(),
+        (Some((target_file, _)), None) => {
+            i18n::binds_unbind_hint_missing_key(lang, target_file).into()
+        }
+        (Some((target_file, flag)), Some(clean_key)) => {
+            if *flag == BindFlag::Default {
+                if let Some((_, existing_cmd)) =
+                    check_existing_key_conflict(dirs, target_file, clean_key)
+                {
+                    i18n::binds_unbind_hint_found_existing(
+                        lang,
+                        target_file,
+                        &existing_cmd,
+                        clean_key,
+                    )
+                    .into()
+                } else {
+                    i18n::binds_unbind_hint_ready(lang, target_file, clean_key).into()
+                }
+            } else {
+                i18n::binds_unbind_hint_ready(lang, target_file, clean_key).into()
+            }
+        }
+    };
+    binds.set_unbind_existing_info(info);
+}
+
 fn check_existing_key_conflict(
     dirs: &BindDirectories,
     file_name: &str,
@@ -679,7 +729,9 @@ fn execute_save_bind(
             binds.set_selected_existing_file(saved_file.clone().into());
             binds.set_file_name_input(saved_file.into());
             binds.set_show_conflict_prompt(false);
+            binds.set_unbind_panel_open(false);
             sync_binds_summary(&binds, &state.selected_flags, lang);
+            sync_unbind_preview(&binds, dirs, lang);
 
             let msg = match (&report.outcome, &report.cs2_sync_warning) {
                 (
@@ -730,6 +782,102 @@ fn execute_save_bind(
     }
 }
 
+fn execute_remove_bind(ui: &MainWindow, state: &BindsViewState, dirs: &BindDirectories) {
+    let lang = state.lang;
+    let binds = ui.global::<BindsState>();
+    let file_input = binds.get_file_name_input().to_string();
+    let selected_existing = binds.get_selected_existing_file().to_string();
+    let raw_key = binds.get_bound_key().to_string();
+
+    if file_input.trim().is_empty() {
+        binds.set_status_kind("warning".into());
+        binds.set_status_message(i18n::binds_err_missing_file(lang).into());
+        return;
+    }
+
+    let clean_key = match validate_bind_key(&raw_key) {
+        Ok(k) => k,
+        Err(_) => {
+            binds.set_status_kind("warning".into());
+            binds.set_status_message(i18n::binds_err_missing_key(lang).into());
+            return;
+        }
+    };
+
+    let (target_file_name, flag) = match determine_bind_save_mode(&selected_existing, &file_input) {
+        Ok(res) => res,
+        Err(err) => {
+            binds.set_status_kind("error".into());
+            binds.set_status_message(i18n::binds_err_invalid_file(lang, &err).into());
+            return;
+        }
+    };
+
+    match remove_cs2_bind_with_local_fallback(dirs, &target_file_name, &clean_key, flag) {
+        Ok(report) => {
+            let refreshed = load_cfg_names_for_dir(&dirs.local_cfg_dir);
+            ui.set_available_cfg_files(ModelRc::new(VecModel::from(refreshed.clone())));
+            binds.set_existing_cfg_files(ModelRc::new(VecModel::from(refreshed)));
+
+            let saved_file = match &report.outcome {
+                BindOperationOutcome::Created { file_name, .. }
+                | BindOperationOutcome::Updated { file_name, .. } => file_name.clone(),
+                _ => target_file_name.clone(),
+            };
+
+            binds.set_selected_existing_file(saved_file.clone().into());
+            binds.set_file_name_input(saved_file.into());
+            binds.set_show_conflict_prompt(false);
+            binds.set_unbind_panel_open(false);
+            sync_binds_summary(&binds, &state.selected_flags, lang);
+            sync_unbind_preview(&binds, dirs, lang);
+
+            let msg = match (&report.outcome, &report.cs2_sync_warning) {
+                (
+                    BindOperationOutcome::Created {
+                        file_name,
+                        bind_line,
+                        ..
+                    },
+                    warn,
+                ) => i18n::binds_unbind_saved_created(
+                    lang,
+                    file_name,
+                    bind_line,
+                    warn.as_deref(),
+                ),
+                (
+                    BindOperationOutcome::Updated {
+                        file_name,
+                        bind_line,
+                        replaced_existing_key,
+                        ..
+                    },
+                    warn,
+                ) => i18n::binds_unbind_saved_updated(
+                    lang,
+                    *replaced_existing_key,
+                    file_name,
+                    bind_line,
+                    warn.as_deref(),
+                ),
+                _ => String::new(),
+            };
+
+            binds.set_status_kind(if report.synced_to_cs2_global {
+                "success".into()
+            } else {
+                "warning".into()
+            });
+            binds.set_status_message(msg.into());
+        }
+        Err(err) => {
+            binds.set_status_kind("error".into());
+            binds.set_status_message(i18n::binds_unbind_err(lang, &err).into());
+        }
+    }
+}
+
 pub fn refresh_existing_cfg_files(ui: &MainWindow, dirs: &BindDirectories) {
     let binds = ui.global::<BindsState>();
     let cfg_names = load_cfg_names_for_dir(&dirs.local_cfg_dir);
@@ -746,6 +894,7 @@ pub fn wire_binds_view(
     let initial_lang = UiLanguage::from_code(ui.get_active_language().as_str());
     let state = Rc::new(RefCell::new(BindsViewState::new(initial_lang, initial_is_grid_view)));
     let rows_model = Rc::new(VecModel::default());
+    let dirs_rc = Rc::new(RefCell::new(dirs));
     let binds = ui.global::<BindsState>();
 
     ui.set_content_is_grid_view(initial_is_grid_view);
@@ -753,9 +902,10 @@ pub fn wire_binds_view(
     binds.set_catalog_rows(ModelRc::from(rows_model.clone()));
     binds.set_status_message(i18n::binds_default_status(initial_lang).into());
 
-    let cfg_names = load_cfg_names_for_dir(&dirs.local_cfg_dir);
+    let cfg_names = load_cfg_names_for_dir(&dirs_rc.borrow().local_cfg_dir);
     binds.set_existing_cfg_files(ModelRc::new(VecModel::from(cfg_names)));
     refresh_catalog_view(&binds, &state.borrow(), &rows_model);
+    sync_unbind_preview(&binds, &dirs_rc.borrow(), initial_lang);
 
     binds.on_resolve_cs2_key(|raw_text| {
         capture_key_from_slint_text(raw_text.as_str())
@@ -765,12 +915,14 @@ pub fn wire_binds_view(
 
     let ui_weak = ui.as_weak();
     let state_sel = state.clone();
+    let dirs_sel = dirs_rc.clone();
     binds.on_existing_file_selected(move |selected| {
         if let Some(ui) = ui_weak.upgrade() {
             let binds = ui.global::<BindsState>();
             let st = state_sel.borrow();
             binds.set_show_conflict_prompt(false);
             sync_binds_summary(&binds, &st.selected_flags, st.lang);
+            sync_unbind_preview(&binds, &dirs_sel.borrow(), st.lang);
             binds.set_status_kind("info".into());
             if selected.trim().is_empty() {
                 binds.set_status_message(i18n::binds_selection_cleared(st.lang).into());
@@ -784,22 +936,26 @@ pub fn wire_binds_view(
 
     let ui_weak = ui.as_weak();
     let state_edit = state.clone();
+    let dirs_edit = dirs_rc.clone();
     binds.on_file_name_edited(move |_| {
         if let Some(ui) = ui_weak.upgrade() {
             let binds = ui.global::<BindsState>();
             let st = state_edit.borrow();
             sync_binds_summary(&binds, &st.selected_flags, st.lang);
+            sync_unbind_preview(&binds, &dirs_edit.borrow(), st.lang);
         }
     });
 
     let ui_weak = ui.as_weak();
     let state_key = state.clone();
+    let dirs_key = dirs_rc.clone();
     binds.on_key_captured(move |captured| {
         if let Some(ui) = ui_weak.upgrade() {
             let binds = ui.global::<BindsState>();
             let st = state_key.borrow();
             binds.set_show_conflict_prompt(false);
             sync_binds_summary(&binds, &st.selected_flags, st.lang);
+            sync_unbind_preview(&binds, &dirs_key.borrow(), st.lang);
             binds.set_status_kind("info".into());
             if captured.trim().is_empty() {
                 binds.set_status_message(i18n::binds_key_removed(st.lang).into());
@@ -922,7 +1078,27 @@ pub fn wire_binds_view(
         }
     });
 
-    let dirs_rc = Rc::new(RefCell::new(dirs));
+    let ui_weak = ui.as_weak();
+    let dirs_unbind_toggle = dirs_rc.clone();
+    let state_unbind_toggle = state.clone();
+    binds.on_unbind_panel_toggled(move |open| {
+        if open {
+            if let Some(ui) = ui_weak.upgrade() {
+                let binds = ui.global::<BindsState>();
+                let lang = state_unbind_toggle.borrow().lang;
+                sync_unbind_preview(&binds, &dirs_unbind_toggle.borrow(), lang);
+            }
+        }
+    });
+
+    let ui_weak = ui.as_weak();
+    let dirs_remove = dirs_rc.clone();
+    let state_remove = state.clone();
+    binds.on_remove_bind_clicked(move || {
+        if let Some(ui) = ui_weak.upgrade() {
+            execute_remove_bind(&ui, &state_remove.borrow(), &dirs_remove.borrow());
+        }
+    });
 
     let ui_weak = ui.as_weak();
     let dirs_save = dirs_rc.clone();
@@ -953,7 +1129,11 @@ pub fn wire_binds_view(
         }
     });
 
-    BindsController { state, rows_model }
+    BindsController {
+        state,
+        rows_model,
+        dirs: dirs_rc,
+    }
 }
 
 #[cfg(test)]
@@ -1025,7 +1205,7 @@ mod tests {
         ui.invoke_card_action_clicked("binds".into());
         assert!(ui.get_show_binds_view(), "Clique em Gerenciar Binds deve abrir BindsView");
 
-        // 1. Validar 7 abas de categorias e soma total de 238 comandos
+        // 1. Validar 7 abas de categorias e soma total de 237 comandos
         let tabs = binds.get_category_tabs();
         assert_eq!(tabs.row_count(), 7);
         assert_eq!(tabs.row_data(0).unwrap().title, "1. Movimentação");
@@ -1044,7 +1224,7 @@ mod tests {
             );
             total_across_tabs += tab_cmd_count;
         }
-        assert_eq!(total_across_tabs, 238);
+        assert_eq!(total_across_tabs, 237);
 
         // 2. Alternância Lista <-> Grade mantendo contagem, destaque de sv_cheats e separador
         binds.invoke_category_tab_selected(1);
@@ -1345,5 +1525,99 @@ mod tests {
         let rows_list = binds.get_catalog_rows();
         assert!((0..rows_list.row_count()).any(|i| rows_list.row_data(i).unwrap().row_kind == 2));
         assert!(!(0..rows_list.row_count()).any(|i| rows_list.row_data(i).unwrap().row_kind == 3));
+    }
+
+    #[test]
+    fn test_binds_view_separated_unbind_flow_and_i18n() {
+        let temp = tempfile::tempdir().expect("Falha ao criar tempdir");
+        let local_cfg = temp.path().join("local_cfg");
+        let bkp_cfg = local_cfg.join("bkp");
+        let cs2_cfg = temp.path().join("cs2_cfg");
+        std::fs::create_dir_all(&local_cfg).unwrap();
+        std::fs::create_dir_all(&cs2_cfg).unwrap();
+
+        let original_autoexec = "bind \"f4\" \"buy ak47;buy vesthelm\"\nbind \"v\" \"noclip\"\n";
+        std::fs::write(local_cfg.join("autoexec.cfg"), original_autoexec).unwrap();
+
+        let dirs = BindDirectories::with_paths(&local_cfg, &bkp_cfg, &cs2_cfg);
+        let ui = MainWindow::new().expect("Falha ao instanciar MainWindow");
+        let settings_path = temp.path().join("settings.json");
+
+        let controller = wire_binds_view(&ui, dirs, settings_path, false);
+        let binds = ui.global::<BindsState>();
+
+        // 1. unbind não deve constar na pesquisa do catálogo comum
+        binds.invoke_search_query_changed("unbind".into());
+        assert_eq!(binds.get_filtered_commands_count(), 0);
+        assert_eq!(binds.get_catalog_rows().row_count(), 0);
+        binds.invoke_category_tab_selected(6);
+        assert!((0..binds.get_catalog_rows().row_count()).all(|i| {
+            let r = binds.get_catalog_rows().row_data(i).unwrap();
+            !r.command_value.as_str().to_ascii_lowercase().starts_with("unbind")
+        }));
+
+        // 2. Selecionar autoexec.cfg e tecla f4 -> abrir painel e detectar bind existente
+        binds.set_selected_existing_file("autoexec.cfg".into());
+        binds.set_file_name_input("autoexec.cfg".into());
+        binds.invoke_existing_file_selected("autoexec.cfg".into());
+        binds.set_bound_key("f4".into());
+        binds.invoke_key_captured("f4".into());
+        binds.set_unbind_panel_open(true);
+        binds.invoke_unbind_panel_toggled(true);
+
+        assert_eq!(binds.get_unbind_preview_line(), "unbind \"f4\"");
+        assert!(binds.get_unbind_existing_info().contains("buy ak47;buy vesthelm"));
+
+        // 3. Troca de idioma atualiza a dica do painel de unbind
+        assert!(slint::select_bundled_translation("en_US").is_ok());
+        controller.refresh_for_language(&ui, UiLanguage::EnUs);
+        assert!(binds.get_unbind_existing_info().contains("Active bind found in 'autoexec.cfg'"));
+
+        assert!(slint::select_bundled_translation("ru_RU").is_ok());
+        controller.refresh_for_language(&ui, UiLanguage::RuRu);
+        assert!(binds.get_unbind_existing_info().contains("Найден активный бинд"));
+
+        assert!(slint::select_bundled_translation("pt_BR").is_ok());
+        controller.refresh_for_language(&ui, UiLanguage::PtBr);
+        assert!(binds.get_unbind_existing_info().contains("Bind ativa encontrada"));
+
+        // 4. Executar remoção -> grava unbind "f4", mantém bind "v", cria backup e fecha painel
+        binds.invoke_remove_bind_clicked();
+        assert!(!binds.get_unbind_panel_open());
+        assert_eq!(binds.get_status_kind(), "success");
+        assert_eq!(
+            std::fs::read_to_string(bkp_cfg.join("autoexec.cfg")).unwrap(),
+            original_autoexec
+        );
+        assert_eq!(
+            std::fs::read_to_string(local_cfg.join("autoexec.cfg")).unwrap(),
+            "unbind \"f4\"\nbind \"v\" \"noclip\"\n"
+        );
+
+        // 5. Criação de novo .cfg diretamente com unbind "v"
+        binds.set_selected_existing_file("".into());
+        binds.set_file_name_input("limpeza".into());
+        binds.invoke_file_name_edited("limpeza".into());
+        binds.set_bound_key("v".into());
+        binds.invoke_key_captured("v".into());
+        binds.invoke_remove_bind_clicked();
+        assert_eq!(
+            std::fs::read_to_string(local_cfg.join("limpeza.cfg")).unwrap(),
+            "unbind \"v\"\n"
+        );
+
+        // 6. Re-vincular f4 em autoexec.cfg remove o unbind "f4" anterior
+        let smoke_idx = find_catalog_command_index("slot8");
+        binds.set_selected_existing_file("autoexec.cfg".into());
+        binds.set_file_name_input("autoexec.cfg".into());
+        binds.invoke_existing_file_selected("autoexec.cfg".into());
+        binds.set_bound_key("f4".into());
+        binds.invoke_key_captured("f4".into());
+        binds.invoke_command_toggled(smoke_idx, true);
+        binds.invoke_save_bind_clicked();
+        assert_eq!(
+            std::fs::read_to_string(local_cfg.join("autoexec.cfg")).unwrap(),
+            "bind \"v\" \"noclip\"\nbind \"f4\" \"slot8\"\n"
+        );
     }
 }

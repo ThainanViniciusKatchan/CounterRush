@@ -63,6 +63,9 @@ export global BindsState {
     in-out property <string> status-kind: "info";
     in-out property <bool> show-conflict-prompt: false;
     in-out property <string> conflict-message: "";
+    in-out property <bool> unbind-panel-open: false;
+    in-out property <string> unbind-preview-line: "";
+    in-out property <string> unbind-existing-info: "";
 
     // Estado do popup flutuante de descrição da grade
     in-out property <bool> tooltip-visible: false;
@@ -83,7 +86,7 @@ export global BindsState {
         { index: 3, tab-label: "Comunicação", title: "4. Comunicação", subtitle: "Voz, clutch binds, pings 3D, rodas e rádio", total-count: 34, selected-count: 0, match-count: 0 },
         { index: 4, tab-label: "Armas e Granadas", title: "5. Armas e Granadas", subtitle: "Seleção via slots e compras rápidas Source 2", total-count: 64, selected-count: 0, match-count: 0 },
         { index: 5, tab-label: "Monitoramento", title: "6. Monitoramento (FPS, Telemetria e Rede)", subtitle: "Telemetria nativa do HUD CS2 e diagnósticos", total-count: 24, selected-count: 0, match-count: 0 },
-        { index: 6, tab-label: "Outros", title: "7. Outros (Áudio, Demos/Replays, HUD e Sistema)", subtitle: "Som, análise de demos GOTV, HUD e manutenção", total-count: 35, selected-count: 0, match-count: 0 },
+        { index: 6, tab-label: "Outros", title: "7. Outros (Áudio, Demos/Replays, HUD e Sistema)", subtitle: "Som, análise de demos GOTV, HUD e manutenção", total-count: 34, selected-count: 0, match-count: 0 },
     ];
 
     in-out property <[BindCatalogRow]> catalog-rows: [
@@ -109,6 +112,8 @@ export global BindsState {
     callback save-bind-clicked();
     callback confirm-conflict-overwrite();
     callback cancel-conflict-overwrite();
+    callback unbind-panel-toggled(bool);
+    callback remove-bind-clicked();
 }
 
 component BindGridSwitchSlot inherits Rectangle {
@@ -307,9 +312,20 @@ export component BindsView inherits Rectangle {
         return text;
     }
 
+    function sync-local-unbind-preview() {
+        if BindsState.bound-key != "" {
+            BindsState.unbind-preview-line = "unbind \"" + BindsState.bound-key + "\"";
+        } else {
+            BindsState.unbind-preview-line = "";
+        }
+    }
+
     function apply-captured-key(key-name: string) {
         BindsState.bound-key = key-name;
         BindsState.is-listening-key = false;
+        if !BindsState.backend-connected {
+            root.sync-local-unbind-preview();
+        }
         BindsState.key-captured(BindsState.bound-key);
     }
 
@@ -362,84 +378,160 @@ export component BindsView inherits Rectangle {
                 padding-bottom: 10px;
                 spacing: 8px;
 
-                // Linha superior: botão voltar para o Painel + título do módulo
+                // Linha superior: botão voltar para o Painel + título do módulo + ação destacada de unbind
                 HorizontalLayout {
-                    alignment: start;
+                    alignment: space-between;
                     spacing: 10px;
 
-                    Rectangle {
-                        height: 26px;
-                        border-radius: CS2Theme.radius-sm;
-                        background: back-touch.has-hover ? CS2Theme.bg-card-hover : CS2Theme.bg-card;
-                        animate background { duration: 100ms; }
+                    HorizontalLayout {
+                        alignment: start;
+                        spacing: 10px;
+
+                        Rectangle {
+                            height: 26px;
+                            border-radius: CS2Theme.radius-sm;
+                            background: back-touch.has-hover ? CS2Theme.bg-card-hover : CS2Theme.bg-card;
+                            animate background { duration: 100ms; }
+
+                            HorizontalLayout {
+                                padding-left: 9px;
+                                padding-right: 10px;
+                                spacing: 6px;
+
+                                VerticalLayout {
+                                    alignment: center;
+                                    Path {
+                                        width: 10px;
+                                        height: 10px;
+                                        viewbox-width: 12;
+                                        viewbox-height: 12;
+                                        stroke: back-touch.has-hover ? CS2Theme.accent-ct-cyan : CS2Theme.text-primary;
+                                        stroke-width: 1.9px;
+                                        commands: "M 7.5 1.5 L 3 6 L 7.5 10.5 M 3.5 6 L 11 6";
+                                    }
+                                }
+
+                                Text {
+                                    text: @tr("Voltar");
+                                    font-size: 11px;
+                                    font-weight: 700;
+                                    color: back-touch.has-hover ? #ffffff : CS2Theme.text-primary;
+                                    vertical-alignment: center;
+                                }
+                            }
+
+                            back-touch := TouchArea {
+                                mouse-cursor: pointer;
+                                clicked => {
+                                    BindsState.is-listening-key = false;
+                                    BindsState.selector-dropdown-open = false;
+                                    root.hide-grid-tooltip();
+                                    root.back-clicked();
+                                }
+                            }
+                        }
+
+                        VerticalLayout {
+                            alignment: center;
+                            Rectangle {
+                                width: 1px;
+                                height: 16px;
+                                background: CS2Theme.border;
+                            }
+                        }
 
                         HorizontalLayout {
-                            padding-left: 9px;
-                            padding-right: 10px;
-                            spacing: 6px;
+                            spacing: 8px;
 
                             VerticalLayout {
                                 alignment: center;
-                                Path {
-                                    width: 10px;
-                                    height: 10px;
-                                    viewbox-width: 12;
-                                    viewbox-height: 12;
-                                    stroke: back-touch.has-hover ? CS2Theme.accent-ct-cyan : CS2Theme.text-primary;
-                                    stroke-width: 1.9px;
-                                    commands: "M 7.5 1.5 L 3 6 L 7.5 10.5 M 3.5 6 L 11 6";
+                                Image {
+                                    source: @image-url("../assets/icons/cfg.svg");
+                                    width: 16px;
+                                    height: 16px;
+                                    colorize: CS2Theme.accent-ct-cyan;
                                 }
                             }
 
                             Text {
-                                text: @tr("Voltar");
-                                font-size: 11px;
-                                font-weight: 700;
-                                color: back-touch.has-hover ? #ffffff : CS2Theme.text-primary;
+                                text: @tr("GERADOR DE BINDS CS2");
+                                font-size: 13px;
+                                font-weight: 900;
+                                letter-spacing: 0.7px;
+                                color: CS2Theme.text-primary;
                                 vertical-alignment: center;
                             }
                         }
+                    }
 
-                        back-touch := TouchArea {
+                    // Botão tático destacado para separação do comando unbind
+                    Rectangle {
+                        height: 26px;
+                        border-radius: CS2Theme.radius-sm;
+                        border-width: 1px;
+                        border-color: CS2Theme.status-danger;
+                        background: BindsState.unbind-panel-open
+                            ? (unbind-toggle-touch.has-hover ? CS2Theme.status-danger-hover : CS2Theme.status-danger)
+                            : (unbind-toggle-touch.has-hover ? CS2Theme.status-danger-soft-hover : CS2Theme.status-danger-soft);
+                        animate background { duration: 100ms; }
+
+                        HorizontalLayout {
+                            padding-left: 9px;
+                            padding-right: 7px;
+                            spacing: 6px;
+                            alignment: center;
+
+                            VerticalLayout {
+                                alignment: center;
+                                Image {
+                                    source: @image-url("../assets/icons/trash.svg");
+                                    width: 12px;
+                                    height: 12px;
+                                    colorize: BindsState.unbind-panel-open ? #ffffff : CS2Theme.status-danger-bright;
+                                }
+                            }
+
+                            Text {
+                                text: @tr("Remover bind criada");
+                                font-size: 10.5px;
+                                font-weight: 800;
+                                color: BindsState.unbind-panel-open ? #ffffff : #fecaca;
+                                vertical-alignment: center;
+                            }
+
+                            Rectangle {
+                                height: 16px;
+                                y: (parent.height - self.height) / 2;
+                                border-radius: CS2Theme.radius-xs;
+                                background: BindsState.unbind-panel-open ? rgba(0, 0, 0, 0.28) : rgba(239, 68, 68, 0.30);
+
+                                HorizontalLayout {
+                                    padding-left: 5px;
+                                    padding-right: 5px;
+                                    Text {
+                                        text: "unbind";
+                                        font-size: 8.5px;
+                                        font-weight: 900;
+                                        color: #ffffff;
+                                        vertical-alignment: center;
+                                    }
+                                }
+                            }
+                        }
+
+                        unbind-toggle-touch := TouchArea {
                             mouse-cursor: pointer;
                             clicked => {
                                 BindsState.is-listening-key = false;
                                 BindsState.selector-dropdown-open = false;
+                                BindsState.show-conflict-prompt = false;
                                 root.hide-grid-tooltip();
-                                root.back-clicked();
+                                BindsState.unbind-panel-open = !BindsState.unbind-panel-open;
+                                if BindsState.unbind-panel-open && !BindsState.backend-connected {
+                                    root.sync-local-unbind-preview();
+                                }
+                                BindsState.unbind-panel-toggled(BindsState.unbind-panel-open);
                             }
-                        }
-                    }
-
-                    VerticalLayout {
-                        alignment: center;
-                        Rectangle {
-                            width: 1px;
-                            height: 16px;
-                            background: CS2Theme.border;
-                        }
-                    }
-
-                    HorizontalLayout {
-                        spacing: 8px;
-
-                        VerticalLayout {
-                            alignment: center;
-                            Image {
-                                source: @image-url("../assets/icons/cfg.svg");
-                                width: 16px;
-                                height: 16px;
-                                colorize: CS2Theme.accent-ct-cyan;
-                            }
-                        }
-
-                        Text {
-                            text: @tr("GERADOR DE BINDS CS2");
-                            font-size: 13px;
-                            font-weight: 900;
-                            letter-spacing: 0.7px;
-                            color: CS2Theme.text-primary;
-                            vertical-alignment: center;
                         }
                     }
                 }
@@ -822,6 +914,9 @@ export component BindsView inherits Rectangle {
                                         mouse-cursor: pointer;
                                         clicked => {
                                             BindsState.bound-key = "";
+                                            if !BindsState.backend-connected {
+                                                root.sync-local-unbind-preview();
+                                            }
                                             BindsState.key-captured("");
                                         }
                                     }
@@ -892,6 +987,7 @@ export component BindsView inherits Rectangle {
                                 clicked => {
                                     BindsState.selector-dropdown-open = false;
                                     BindsState.is-listening-key = false;
+                                    BindsState.unbind-panel-open = false;
                                     BindsState.save-bind-clicked();
                                 }
                             }
@@ -998,6 +1094,168 @@ export component BindsView inherits Rectangle {
                                 clicked => {
                                     BindsState.selected-commands-count = 0;
                                     BindsState.clear-selected-commands();
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Painel inline destacado para remoção de bind (unbind)
+                if BindsState.unbind-panel-open : Rectangle {
+                    background: CS2Theme.status-danger-soft;
+                    border-radius: CS2Theme.radius-sm;
+                    border-width: 1px;
+                    border-color: CS2Theme.status-danger;
+                    clip: true;
+
+                    Rectangle {
+                        x: 0px;
+                        y: 0px;
+                        width: 4px;
+                        height: parent.height;
+                        background: CS2Theme.status-danger;
+                    }
+
+                    HorizontalLayout {
+                        padding-left: 14px;
+                        padding-right: 12px;
+                        padding-top: 8px;
+                        padding-bottom: 8px;
+                        spacing: 12px;
+                        alignment: space-between;
+
+                        VerticalLayout {
+                            spacing: 3px;
+                            horizontal-stretch: 1;
+
+                            HorizontalLayout {
+                                spacing: 7px;
+                                alignment: start;
+
+                                VerticalLayout {
+                                    alignment: center;
+                                    Rectangle {
+                                        width: 6px;
+                                        height: 6px;
+                                        border-radius: 3px;
+                                        background: CS2Theme.status-danger;
+                                    }
+                                }
+
+                                Text {
+                                    text: @tr("Remover bind criada");
+                                    font-size: 11px;
+                                    font-weight: 900;
+                                    letter-spacing: 0.4px;
+                                    color: CS2Theme.status-danger-bright;
+                                    vertical-alignment: center;
+                                }
+
+                                if BindsState.unbind-preview-line != "" : Rectangle {
+                                    height: 18px;
+                                    y: (parent.height - self.height) / 2;
+                                    border-radius: CS2Theme.radius-xs;
+                                    background: CS2Theme.bg-main;
+                                    border-width: 1px;
+                                    border-color: rgba(239, 68, 68, 0.45);
+
+                                    HorizontalLayout {
+                                        padding-left: 7px;
+                                        padding-right: 7px;
+                                        Text {
+                                            text: BindsState.unbind-preview-line;
+                                            font-size: 10px;
+                                            font-weight: 800;
+                                            color: #ffffff;
+                                            vertical-alignment: center;
+                                        }
+                                    }
+                                }
+                            }
+
+                            Text {
+                                text: BindsState.unbind-existing-info != ""
+                                    ? BindsState.unbind-existing-info
+                                    : @tr("Selecione o arquivo .cfg (1) e capture a tecla desejada (2) para remover a bind.");
+                                font-size: 10.5px;
+                                font-weight: 500;
+                                color: CS2Theme.text-primary;
+                                wrap: word-wrap;
+                            }
+                        }
+
+                        HorizontalLayout {
+                            spacing: 8px;
+                            alignment: center;
+
+                            Rectangle {
+                                height: 28px;
+                                y: (parent.height - self.height) / 2;
+                                background: unbind-cancel-touch.has-hover ? CS2Theme.bg-card-hover : CS2Theme.bg-main;
+                                border-radius: CS2Theme.radius-xs;
+                                border-width: 1px;
+                                border-color: CS2Theme.border-hover;
+
+                                HorizontalLayout {
+                                    padding-left: 10px;
+                                    padding-right: 10px;
+                                    Text {
+                                        text: @tr("CANCELAR");
+                                        font-size: 10px;
+                                        font-weight: 800;
+                                        color: CS2Theme.text-primary;
+                                        vertical-alignment: center;
+                                    }
+                                }
+
+                                unbind-cancel-touch := TouchArea {
+                                    mouse-cursor: pointer;
+                                    clicked => {
+                                        BindsState.unbind-panel-open = false;
+                                        BindsState.unbind-panel-toggled(false);
+                                    }
+                                }
+                            }
+
+                            Rectangle {
+                                height: 28px;
+                                y: (parent.height - self.height) / 2;
+                                background: remove-bind-touch.has-hover ? CS2Theme.status-danger-hover : CS2Theme.status-danger;
+                                border-radius: CS2Theme.radius-xs;
+                                animate background { duration: 100ms; }
+
+                                HorizontalLayout {
+                                    padding-left: 11px;
+                                    padding-right: 12px;
+                                    spacing: 6px;
+                                    alignment: center;
+
+                                    VerticalLayout {
+                                        alignment: center;
+                                        Image {
+                                            source: @image-url("../assets/icons/trash.svg");
+                                            width: 12px;
+                                            height: 12px;
+                                            colorize: #ffffff;
+                                        }
+                                    }
+
+                                    Text {
+                                        text: @tr("REMOVER BIND");
+                                        font-size: 10px;
+                                        font-weight: 900;
+                                        color: #ffffff;
+                                        vertical-alignment: center;
+                                    }
+                                }
+
+                                remove-bind-touch := TouchArea {
+                                    mouse-cursor: pointer;
+                                    clicked => {
+                                        BindsState.selector-dropdown-open = false;
+                                        BindsState.is-listening-key = false;
+                                        BindsState.remove-bind-clicked();
+                                    }
                                 }
                             }
                         }

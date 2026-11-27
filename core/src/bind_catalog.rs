@@ -319,7 +319,7 @@ static CS2_BIND_CATALOG: &[BindCommandEntry] = &[
     cmd!(CAT_6, NOTE_6, SUB_6_2, "status", "Imprime no console dados do servidor atual, mapa, ping e jogadores conectados."),
     cmd!(CAT_6, NOTE_6, SUB_6_2, "sys_info", "Gera no console um relatório completo de hardware, drivers e configurações ativas."),
 
-    // 7. Outros (35)
+    // 7. Outros (34)
     cmd!(CAT_7, NOTE_7, SUB_7_1, "incrementvar volume 0 1 0.05", "Aumenta o volume geral do jogo em passos de 5%."),
     cmd!(CAT_7, NOTE_7, SUB_7_1, "incrementvar volume 0 1 -0.05", "Diminui o volume geral do jogo em passos de 5%."),
     cmd!(CAT_7, NOTE_7, SUB_7_1, "volume 0.08", "Volume Modo Aquecimento/DM (0.08): reduz o volume geral do jogo para 8%."),
@@ -353,7 +353,6 @@ static CS2_BIND_CATALOG: &[BindCommandEntry] = &[
     cmd!(CAT_7, NOTE_7, SUB_7_4, "key_listboundkeys", "Lista no console todas as teclas que possuem binds ativas no momento."),
     cmd!(CAT_7, NOTE_7, SUB_7_4, "key_findbinding \"comando\"" => "key_findbinding +voicerecord", "Pesquisa qual tecla está associada a um comando específico (gravado sem aspas internas)."),
     cmd!(CAT_7, NOTE_7, SUB_7_4, "find \"palavra\"" => "find radar", "Busca qualquer comando ou variável existente no CS2 com o termo pesquisado (gravado sem aspas internas)."),
-    cmd!(CAT_7, NOTE_7, SUB_7_4, "unbind \"TECLA\"" => "unbind v", "Remove o comando atribuído a uma tecla específica (gravado sem aspas internas)."),
     cmd!(CAT_7, NOTE_7, SUB_7_4, "binddefaults", "Restaura todas as teclas para a configuração original de fábrica da Valve."),
 ];
 
@@ -528,7 +527,7 @@ mod tests {
     #[test]
     fn test_catalog_count_and_exact_category_order() {
         let catalog = cs2_bind_catalog();
-        assert_eq!(catalog.len(), 238);
+        assert_eq!(catalog.len(), 237);
 
         let mut categories = Vec::new();
         for entry in catalog {
@@ -643,7 +642,23 @@ mod tests {
         );
         assert!(categories.iter().all(|c| !c.subtitle.is_empty()));
         let total: usize = categories.iter().map(|c| c.command_count).sum();
-        assert_eq!(total, 238);
+        assert_eq!(total, 237);
+    }
+
+    #[test]
+    fn test_unbind_is_not_in_regular_bind_catalog() {
+        for entry in cs2_bind_catalog() {
+            assert!(
+                !entry.cfg_command.to_ascii_lowercase().starts_with("unbind"),
+                "Comando unbind deve ficar separado do catálogo comum: {}",
+                entry.cfg_command
+            );
+            assert!(
+                !entry.display_command.to_ascii_lowercase().starts_with("unbind"),
+                "Comando unbind não deve aparecer na listagem comum: {}",
+                entry.display_command
+            );
+        }
     }
 
     #[test]

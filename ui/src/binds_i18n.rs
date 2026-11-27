@@ -225,8 +225,8 @@ pub fn localize_featured_badge(lang: UiLanguage) -> &'static str {
     }
 }
 
-/// Tabela 1:1 com `CS2_BIND_CATALOG` (238 itens): (cfg_command, descrição EN, descrição RU).
-pub const CATALOG_TRANSLATIONS: [(&str, &str, &str); 238] = [
+/// Tabela 1:1 com `CS2_BIND_CATALOG` (237 itens): (cfg_command, descrição EN, descrição RU).
+pub const CATALOG_TRANSLATIONS: [(&str, &str, &str); 237] = [
     // 1. Movimentação (15)
     ("+forward", "Move forward (W).", "Движение вперёд (W)."),
     ("+back", "Move backward (S).", "Движение назад (S)."),
@@ -442,7 +442,7 @@ pub const CATALOG_TRANSLATIONS: [(&str, &str, &str); 238] = [
     ("status", "Print current server info, map, ping, and connected players to console.", "Выводит в консоль данные текущего сервера, карту, пинг и список игроков."),
     ("sys_info", "Print a full hardware, driver, and active configuration report to console.", "Выводит в консоль полный отчёт об оборудовании, драйверах и активных настройках."),
 
-    // 7. Outros (35)
+    // 7. Outros (34)
     ("incrementvar volume 0 1 0.05", "Increase master game volume in 5% steps.", "Увеличивает общую громкость игры с шагом 5%."),
     ("incrementvar volume 0 1 -0.05", "Decrease master game volume in 5% steps.", "Уменьшает общую громкость игры с шагом 5%."),
     ("volume 0.08", "Warmup/DM volume mode (0.08): lowers master game volume to 8%.", "Громкость разминки/DM (0.08): снижает общую громкость игры до 8%."),
@@ -476,7 +476,6 @@ pub const CATALOG_TRANSLATIONS: [(&str, &str, &str); 238] = [
     ("key_listboundkeys", "List all keys with active binds in the console.", "Выводит в консоль список всех клавиш с активными биндами."),
     ("key_findbinding +voicerecord", "Find which key is bound to a specific command (saved without inner quotes).", "Находит клавишу, назначенную на указанную команду (записывается без внутренних кавычек)."),
     ("find radar", "Search any CS2 command or variable containing the query term (saved without inner quotes).", "Ищет любую команду или переменную CS2 по заданному слову (записывается без внутренних кавычек)."),
-    ("unbind v", "Remove the command bound to a specific key (saved without inner quotes).", "Удаляет команду с указанной клавиши (записывается без внутренних кавычек)."),
     ("binddefaults", "Restore all keys to Valve's original factory defaults.", "Сбрасывает все клавиши к заводским настройкам Valve по умолчанию."),
 ];
 
@@ -551,7 +550,7 @@ mod tests {
     fn test_catalog_translations_align_1_to_1_with_core_catalog() {
         let catalog = cs2_bind_catalog();
         assert_eq!(CATALOG_TRANSLATIONS.len(), catalog.len());
-        assert_eq!(catalog.len(), 238);
+        assert_eq!(catalog.len(), 237);
 
         for (idx, entry) in catalog.iter().enumerate() {
             let (cfg, en_desc, ru_desc) = CATALOG_TRANSLATIONS[idx];

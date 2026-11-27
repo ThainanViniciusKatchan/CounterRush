@@ -943,3 +943,12 @@ msgstr "GitHub Updates"
 
 msgid "Versão atual: v{}"
 msgstr "Current version: v{}"
+
+msgid "Remover bind criada"
+msgstr "Remove created bind"
+
+msgid "REMOVER BIND"
+msgstr "REMOVE BIND"
+
+msgid "Selecione o arquivo .cfg (1) e capture a tecla desejada (2) para remover a bind."
+msgstr "Select the .cfg file (1) and capture the desired key (2) to remove the bind."

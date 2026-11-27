@@ -243,6 +243,11 @@ pub fn format_bind_line(tecla: &str, comando_unificado: &str) -> String {
     format!("bind \"{tecla}\" \"{comando_unificado}\"")
 }
 
+/// Formata uma linha de remoção de bind na sintaxe oficial do CS2 (`unbind "<tecla>"`).
+pub fn format_unbind_line(tecla: &str) -> String {
+    format!("unbind \"{tecla}\"")
+}
+
 fn tokenize_cfg_line(line: &str) -> Vec<String> {
     let clean = line.trim_start_matches('\u{feff}').trim_start();
     if clean.is_empty() || clean.starts_with("//") {
@@ -316,6 +321,15 @@ pub fn parse_bind_line(line: &str) -> Option<(String, String)> {
     Some((key, command))
 }
 
+/// Extrai a tecla caso a linha represente uma declaração `unbind` ativa.
+pub fn parse_unbind_line(line: &str) -> Option<String> {
+    let tokens = tokenize_cfg_line(line);
+    if tokens.len() < 2 || !tokens[0].eq_ignore_ascii_case("unbind") {
+        return None;
+    }
+    Some(tokens[1].clone())
+}
+
 /// Verifica se o conteúdo de um `.cfg` já contém um `bind` ativo para `tecla`.
 pub fn find_key_conflict_in_content(content: &str, tecla: &str) -> Option<String> {
     for line in content.lines() {
@@ -344,6 +358,11 @@ fn upsert_bind_in_content(content: &str, tecla: &str, new_bind_line: &str) -> (S
                 continue;
             }
         }
+        if let Some(unbound_key) = parse_unbind_line(raw_line) {
+            if unbound_key.eq_ignore_ascii_case(tecla) {
+                continue;
+            }
+        }
         result_lines.push(raw_line.to_string());
     }
 
@@ -356,6 +375,47 @@ fn upsert_bind_in_content(content: &str, tecla: &str, new_bind_line: &str) -> (S
         out.push_str(line_ending);
     }
     (out, replaced)
+}
+
+fn upsert_unbind_in_content(content: &str, tecla: &str, unbind_line: &str) -> (String, bool) {
+    let line_ending = if content.contains("\r\n") { "\r\n" } else { "\n" };
+    let clean_content = content.strip_prefix('\u{feff}').unwrap_or(content);
+    let mut result_lines: Vec<String> = Vec::new();
+    let mut inserted = false;
+    let mut removed_existing_bind = false;
+
+    for raw_line in clean_content.lines() {
+        if let Some((existing_key, _)) = parse_bind_line(raw_line) {
+            if existing_key.eq_ignore_ascii_case(tecla) {
+                removed_existing_bind = true;
+                if !inserted {
+                    result_lines.push(unbind_line.to_string());
+                    inserted = true;
+                }
+                continue;
+            }
+        }
+        if let Some(unbound_key) = parse_unbind_line(raw_line) {
+            if unbound_key.eq_ignore_ascii_case(tecla) {
+                if !inserted {
+                    result_lines.push(unbind_line.to_string());
+                    inserted = true;
+                }
+                continue;
+            }
+        }
+        result_lines.push(raw_line.to_string());
+    }
+
+    if !inserted {
+        result_lines.push(unbind_line.to_string());
+    }
+
+    let mut out = result_lines.join(line_ending);
+    if !out.ends_with(line_ending) {
+        out.push_str(line_ending);
+    }
+    (out, removed_existing_bind)
 }
 
 fn write_bytes_atomically(path: &Path, data: &[u8]) -> Result<(), CoreError> {
@@ -976,6 +1036,144 @@ where
     }
 }
 
+/// Remove a bind de uma tecla gravando `unbind "<tecla>"` nos diretórios informados (com backup prévio).
+pub fn remove_cs2_bind_with_dirs(
+    dirs: &BindDirectories,
+    nome_config: &str,
+    tecla: &str,
+    flag: Option<BindFlag>,
+) -> Result<BindOperationOutcome, CoreError> {
+    let mode = flag.unwrap_or(BindFlag::Default);
+    if mode == BindFlag::Restore {
+        return Err(invalid_input(
+            "A flag --restore não pode ser usada na operação de unbind.",
+        ));
+    }
+
+    let file_name = validate_cfg_file_name(nome_config)?;
+    let clean_key = validate_bind_key(tecla)?;
+    let unbind_line = format_unbind_line(&clean_key);
+
+    let local_path = dirs.local_cfg_dir.join(&file_name);
+    let cs2_path = dirs.cs2_cfg_dir.join(&file_name);
+
+    let existing_source = if local_path.is_file() {
+        Some(local_path.as_path())
+    } else if cs2_path.is_file() {
+        Some(cs2_path.as_path())
+    } else {
+        None
+    };
+
+    let backup_path = match existing_source {
+        Some(src) => Some(save_latest_backup(src, &dirs.backup_dir, &file_name)?),
+        None => None,
+    };
+
+    match (mode, existing_source) {
+        (BindFlag::Default, Some(src)) => {
+            let current_content = std::fs::read_to_string(src)?;
+            let (updated_content, removed_existing_bind) =
+                upsert_unbind_in_content(&current_content, &clean_key, &unbind_line);
+
+            write_cfg_to_targets(&local_path, &cs2_path, updated_content.as_bytes())?;
+
+            Ok(BindOperationOutcome::Updated {
+                file_name,
+                bind_line: unbind_line,
+                replaced_existing_key: removed_existing_bind,
+                local_path,
+                cs2_path,
+                backup_path,
+            })
+        }
+        (BindFlag::NewConfig, Some(src)) => {
+            let current_content = std::fs::read_to_string(src)?;
+            let had_bind = find_key_conflict_in_content(&current_content, &clean_key).is_some();
+            let new_content = format!("{unbind_line}\n");
+            write_cfg_to_targets(&local_path, &cs2_path, new_content.as_bytes())?;
+
+            Ok(BindOperationOutcome::Updated {
+                file_name,
+                bind_line: unbind_line,
+                replaced_existing_key: had_bind,
+                local_path,
+                cs2_path,
+                backup_path,
+            })
+        }
+        (_, None) => {
+            let new_content = format!("{unbind_line}\n");
+            write_cfg_to_targets(&local_path, &cs2_path, new_content.as_bytes())?;
+
+            Ok(BindOperationOutcome::Created {
+                file_name,
+                bind_line: unbind_line,
+                local_path,
+                cs2_path,
+                backup_path: None,
+            })
+        }
+        (BindFlag::Restore, _) => unreachable!(),
+    }
+}
+
+/// Grava `unbind "<tecla>"` com backup automático e fallback para gravação local
+/// quando o diretório global do CS2 estiver inacessível ou exigir elevação.
+pub fn remove_cs2_bind_with_local_fallback(
+    dirs: &BindDirectories,
+    nome_config: &str,
+    tecla: &str,
+    flag: BindFlag,
+) -> Result<GuiBindSaveReport, CoreError> {
+    let file_name = validate_cfg_file_name(nome_config)?;
+    let local_path = dirs.local_cfg_dir.join(&file_name);
+    let backup_path = dirs.backup_dir.join(&file_name);
+
+    let prev_local_bytes = std::fs::read(&local_path).ok();
+    let prev_backup_bytes = std::fs::read(&backup_path).ok();
+
+    let first_attempt = remove_cs2_bind_with_dirs(dirs, nome_config, tecla, Some(flag));
+
+    match first_attempt {
+        Ok(outcome) => Ok(GuiBindSaveReport {
+            outcome,
+            synced_to_cs2_global: true,
+            cs2_sync_warning: None,
+        }),
+        Err(CoreError::Io(ref io_err))
+            if matches!(
+                io_err.kind(),
+                io::ErrorKind::PermissionDenied | io::ErrorKind::NotFound
+            ) && dirs.local_cfg_dir != dirs.cs2_cfg_dir =>
+        {
+            restore_snapshot(&local_path, prev_local_bytes);
+            restore_snapshot(&backup_path, prev_backup_bytes);
+
+            let warning = format!(
+                "Salvo em config\\cfg (sem acesso ao diretório global do CS2: {io_err})"
+            );
+            let local_only_dirs = BindDirectories::with_paths(
+                &dirs.local_cfg_dir,
+                &dirs.backup_dir,
+                &dirs.local_cfg_dir,
+            );
+            let outcome = remove_cs2_bind_with_dirs(
+                &local_only_dirs,
+                nome_config,
+                tecla,
+                Some(flag),
+            )?;
+            Ok(GuiBindSaveReport {
+                outcome,
+                synced_to_cs2_global: false,
+                cs2_sync_warning: Some(warning),
+            })
+        }
+        Err(err) => Err(err),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1299,5 +1497,113 @@ mod tests {
         assert_eq!(replaced, vec!["+exec", "limpo.cfg"]);
 
         assert!(set_exec_cfg_in_launch_args(&[], Some("../evil.cfg")).is_err());
+    }
+
+    #[test]
+    fn test_format_and_parse_unbind_line() {
+        assert_eq!(format_unbind_line("v"), "unbind \"v\"");
+        assert_eq!(parse_unbind_line("unbind \"v\""), Some("v".to_string()));
+        assert_eq!(parse_unbind_line("UNBIND mouse4 // limpar"), Some("mouse4".to_string()));
+        assert_eq!(parse_unbind_line("bind \"v\" \"noclip\""), None);
+        assert_eq!(parse_unbind_line("// unbind \"v\""), None);
+    }
+
+    #[test]
+    fn test_remove_cs2_bind_replaces_existing_bind_with_backup_and_preserves_others() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let local_dir = temp.path().join("local_cfg");
+        let bkp_dir = local_dir.join("bkp");
+        let cs2_dir = temp.path().join("cs2_cfg");
+        std::fs::create_dir_all(&local_dir).unwrap();
+        std::fs::create_dir_all(&cs2_dir).unwrap();
+
+        let original = "// header\nbind \"f4\" \"buy ak47\"\nbind \"v\" \"noclip\"\n";
+        std::fs::write(local_dir.join("autoexec.cfg"), original).unwrap();
+        let dirs = BindDirectories::with_paths(&local_dir, &bkp_dir, &cs2_dir);
+
+        let report = remove_cs2_bind_with_local_fallback(
+            &dirs,
+            "autoexec.cfg",
+            "v",
+            BindFlag::Default,
+        )
+        .expect("unbind deve suceder");
+
+        assert!(report.synced_to_cs2_global);
+        assert!(matches!(
+            report.outcome,
+            BindOperationOutcome::Updated {
+                replaced_existing_key: true,
+                ..
+            }
+        ));
+        assert_eq!(
+            std::fs::read_to_string(bkp_dir.join("autoexec.cfg")).unwrap(),
+            original
+        );
+        let after_first = std::fs::read_to_string(local_dir.join("autoexec.cfg")).unwrap();
+        assert_eq!(after_first, "// header\nbind \"f4\" \"buy ak47\"\nunbind \"v\"\n");
+
+        // Idempotência ao executar unbind novamente na mesma tecla
+        let second = remove_cs2_bind_with_local_fallback(
+            &dirs,
+            "autoexec.cfg",
+            "v",
+            BindFlag::Default,
+        )
+        .expect("segundo unbind deve ser idempotente");
+        assert!(matches!(
+            second.outcome,
+            BindOperationOutcome::Updated {
+                replaced_existing_key: false,
+                ..
+            }
+        ));
+        assert_eq!(
+            std::fs::read_to_string(local_dir.join("autoexec.cfg")).unwrap(),
+            after_first
+        );
+
+        // Re-criar bind para a mesma tecla remove a linha unbind anterior
+        save_cs2_bind_with_local_fallback(
+            &dirs,
+            "autoexec.cfg",
+            "v",
+            &["slot8"],
+            BindFlag::Default,
+            |_| Ok(true),
+        )
+        .expect("rebind deve suceder");
+        assert_eq!(
+            std::fs::read_to_string(local_dir.join("autoexec.cfg")).unwrap(),
+            "// header\nbind \"f4\" \"buy ak47\"\nbind \"v\" \"slot8\"\n"
+        );
+    }
+
+    #[test]
+    fn test_remove_cs2_bind_creates_new_cfg_and_supports_local_fallback() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let local_dir = temp.path().join("local_cfg");
+        let bkp_dir = local_dir.join("bkp");
+        let cs2_dir = temp.path().join("cs2_cfg");
+        let dirs = BindDirectories::with_paths(&local_dir, &bkp_dir, &cs2_dir);
+
+        let created = remove_cs2_bind_with_local_fallback(
+            &dirs,
+            "limpar_binds",
+            "k",
+            BindFlag::NewConfig,
+        )
+        .expect("criação de novo cfg com unbind deve suceder");
+
+        assert!(matches!(created.outcome, BindOperationOutcome::Created { .. }));
+        assert_eq!(
+            std::fs::read_to_string(local_dir.join("limpar_binds.cfg")).unwrap(),
+            "unbind \"k\"\n"
+        );
+        assert_eq!(
+            std::fs::read_to_string(cs2_dir.join("limpar_binds.cfg")).unwrap(),
+            "unbind \"k\"\n"
+        );
     }
 }
